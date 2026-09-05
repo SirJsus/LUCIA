@@ -1,0 +1,11 @@
+{
+  "name": "lucia-monorepo",
+  "private": true,
+  "packageManager": "pnpm@11.22.0",
+  "scripts": {
+    "dev:web": "pnpm --filter @lucia/web dev",
+    "build:web": "pnpm --filter @lucia/web build",
+    "lint": "pnpm -r lint",
+    "typecheck": "pnpm -r typecheck"
+  }
+}

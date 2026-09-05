@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.uv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Node
+node_modules/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Motores compilados y redes neuronales (pesadas, se descargan con scripts/)
+engines/bin/
+engines/networks/
+engines/stockfish/src/*.o
+engines/lc0/build/
+
+# Datos locales
+data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Entorno
+.env
+.env.*
+!.env.example
+
+# IDE / SO
+.idea/
+.vscode/
+.DS_Store

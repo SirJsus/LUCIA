@@ -1,0 +1,7 @@
+packages:
+  - "apps/web"
+  - "packages/shared-types"
+
+# pnpm 11: dependencias cuyos scripts de instalación se permiten ejecutar
+allowBuilds:
+  esbuild: true
