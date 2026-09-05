@@ -44,10 +44,19 @@ cp "$ENGINES/stockfish/src/stockfish" "$BIN/stockfish"
 echo "== Lc0 ($LC0_TAG) =="
 add_submodule "$ENGINES/lc0" https://github.com/LeelaChessZero/lc0.git "$LC0_TAG"
 pushd "$ENGINES/lc0" >/dev/null
+LC0_BUILDDIR="build/release"
 # Sin GPU: backend blas. Con CUDA instalado, quita -Dblas y deja que Meson detecte cuda.
-./build.sh release -Dblas=true -Dopenblas=true
+if [[ -f "$LC0_BUILDDIR/build.ninja" ]]; then
+  meson configure "$LC0_BUILDDIR" -Dbuildtype=release -Dblas=true -Dopenblas=true
+else
+  meson setup "$LC0_BUILDDIR" --buildtype release -Dblas=true -Dopenblas=true
+fi
+# Solo el binario `lc0`, no los tests empaquetados: traen un googletest 1.10.0
+# (2020) que no compila con GCC recientes (falta <cstdint> para uintptr_t en
+# gtest-death-test.cc) y no los necesitamos para tener el motor.
+meson compile -C "$LC0_BUILDDIR" lc0
 popd >/dev/null
-cp "$ENGINES/lc0/build/release/lc0" "$BIN/lc0"
+cp "$ENGINES/lc0/$LC0_BUILDDIR/lc0" "$BIN/lc0"
 
 echo "== Red por defecto de Lc0 =="
 if [[ ! -f "$NETS/default.pb.gz" ]]; then

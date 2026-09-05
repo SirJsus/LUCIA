@@ -24,7 +24,7 @@ LUCIA/
 ## Documentación
 
 | Doc | Contenido |
-|-----|-----------|
+| ----- | ----------- |
 | [01-vision.md](docs/01-vision.md) | Qué es LUCIA, para quién y por qué |
 | [02-requerimientos.md](docs/02-requerimientos.md) | Requerimientos funcionales y no funcionales, priorizados |
 | [03-arquitectura.md](docs/03-arquitectura.md) | Componentes, flujo de datos, modelo de datos |
