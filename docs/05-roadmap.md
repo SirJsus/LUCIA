@@ -1,5 +1,10 @@
 # 05 · Roadmap
 
+> Las fases 0 a 4 son el camino hacia **v1.0.0**: cubren todo el alcance
+> congelado en [docs/02-requerimientos.md](02-requerimientos.md). Cuando se
+> marquen todas sus casillas, `versionador` propone el corte de 1.0.0. Fases
+> agregadas después de eso van bajo [Post 1.0](#post-10-futuro), al final.
+
 ## Fase 0 · Cimientos (esta)
 
 - [x] Esqueleto del monorepo, documentación, requerimientos, stack.
@@ -39,3 +44,10 @@
 - [ ] Explicaciones en lenguaje natural de errores.
 - [ ] Empaquetado (Docker, posiblemente Tauri).
 - [ ] macOS / Windows.
+
+## Post 1.0 (futuro)
+
+Ideas y fases que surjan después de publicada v1.0.0, o que se decida sacar
+del alcance original antes de esa fecha. Se numeran como Fase 5 en adelante.
+
+*(vacío por ahora)*

@@ -16,5 +16,10 @@
   (flujo general, módulos, secuencias) y la tabla de qué RF vive en qué
   archivo. Consultarlo antes de tocar algo que no se conoce; lo mantiene el
   agente `mapeador`.
+- Versión y alcance: `docs/02-requerimientos.md` tiene el alcance congelado de
+  v1.0 (todo lo que ya está ahí, con la fecha de corte); un RF/RNF añadido
+  después va a su sección `Post 1.0 (futuro)`. `CHANGELOG.md` lleva el
+  historial de versiones. Lo vigila el agente `versionador` — usar `/versionar`
+  al cerrar una fase del roadmap o al añadir un requerimiento nuevo.
 - Comandos: `make doctor`, `make up` (`S=api`/`S=web`), `make engines`, `make test`, `make lint`.
 - Licencia GPL-3.0: toda dependencia nueva debe ser compatible.

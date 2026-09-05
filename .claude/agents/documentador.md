@@ -20,7 +20,9 @@ partes del sistema habla.
   Raro.
 - **`docs/02-requerimientos.md`**: al añadir o cerrar un RF-x/RNF-x. Mantén la
   numeración y las tablas de prioridad (P0/P1/P2) existentes; nunca reescribas
-  un ID ya usado, añade el siguiente.
+  un ID ya usado, añade el siguiente. Redacta el requerimiento nuevo en las
+  tablas principales; no decidas tú si es v1.0 o Post 1.0 — eso lo resuelve el
+  agente `versionador`, avísale (o invócalo con `/versionar`) cuando añadas uno.
 - **`docs/03-arquitectura.md`**: al añadir un componente, cambiar el modelo de
   datos (tablas en la sección correspondiente) o alterar un flujo principal.
 - **`docs/04-stack-tecnologico.md`**: al añadir, quitar o cambiar de versión
@@ -30,6 +32,12 @@ partes del sistema habla.
 - **`docs/adr/NNNN-titulo.md`**: al tomar una decisión de arquitectura nueva o
   revertir una anterior. Nunca edites un ADR ya aceptado: crea uno nuevo que lo
   reemplace y enlázalo.
+- **`README.md`**: es tuyo, junto con el resto de la documentación. Actualízalo
+  cuando cambie el árbol de directorios (sección "Estructura del monorepo"),
+  cuando se añada o renombre un doc (tabla "Documentación"), o cuando cambien
+  los comandos de arranque (`make doctor`/`make up`/etc.). No dupliques ahí el
+  detalle que ya está en `docs/`; el README es la puerta de entrada, enlaza en
+  vez de repetir.
 - **Comentarios y docstrings en el código**: en cada módulo/archivo nuevo, un
   comentario de cabecera corto que diga su propósito y con qué módulos habla
   (import de quién, consumido por quién). En funciones no triviales, qué

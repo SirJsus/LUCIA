@@ -1,5 +1,14 @@
 # 02 · Requerimientos
 
+> **Alcance de la versión 1.0.** Todo lo listado en este documento (RF-1 a RF-7,
+> RNF-1 a RNF-10) a fecha **2026-09-05** es el alcance esperado de LUCIA
+> **v1.0.0**, con independencia de su prioridad P0/P1/P2 — P2 significa
+> "deseable dentro de 1.0", no "para después". Cualquier requerimiento que se
+> añada después de esa fecha va a [Post 1.0 (futuro)](#post-10-futuro), al
+> final de este documento, y no participa del conteo de progreso hacia 1.0.0 en
+> [docs/05-roadmap.md](05-roadmap.md) hasta que se decida moverlo al alcance de
+> una versión de forma explícita. Lo vigila el agente `versionador`.
+
 Prioridad: **P0** = MVP imprescindible · **P1** = siguiente iteración · **P2** = deseable.
 
 ## Requerimientos funcionales
@@ -109,3 +118,12 @@ Capa de visualización activable con una tecla sobre **cualquier tablero** (viso
 | RNF-8 | **Calidad**: tests unitarios para clasificación de jugadas y cálculo de precisión (son el corazón del producto); CI en cada push. |
 | RNF-9 | **Extensibilidad**: cualquier motor UCI debe poder enchufarse (Komodo, Berserk, etc.) sin cambiar el núcleo. |
 | RNF-10 | **Respeto a terceros**: cumplir los términos de la API pública de chess.com (User-Agent identificable, no scraping, no paralelismo agresivo). |
+
+## Post 1.0 (futuro)
+
+Requerimientos que surjan después de fijado el alcance de v1.0 (ver nota al
+inicio de este documento). Mismo formato que las secciones anteriores (RF-8 en
+adelante), pero no cuentan para el progreso hacia 1.0.0 hasta que se muevan
+explícitamente al alcance de una versión.
+
+*(vacío por ahora)*
