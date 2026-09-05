@@ -5,11 +5,14 @@
 > marquen todas sus casillas, `versionador` propone el corte de 1.0.0. Fases
 > agregadas después de eso van bajo [Post 1.0](#post-10-futuro), al final.
 
-## Fase 0 · Cimientos (esta)
+## Fase 0 · Cimientos ✅
 
 - [x] Esqueleto del monorepo, documentación, requerimientos, stack.
-- [ ] Añadir sub-módulos Stockfish y Lc0; `scripts/setup-engines.sh` funcionando en Fedora.
-- [ ] `uv sync` + `pnpm install` limpios; CI verde con tests vacíos.
+- [x] Sub-módulos Stockfish y Lc0 añadidos; `scripts/setup-engines.sh` compila
+      ambos en Fedora (Lc0 solo el target `lc0`, sin sus tests empaquetados,
+      que traen un `googletest` 1.10.0 incompatible con GCC recientes).
+- [x] `uv sync --all-packages --all-extras` + `pnpm install` limpios; ruff,
+      pytest, tsc, eslint y `vite build` pasan en local igual que en CI.
 
 ## Fase 1 · MVP "Game Review propio" (P0)
 

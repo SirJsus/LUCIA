@@ -15,6 +15,8 @@ lucia-chesscom = { workspace = true }
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Submódulos de motores (código de terceros, ver ADR-0002): no se lintea ni se formatea.
+extend-exclude = ["engines"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP", "N", "ASYNC"]
@@ -22,3 +24,7 @@ select = ["E", "F", "I", "B", "UP", "N", "ASYNC"]
 [tool.pytest.ini_options]
 testpaths = ["apps/api/tests", "packages/core/tests", "packages/chesscom/tests"]
 asyncio_mode = "auto"
+# Varios packages del workspace tienen tests con el mismo nombre de archivo
+# (test_smoke.py) y sin __init__.py; el modo de import por defecto de pytest
+# los importaría como el mismo módulo top-level y colisionaría en la colección.
+addopts = "--import-mode=importlib"

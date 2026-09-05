@@ -39,7 +39,7 @@ mkdir -p data/logs
 
 if [[ $INSTALL -eq 1 ]]; then
   if [[ " ${SERVICES[*]} " == *" api "* && ! -d .venv ]]; then
-    info "instalando dependencias Python (uv sync)"; uv sync --all-extras 2>&1 | prefix "uv" "$C_MAGENTA"
+    info "instalando dependencias Python (uv sync)"; uv sync --all-packages --all-extras 2>&1 | prefix "uv" "$C_MAGENTA"
   fi
   if [[ " ${SERVICES[*]} " == *" web "* && ! -d node_modules ]]; then
     info "instalando dependencias JS (pnpm install)"; pnpm install 2>&1 | prefix "pnpm" "$C_MAGENTA"

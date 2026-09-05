@@ -47,8 +47,8 @@ make up S=api  # solo un servicio (api | web)
 
 Ctrl+C apaga todos los servicios. Los logs también quedan en `data/logs/<servicio>.log`.
 
-- API: http://localhost:8000/docs
-- Web: http://localhost:5173
+- API: <http://localhost:8000/docs>
+- Web: <http://localhost:5173>
 
 Docker (`infra/docker/`) queda como vía de portabilidad y reproducibilidad, no como entorno principal. Ver [docs/04-stack-tecnologico.md](docs/04-stack-tecnologico.md).
 

@@ -1,5 +1,4 @@
 from fastapi.testclient import TestClient
-
 from lucia_api.main import app
 
 

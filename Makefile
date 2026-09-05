@@ -17,7 +17,7 @@ up:
 	./scripts/dev.sh $(S)
 
 setup:
-	uv sync
+	uv sync --all-packages --all-extras
 	pnpm install
 
 engines:
