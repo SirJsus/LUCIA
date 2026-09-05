@@ -1,0 +1,24 @@
+[project]
+name = "lucia-workspace"
+version = "0.1.0"
+description = "L.U.C.I.A. - Logic & Ultimate Chess Insight Algorithm (workspace raiz)"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv.workspace]
+members = ["apps/api", "packages/core", "packages/chesscom"]
+
+[tool.uv.sources]
+lucia-core = { workspace = true }
+lucia-chesscom = { workspace = true }
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "N", "ASYNC"]
+
+[tool.pytest.ini_options]
+testpaths = ["apps/api/tests", "packages/core/tests", "packages/chesscom/tests"]
+asyncio_mode = "auto"
