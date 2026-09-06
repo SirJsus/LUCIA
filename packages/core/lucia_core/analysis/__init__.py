@@ -9,7 +9,9 @@ es la misma que "antes de la jugada i+1".
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from typing import Protocol
 
 import chess
 import chess.engine
@@ -20,7 +22,19 @@ from lucia_core.classification import (
     MoveClassification,
     classify_move,
 )
-from lucia_core.engine import EngineBridge
+from lucia_core.phases import Phase, phases_by_ply
+
+OnPosition = Callable[[int, int], Awaitable[None]]
+"""Callback de progreso: `on_position(ply_evaluado, total_de_jugadas)`."""
+
+
+class AnalysingEngine(Protocol):
+    """Lo que `evaluate_positions` necesita de un motor: analizar una
+    posición. No exige `EngineBridge` en concreto (`Protocol` estructural)
+    para que `apps/api` pueda envolverlo con caché por FEN (RF-2.7) sin que
+    `lucia_core` sepa nada de bases de datos."""
+
+    async def analyse(self, board: chess.Board) -> list[chess.engine.InfoDict]: ...
 
 
 @dataclass(frozen=True)
@@ -46,6 +60,8 @@ class AnalyzedMove:
     uci: str
     fen_before: str
     classification: MoveClassification
+    phase: Phase
+    """Fase de la partida al jugarse (RF-3.3), de `lucia_core.phases`."""
     accuracy: float
     """Precisión de esta jugada (0-100), fórmula de `lucia_core.accuracy`."""
     win_percent_before: float
@@ -61,9 +77,18 @@ class AnalyzedGame:
 
 
 async def evaluate_positions(
-    engine: EngineBridge, board: chess.Board, moves: list[chess.Move]
+    engine: AnalysingEngine,
+    board: chess.Board,
+    moves: list[chess.Move],
+    on_position: OnPosition | None = None,
 ) -> list[PositionEval]:
-    """Evalúa la posición inicial y la que sigue a cada jugada de `moves`."""
+    """Evalúa la posición inicial y la que sigue a cada jugada de `moves`.
+
+    Si se pasa `on_position`, se llama tras cada evaluación con
+    `(ply_evaluado, total_de_jugadas)` — pensado para reportar progreso
+    (RF-2.4) en un análisis largo, sin que este módulo sepa nada de colas ni
+    de WebSockets.
+    """
     posiciones: list[PositionEval] = []
     actual = board.copy()
     for ply in range(len(moves) + 1):
@@ -80,19 +105,31 @@ async def evaluate_positions(
                 pv=tuple(pv),
             )
         )
+        if on_position is not None:
+            await on_position(ply, len(moves))
         if ply < len(moves):
             actual.push(moves[ply])
     return posiciones
 
 
 async def analyze_game(
-    engine: EngineBridge,
+    engine: AnalysingEngine,
     board: chess.Board,
     moves: list[chess.Move],
     thresholds: ClassificationThresholds | None = None,
+    on_position: OnPosition | None = None,
 ) -> AnalyzedGame:
     """Evalúa, clasifica y calcula la precisión de una partida completa."""
-    posiciones = await evaluate_positions(engine, board, moves)
+    posiciones = await evaluate_positions(engine, board, moves, on_position)
+
+    # Las fases se calculan sobre los tableros, no sobre las evaluaciones: no
+    # hace falta el motor para saber si una posición es un final.
+    tableros: list[chess.Board] = []
+    recorrido = board.copy()
+    for move in moves:
+        tableros.append(recorrido.copy())
+        recorrido.push(move)
+    fases = phases_by_ply(tableros)
 
     analizadas: list[AnalyzedMove] = []
     actual = board.copy()
@@ -107,6 +144,7 @@ async def analyze_game(
                 uci=move.uci(),
                 fen_before=antes.fen,
                 classification=clasificacion,
+                phase=fases[i],
                 accuracy=move_accuracy(win_antes, win_despues),
                 win_percent_before=win_antes,
                 win_percent_after=win_despues,

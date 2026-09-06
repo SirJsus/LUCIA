@@ -46,6 +46,10 @@ class ChessComClient:
             headers={"User-Agent": user_agent},
             timeout=timeout,
             http2=True,
+            # chess.com devuelve 301 cuando el username no está en el "casing"
+            # canónico (p. ej. "MagnusCarlsen" -> "magnuscarlsen"); sin esto,
+            # httpx no lo sigue por defecto y `raise_for_status()` revienta.
+            follow_redirects=True,
         )
 
     async def get_player(self, username: str) -> ChessComPlayer:

@@ -26,7 +26,7 @@ flowchart TB
     end
 
     subgraph Servidor["apps/api (FastAPI)"]
-        ROUTERS["routers/<br/>games · analysis · stats · training · engines · sync"]
+        ROUTERS["routers/<br/>sync · games · analysis · stats · engines · boards"]
         WORKER["worker/<br/>cola de análisis en background"]
     end
 
@@ -78,7 +78,7 @@ graph LR
     web --> types
     api --> core
     api --> chesscom
-    types -. "openapi-typescript<br/>desde /openapi.json" .-> api
+    types -. "make types:<br/>export-openapi.py + openapi-typescript" .-> api
 ```
 
 Regla: `lucia_core` y `lucia_chesscom` no dependen de `lucia_api` (evita ciclos);
@@ -119,38 +119,44 @@ sequenceDiagram
     A-->>U: resumen de sincronización
 ```
 
-### Analizar una partida (RF-2)
-
-Estado real: el motor de análisis (`lucia_core.engine`, `.analysis`,
-`.classification`, `.accuracy`) está implementado, probado con Stockfish real
-y sin caché ni base de datos de por medio — se usa hoy como librería pura
-(`analyze_game(engine, board, moves) -> AnalyzedGame`). Lo que sigue en el
-diagrama de abajo (endpoint, worker, `position_cache`, WebSocket) es la
-integración en `apps/api`, todavía pendiente.
+### Analizar una partida (RF-2, implementado)
 
 ```mermaid
 sequenceDiagram
     participant U as Usuario (web)
-    participant A as apps/api
-    participant W as worker
+    participant A as apps/api (routers/analysis.py)
+    participant WK as AnalysisWorker
+    participant S as services/analysis.py
     participant E as EngineBridge (Stockfish/Lc0)
     participant DB as SQLite
 
-    U->>A: POST /analysis {game_ids, config}
-    A->>W: encolar
-    A-->>U: WebSocket: progreso
-    loop cada jugada
-        W->>DB: ¿FEN en position_cache?
+    U->>A: POST /analysis {game_ids, engine, depth, multipv}
+    A->>DB: crear Analysis (status=queued) por partida
+    A->>WK: enqueue(analysis_id)
+    A-->>U: 200: resumen con status=queued
+
+    U->>A: WS /ws/analysis/{id}
+    WK->>WK: consumidor toma el siguiente de la cola
+    WK->>S: run_analysis(analysis, game, on_progress)
+    S->>DB: status=running
+    loop cada posición de la partida
+        S->>DB: ¿FEN+engine+depth+multipv en position_cache?
         alt no está en caché
-            W->>E: analyse(board)
-            E-->>W: eval, mejores líneas
-            W->>DB: guardar en position_cache
+            S->>E: analyse(board)
+            E-->>S: eval, mejores líneas (MultiPV)
+            S->>DB: guardar en position_cache
         end
-        W->>DB: guardar analyzed_move (clasificación, precisión)
-        W-->>U: WebSocket: progreso
+        S->>WK: on_progress(ply, total)
+        WK-->>U: WS: {status: running, ply, total}
     end
-    W-->>U: WebSocket: análisis completo
+    S->>DB: guardar analyzed_moves + white/black_accuracy
+    S->>DB: status=done (o error, con el motivo)
+    WK-->>U: WS: {status: done | error}
 ```
+
+`GET /analysis/{id}` es el respaldo si no hubo WebSocket conectado o se
+perdió algún evento (hay una ventana de carrera pequeña y documentada entre
+suscribirse y el estado real, ver docstring de `analysis_progress`).
 
 ## 4 · Ubicación por requerimiento
 
@@ -160,11 +166,16 @@ amplía a medida que se implementa cada RF (ver [05-roadmap.md](05-roadmap.md)).
 | Requerimiento | Módulo / archivo | Doc detallada |
 | --- | --- | --- |
 | RF-1 · Importación chess.com | `packages/chesscom/lucia_chesscom/` (cliente, PGN, sync incremental), `apps/api/lucia_api/services/chesscom_sync.py`, `db/models.py`, `routers/sync.py` | [03-arquitectura.md § chesscom](03-arquitectura.md) |
-| RF-2 · Análisis con motores | `packages/core/lucia_core/engine/`, `analysis/`, `classification/`, `accuracy/` | [03-arquitectura.md § core](03-arquitectura.md) |
-| RF-3 · Estadísticas e insight | `packages/core/lucia_core/insights/`, `apps/api/lucia_api/routers/stats.py` (pendiente) | [03-arquitectura.md](03-arquitectura.md) |
+| RF-2 · Análisis con motores | `packages/core/lucia_core/` (engine, analysis, classification, accuracy), `apps/api/lucia_api/services/analysis.py`, `worker/`, `routers/analysis.py` | [03-arquitectura.md § core / api](03-arquitectura.md) |
+| RF-3.1-3.3 · Dashboard | `apps/api/lucia_api/services/stats.py` + `routers/stats.py`, `packages/core/lucia_core/phases/`, `apps/web/src/features/dashboard/` | [03-arquitectura.md](03-arquitectura.md) |
+| RF-3.4+ · Insight avanzado | `packages/core/lucia_core/insights/` (pendiente, fase 2) | [05-roadmap.md](05-roadmap.md) |
 | RF-4 · Entrenamiento | pendiente (fase 3) | [05-roadmap.md](05-roadmap.md) |
-| RF-5 · Interfaz / visor | `apps/web/src/features/viewer/` | [04-stack-tecnologico.md § frontend](04-stack-tecnologico.md) |
-| RF-6 · Tablero de análisis | pendiente (fase 1-2) | [02-requerimientos.md § RF-6](02-requerimientos.md) |
+| RF-5.1 · Visor de partida | `apps/web/src/features/viewer/` (Chessboard, MoveList, EvalChart, useAnalysisProgress) | [03-arquitectura.md § web](03-arquitectura.md) |
+| RF-5.3 · Listado de partidas | `apps/api/lucia_api/routers/games.py`, `apps/web/src/features/games/` | [03-arquitectura.md](03-arquitectura.md) |
+| RF-5.4 · Config. de motores | `apps/api/lucia_api/routers/engines.py` + `services/engines.py`, `apps/web/src/features/engines/` | [03-arquitectura.md](03-arquitectura.md) |
+| RF-5.6 · Tema claro/oscuro | `apps/web/src/components/ThemeToggle.tsx` | [02-requerimientos.md § RF-5](02-requerimientos.md) |
+| Contrato API ↔ front | `scripts/export-openapi.py`, `openapi.json`, `packages/shared-types/` | [03-arquitectura.md § api](03-arquitectura.md) |
+| RF-6 · Tablero de análisis | `apps/api/lucia_api/routers/boards.py`, `apps/web/src/features/board/` (`tree.ts` = árbol de variantes) | [03-arquitectura.md § web](03-arquitectura.md) |
 | RF-7 · Ocupación del tablero | pendiente (fase 2/4) | [02-requerimientos.md § RF-7](02-requerimientos.md) |
 | Motores UCI | `engines/`, `scripts/setup-engines.sh` | [ADR-0002](adr/0002-motores-como-submodulos.md) |
 | Persistencia | `apps/api/lucia_api/db/` | [ADR-0005](adr/0005-sqlite-local-first.md) |

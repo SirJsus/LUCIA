@@ -1,0 +1,2007 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "L.U.C.I.A. API",
+    "description": "Logic & Ultimate Chess Insight Algorithm",
+    "version": "0.2.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync": {
+      "post": {
+        "tags": [
+          "sync"
+        ],
+        "summary": "Sync",
+        "operationId": "sync_sync_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/SyncRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/games": {
+      "get": {
+        "tags": [
+          "games"
+        ],
+        "summary": "List Games",
+        "description": "Filtros según RF-5.3. `color` sin `username` se ignora: \"blancas\" o\n\"negras\" no significa nada sin decir de quién.",
+        "operationId": "list_games_games_get",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          },
+          {
+            "name": "color",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "white",
+                    "black"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Color"
+            }
+          },
+          {
+            "name": "time_class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Time Class"
+            }
+          },
+          {
+            "name": "rated",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rated"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GameSummary"
+                  },
+                  "title": "Response List Games Games Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/games/{game_id}": {
+      "get": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Get Game",
+        "operationId": "get_game_games__game_id__get",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis": {
+      "post": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Create Analysis",
+        "operationId": "create_analysis_analysis_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AnalysisSummary"
+                  },
+                  "title": "Response Create Analysis Analysis Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "List Analyses",
+        "description": "Análisis existentes, opcionalmente los de una partida concreta. Sirve\npara que el visor sepa si ya hay uno hecho en vez de volver a analizar.",
+        "operationId": "list_analyses_analysis_get",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Game Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AnalysisSummary"
+                  },
+                  "title": "Response List Analyses Analysis Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis/position": {
+      "post": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Analyze Position",
+        "description": "Analiza una posición suelta y devuelve las mejores líneas (RF-5.2 /\nRF-6.2). Para el tablero de análisis y la exploración en vivo.",
+        "operationId": "analyze_position_analysis_position_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PositionAnalysisRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EngineLineOut"
+                  },
+                  "type": "array",
+                  "title": "Response Analyze Position Analysis Position Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis/{analysis_id}": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Get Analysis",
+        "operationId": "get_analysis_analysis__analysis_id__get",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Analysis Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/engines/config": {
+      "get": {
+        "tags": [
+          "engines"
+        ],
+        "summary": "Engines Config",
+        "operationId": "engines_config_engines_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnginesConfigOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/engines/config/{engine_name}": {
+      "put": {
+        "tags": [
+          "engines"
+        ],
+        "summary": "Update Engine Config",
+        "operationId": "update_engine_config_engines_config__engine_name__put",
+        "parameters": [
+          {
+            "name": "engine_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Engine Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EngineConfigUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineConfigOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "tags": [
+          "stats"
+        ],
+        "summary": "Player Stats",
+        "description": "Estadísticas del jugador indicado, o del de `CHESSCOM_USERNAME` si se\nomite. Se pide el nombre porque la base guarda partidas de ambos bandos:\nsin saber quién es \"yo\", un marcador de victorias no significa nada.",
+        "operationId": "player_stats_stats_get",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          },
+          {
+            "name": "limit_openings",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit Openings"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerStatsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards": {
+      "get": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "List Boards",
+        "operationId": "list_boards_boards_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BoardSummary"
+                  },
+                  "title": "Response List Boards Boards Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Create Board",
+        "operationId": "create_board_boards_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards/{board_id}": {
+      "get": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Get Board",
+        "operationId": "get_board_boards__board_id__get",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Update Board",
+        "operationId": "update_board_boards__board_id__put",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Delete Board",
+        "operationId": "delete_board_boards__board_id__delete",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnalysisDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "multipv": {
+            "type": "integer",
+            "title": "Multipv"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "white_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "White Accuracy"
+          },
+          "black_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Black Accuracy"
+          },
+          "moves": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyzedMoveOut"
+            },
+            "type": "array",
+            "title": "Moves"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "game_id",
+          "engine",
+          "depth",
+          "multipv",
+          "status",
+          "error",
+          "white_accuracy",
+          "black_accuracy",
+          "moves"
+        ],
+        "title": "AnalysisDetail"
+      },
+      "AnalysisRequest": {
+        "properties": {
+          "game_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Game Ids"
+          },
+          "engine": {
+            "type": "string",
+            "enum": [
+              "stockfish",
+              "lc0"
+            ],
+            "title": "Engine",
+            "default": "stockfish"
+          },
+          "depth": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depth"
+          },
+          "multipv": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multipv"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game_ids"
+        ],
+        "title": "AnalysisRequest"
+      },
+      "AnalysisSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "multipv": {
+            "type": "integer",
+            "title": "Multipv"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "white_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "White Accuracy"
+          },
+          "black_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Black Accuracy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "game_id",
+          "engine",
+          "depth",
+          "multipv",
+          "status",
+          "error",
+          "white_accuracy",
+          "black_accuracy"
+        ],
+        "title": "AnalysisSummary"
+      },
+      "AnalyzedMoveOut": {
+        "properties": {
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "san": {
+            "type": "string",
+            "title": "San"
+          },
+          "uci": {
+            "type": "string",
+            "title": "Uci"
+          },
+          "fen_before": {
+            "type": "string",
+            "title": "Fen Before"
+          },
+          "classification": {
+            "type": "string",
+            "title": "Classification"
+          },
+          "phase": {
+            "type": "string",
+            "title": "Phase"
+          },
+          "move_accuracy": {
+            "type": "number",
+            "title": "Move Accuracy"
+          },
+          "win_percent_before": {
+            "type": "number",
+            "title": "Win Percent Before"
+          },
+          "win_percent_after": {
+            "type": "number",
+            "title": "Win Percent After"
+          },
+          "best_move_uci": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Move Uci"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ply",
+          "color",
+          "san",
+          "uci",
+          "fen_before",
+          "classification",
+          "phase",
+          "move_accuracy",
+          "win_percent_before",
+          "win_percent_after",
+          "best_move_uci"
+        ],
+        "title": "AnalyzedMoveOut"
+      },
+      "BoardCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "root_fen": {
+            "type": "string",
+            "title": "Root Fen",
+            "default": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+          },
+          "tree_json": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Tree Json"
+          },
+          "tags_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags Json"
+          },
+          "is_own_game": {
+            "type": "boolean",
+            "title": "Is Own Game",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "BoardCreate"
+      },
+      "BoardDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "tags_json": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags Json"
+          },
+          "root_fen": {
+            "type": "string",
+            "title": "Root Fen"
+          },
+          "is_own_game": {
+            "type": "boolean",
+            "title": "Is Own Game"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "tree_json": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Tree Json"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "tags_json",
+          "root_fen",
+          "is_own_game",
+          "created_at",
+          "updated_at",
+          "tree_json"
+        ],
+        "title": "BoardDetail"
+      },
+      "BoardSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "tags_json": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags Json"
+          },
+          "root_fen": {
+            "type": "string",
+            "title": "Root Fen"
+          },
+          "is_own_game": {
+            "type": "boolean",
+            "title": "Is Own Game"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "tags_json",
+          "root_fen",
+          "is_own_game",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "BoardSummary",
+        "description": "Lo que hace falta para listar; sin el árbol, que puede ser grande."
+      },
+      "BoardUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "tree_json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tree Json"
+          },
+          "tags_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags Json"
+          },
+          "is_own_game": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Own Game"
+          }
+        },
+        "type": "object",
+        "title": "BoardUpdate",
+        "description": "Todos los campos son opcionales: la UI autoguarda solo lo que cambió."
+      },
+      "EngineConfigOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "threads": {
+            "type": "integer",
+            "title": "Threads"
+          },
+          "hash_mb": {
+            "type": "integer",
+            "title": "Hash Mb"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "multipv": {
+            "type": "integer",
+            "title": "Multipv"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "weights_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights Path"
+          },
+          "weights_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights Available"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "threads",
+          "hash_mb",
+          "depth",
+          "multipv",
+          "path",
+          "available"
+        ],
+        "title": "EngineConfigOut"
+      },
+      "EngineConfigUpdate": {
+        "properties": {
+          "threads": {
+            "type": "integer",
+            "maximum": 64.0,
+            "minimum": 1.0,
+            "title": "Threads"
+          },
+          "hash_mb": {
+            "type": "integer",
+            "maximum": 8192.0,
+            "minimum": 16.0,
+            "title": "Hash Mb"
+          },
+          "depth": {
+            "type": "integer",
+            "maximum": 40.0,
+            "minimum": 1.0,
+            "title": "Depth"
+          },
+          "multipv": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Multipv"
+          }
+        },
+        "type": "object",
+        "required": [
+          "threads",
+          "hash_mb",
+          "depth",
+          "multipv"
+        ],
+        "title": "EngineConfigUpdate",
+        "description": "Los rangos evitan configuraciones que colgarían la máquina (o el\nanálisis) sin darse cuenta: un `depth` de 60 no termina nunca."
+      },
+      "EngineLineOut": {
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "score_cp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Cp"
+          },
+          "score_mate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Mate"
+          },
+          "pv_uci": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pv Uci"
+          },
+          "pv_san": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pv San"
+          }
+        },
+        "type": "object",
+        "required": [
+          "rank",
+          "score_cp",
+          "score_mate",
+          "pv_uci",
+          "pv_san"
+        ],
+        "title": "EngineLineOut"
+      },
+      "EnginesConfigOut": {
+        "properties": {
+          "stockfish": {
+            "$ref": "#/components/schemas/EngineConfigOut"
+          },
+          "lc0": {
+            "$ref": "#/components/schemas/EngineConfigOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stockfish",
+          "lc0"
+        ],
+        "title": "EnginesConfigOut"
+      },
+      "GameDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "white_username": {
+            "type": "string",
+            "title": "White Username"
+          },
+          "white_rating": {
+            "type": "integer",
+            "title": "White Rating"
+          },
+          "white_result": {
+            "type": "string",
+            "title": "White Result"
+          },
+          "black_username": {
+            "type": "string",
+            "title": "Black Username"
+          },
+          "black_rating": {
+            "type": "integer",
+            "title": "Black Rating"
+          },
+          "black_result": {
+            "type": "string",
+            "title": "Black Result"
+          },
+          "time_control": {
+            "type": "string",
+            "title": "Time Control"
+          },
+          "time_class": {
+            "type": "string",
+            "title": "Time Class"
+          },
+          "rated": {
+            "type": "boolean",
+            "title": "Rated"
+          },
+          "eco": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eco"
+          },
+          "played_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Played At"
+          },
+          "pgn": {
+            "type": "string",
+            "title": "Pgn"
+          },
+          "clocks_json": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clocks Json"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "white_username",
+          "white_rating",
+          "white_result",
+          "black_username",
+          "black_rating",
+          "black_result",
+          "time_control",
+          "time_class",
+          "rated",
+          "eco",
+          "played_at",
+          "pgn",
+          "clocks_json"
+        ],
+        "title": "GameDetail"
+      },
+      "GameSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "white_username": {
+            "type": "string",
+            "title": "White Username"
+          },
+          "white_rating": {
+            "type": "integer",
+            "title": "White Rating"
+          },
+          "white_result": {
+            "type": "string",
+            "title": "White Result"
+          },
+          "black_username": {
+            "type": "string",
+            "title": "Black Username"
+          },
+          "black_rating": {
+            "type": "integer",
+            "title": "Black Rating"
+          },
+          "black_result": {
+            "type": "string",
+            "title": "Black Result"
+          },
+          "time_control": {
+            "type": "string",
+            "title": "Time Control"
+          },
+          "time_class": {
+            "type": "string",
+            "title": "Time Class"
+          },
+          "rated": {
+            "type": "boolean",
+            "title": "Rated"
+          },
+          "eco": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eco"
+          },
+          "played_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Played At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "white_username",
+          "white_rating",
+          "white_result",
+          "black_username",
+          "black_rating",
+          "black_result",
+          "time_control",
+          "time_class",
+          "rated",
+          "eco",
+          "played_at"
+        ],
+        "title": "GameSummary"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "MonthlyCountOut": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "month": {
+            "type": "integer",
+            "title": "Month"
+          },
+          "games": {
+            "type": "integer",
+            "title": "Games"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "month",
+          "games"
+        ],
+        "title": "MonthlyCountOut"
+      },
+      "OpeningStatsOut": {
+        "properties": {
+          "opening": {
+            "type": "string",
+            "title": "Opening"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "record": {
+            "$ref": "#/components/schemas/RecordOut"
+          },
+          "average_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Accuracy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "opening",
+          "color",
+          "record",
+          "average_accuracy"
+        ],
+        "title": "OpeningStatsOut"
+      },
+      "PhaseStatsOut": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "title": "Phase"
+          },
+          "moves": {
+            "type": "integer",
+            "title": "Moves"
+          },
+          "average_accuracy": {
+            "type": "number",
+            "title": "Average Accuracy"
+          },
+          "average_win_percent_lost": {
+            "type": "number",
+            "title": "Average Win Percent Lost"
+          },
+          "blunders": {
+            "type": "integer",
+            "title": "Blunders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phase",
+          "moves",
+          "average_accuracy",
+          "average_win_percent_lost",
+          "blunders"
+        ],
+        "title": "PhaseStatsOut"
+      },
+      "PlayerStatsOut": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "total_games": {
+            "type": "integer",
+            "title": "Total Games"
+          },
+          "overall": {
+            "$ref": "#/components/schemas/RecordOut"
+          },
+          "by_time_class": {
+            "items": {
+              "$ref": "#/components/schemas/TimeClassStatsOut"
+            },
+            "type": "array",
+            "title": "By Time Class"
+          },
+          "by_month": {
+            "items": {
+              "$ref": "#/components/schemas/MonthlyCountOut"
+            },
+            "type": "array",
+            "title": "By Month"
+          },
+          "by_opening": {
+            "items": {
+              "$ref": "#/components/schemas/OpeningStatsOut"
+            },
+            "type": "array",
+            "title": "By Opening"
+          },
+          "by_phase": {
+            "items": {
+              "$ref": "#/components/schemas/PhaseStatsOut"
+            },
+            "type": "array",
+            "title": "By Phase"
+          },
+          "analyzed_games": {
+            "type": "integer",
+            "title": "Analyzed Games"
+          },
+          "average_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Accuracy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "total_games",
+          "overall",
+          "by_time_class",
+          "by_month",
+          "by_opening",
+          "by_phase",
+          "analyzed_games",
+          "average_accuracy"
+        ],
+        "title": "PlayerStatsOut"
+      },
+      "PositionAnalysisRequest": {
+        "properties": {
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "engine": {
+            "type": "string",
+            "enum": [
+              "stockfish",
+              "lc0"
+            ],
+            "title": "Engine",
+            "default": "stockfish"
+          },
+          "depth": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 22.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depth"
+          },
+          "multipv": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multipv"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fen"
+        ],
+        "title": "PositionAnalysisRequest"
+      },
+      "RecordOut": {
+        "properties": {
+          "wins": {
+            "type": "integer",
+            "title": "Wins"
+          },
+          "draws": {
+            "type": "integer",
+            "title": "Draws"
+          },
+          "losses": {
+            "type": "integer",
+            "title": "Losses"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "score_percent": {
+            "type": "number",
+            "title": "Score Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "wins",
+          "draws",
+          "losses",
+          "total",
+          "score_percent"
+        ],
+        "title": "RecordOut"
+      },
+      "SyncRequest": {
+        "properties": {
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "type": "object",
+        "title": "SyncRequest"
+      },
+      "SyncSummary": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "months_synced": {
+            "items": {
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "array",
+            "title": "Months Synced"
+          },
+          "games_upserted": {
+            "type": "integer",
+            "title": "Games Upserted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "months_synced",
+          "games_upserted"
+        ],
+        "title": "SyncSummary"
+      },
+      "TimeClassStatsOut": {
+        "properties": {
+          "time_class": {
+            "type": "string",
+            "title": "Time Class"
+          },
+          "record": {
+            "$ref": "#/components/schemas/RecordOut"
+          },
+          "current_rating": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Rating"
+          }
+        },
+        "type": "object",
+        "required": [
+          "time_class",
+          "record",
+          "current_rating"
+        ],
+        "title": "TimeClassStatsOut"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    }
+  }
+}

@@ -3,29 +3,72 @@
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Iterator
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
 from lucia_api.db.base import Base
 from lucia_chesscom import ChessComGame, ChessComPlayer, ChessComPlayerStats
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+
+# packages/core/tests/conftest.py -> tests -> api -> apps -> raíz del repo.
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+STOCKFISH_PATH = _PROJECT_ROOT / "engines" / "bin" / "stockfish"
+
+requiere_stockfish = pytest.mark.skipif(
+    not STOCKFISH_PATH.exists(),
+    reason="Stockfish no está compilado; ejecuta 'make engines' para correr estos tests.",
+)
+
+
+@pytest.fixture(autouse=True)
+def _worker_limpio() -> Iterator[None]:
+    """`app` es un singleton de módulo compartido entre tests. Sin esto, el
+    segundo test que entra a `TestClient(app)` heredaría el `AnalysisWorker`
+    (y su `asyncio.Queue`) del test anterior, atado a un event loop ya
+    cerrado — pytest-asyncio crea uno nuevo por test. Se limpia antes y
+    después de cada test para que `lifespan()` siempre cree uno propio,
+    salvo que el test mismo fije `app.state.worker` tras este fixture."""
+    from lucia_api.main import app
+
+    if hasattr(app.state, "worker"):
+        del app.state.worker
+    yield
+    if hasattr(app.state, "worker"):
+        del app.state.worker
 
 
 @pytest_asyncio.fixture
-async def db_session(tmp_path: Path) -> AsyncIterator[AsyncSession]:
-    """Una base SQLite de usar y tirar por test, con el esquema real
-    (mismos modelos que produce Alembic), sin tocar `data/lucia.db`."""
+async def db_engine(tmp_path: Path) -> AsyncIterator[AsyncEngine]:
+    """El motor SQLite de usar y tirar por test, con el esquema real (mismos
+    modelos que produce Alembic), sin tocar `data/lucia.db`. Expuesto aparte
+    de `db_session` para que el worker en background pueda tener su propia
+    fábrica de sesiones apuntando a la misma base temporal (ver
+    `db_session_factory`), tal como pasa en producción con `data/lucia.db`."""
     engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'test.db'}")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-
-    factory = async_sessionmaker(engine, expire_on_commit=False)
-    async with factory() as session:
-        yield session
-
+    yield engine
     await engine.dispose()
+
+
+@pytest.fixture
+def db_session_factory(db_engine: AsyncEngine) -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(db_engine, expire_on_commit=False)
+
+
+@pytest_asyncio.fixture
+async def db_session(
+    db_session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncIterator[AsyncSession]:
+    async with db_session_factory() as session:
+        yield session
 
 
 @pytest.fixture

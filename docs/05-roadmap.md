@@ -30,14 +30,50 @@
       `lichess` de `python-chess`, `move_accuracy`/`game_accuracy` con la
       fórmula pública de Lichess). 45 tests, varios contra Stockfish real
       (detección de mate en 1, blunder de la trampa del tonto). Sin
-      dependencias nuevas. Pendiente de este bloque: caché por FEN (RF-2.7,
-      necesita `position_cache` en BD), Lc0 como segundo motor (RF-2.6),
-      categoría "book" (necesita `openings/`), MultiPV real en la
+      dependencias nuevas. Pendiente de este bloque: Lc0 como segundo motor
+      (RF-2.6), categoría "book" (necesita `openings/`), MultiPV real en la
       clasificación (RF-2.8, momentos críticos).
-- [ ] API: `/games`, `/analysis` (+ worker, WebSocket de progreso, `position_cache`, usando `lucia-core` como librería), `/engines/config` (`/sync` ya está, ver arriba).
-- [ ] Web: lista de partidas, visor con tablero + clasificaciones + gráfico de eval, análisis en vivo.
-- [ ] Dashboard básico: ratings, W/D/L, rendimiento por apertura y por fase.
-- [ ] Tablero de análisis, núcleo (RF-6.1 a 6.5): crear desde inicial / FEN / PGN / editor de posición, análisis en vivo, árbol de variantes (ramas, promover, borrar), guardar / listar / eliminar tableros, independientes del historial y de las estadísticas.
+- [x] API: `/games` (RF-5.3: listar y filtrar por username/color/time_class/
+      rated, con paginación), `/analysis` + `AnalysisWorker` (RF-2.4: cola en
+      proceso con `asyncio.Queue`, un consumidor) + `WS /ws/analysis/{id}`
+      (progreso en vivo, con `GET /analysis/{id}` como respaldo) +
+      `position_cache` (RF-2.7: caché por FEN+motor+profundidad+MultiPV, solo
+      con límite por profundidad) usando `lucia-core` como librería pura,
+      `/engines/config` (RF-5.4, lectura y escritura). 19 tests nuevos,
+      incluido el flujo completo POST → WebSocket → GET contra Stockfish
+      real. Encontrado y corregido en el camino: un bug de aislamiento entre
+      tests por compartir el `AnalysisWorker` (y su cola de asyncio) entre
+      tests con distinto event loop. Pendiente: filtros de `/games` por
+      apertura, rango de fechas y rival específico.
+- [x] Web: lista de partidas con filtros y paginación, visor con tablero
+      (chessground), jugadas clasificadas, gráfico de evaluación (en
+      probabilidad de victoria) y navegación con teclado; análisis en vivo con
+      barra de progreso por WebSocket. Pantalla de motores con la
+      configuración **editable** (RF-5.4: hilos, hash, profundidad, MultiPV;
+      la ruta del binario queda en solo lectura a propósito — aceptarla por
+      HTTP sería ejecución arbitraria de comandos). Tema claro/oscuro.
+      Tipos TS generados desde el OpenAPI real (`make types`), con
+      verificación en CI de que no se desincronizan. 10 tests de front.
+      Pendiente: reordenar/explorar variantes desde el visor (RF-5.2),
+      exportar PGN anotado (RF-5.5).
+- [x] Dashboard (RF-3.1 a 3.3): marcador y rating por control de tiempo,
+      partidas por mes, rendimiento por apertura separando blancas de negras,
+      y pérdida de ventaja por fase, resaltando la peor. Necesitó implementar
+      `lucia_core.phases` (fase por material y desarrollo, monotónica a lo
+      largo de la partida) y añadir la columna `phase` a `analyzed_moves`.
+      Verificado contra 324 partidas reales. Pendiente: "eval promedio al
+      salir de la apertura" (RF-3.2), que se hará con los extractores de
+      patrones de fase 2.
+- [x] Tablero de análisis, núcleo (RF-6.1 a 6.5): crear desde posición
+      inicial, FEN o PGN pegado; mover piezas arrastrando; árbol de variantes
+      con ramas, promover y borrar; guardar, listar y eliminar; autoguardado;
+      análisis en vivo del motor sobre la posición actual
+      (`POST /analysis/position`, con tope de profundidad porque es síncrono);
+      exportación a PGN con variantes. Independiente del historial: los
+      tableros no cuentan en estadísticas salvo que se marquen como partida
+      propia. 17 tests del árbol de variantes. Pendiente: editor de posición
+      pieza a pieza (RF-6.1 permite FEN, que cubre el caso), deshacer/rehacer
+      explícito (RF-6.8).
 
 ## Fase 2 · Insight (P1)
 

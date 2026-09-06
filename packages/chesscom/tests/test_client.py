@@ -34,6 +34,32 @@ async def test_get_player() -> None:
 
 
 @pytest.mark.asyncio
+async def test_sigue_redirecciones_por_casing_del_username() -> None:
+    # chess.com redirige (301) cuando el username no viene en su "casing"
+    # canónico; encontrado en una prueba en vivo con "MagnusCarlsen".
+    with respx.mock(base_url="https://api.chess.com/pub") as mock:
+        mock.get("/player/MagnusCarlsen").mock(
+            return_value=httpx.Response(
+                301, headers={"Location": "https://api.chess.com/pub/player/magnuscarlsen"}
+            )
+        )
+        mock.get("/player/magnuscarlsen").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "username": "magnuscarlsen",
+                    "player_id": 2,
+                    "country": "https://api.chess.com/pub/country/NO",
+                    "joined": 0,
+                },
+            )
+        )
+        async with ChessComClient(user_agent=UA) as client:
+            player = await client.get_player("MagnusCarlsen")
+        assert player.username == "magnuscarlsen"
+
+
+@pytest.mark.asyncio
 async def test_get_archives_parsea_anio_mes() -> None:
     with respx.mock(base_url="https://api.chess.com/pub") as mock:
         mock.get("/player/hikaru/games/archives").mock(
