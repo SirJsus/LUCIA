@@ -16,10 +16,25 @@
 
 ## Fase 1 · MVP "Game Review propio" (P0)
 
-- [ ] `lucia-chesscom`: descargar perfil + archivos mensuales, parsear PGN y relojes, guardar en SQLite. Sync incremental.
-- [ ] `lucia-core`: `EngineBridge` con Stockfish; `GameAnalyzer` ply a ply con MultiPV; caché por FEN.
-- [ ] `MoveClassifier` + `Accuracy` con tests contra partidas de referencia.
-- [ ] API: `/sync`, `/games`, `/analysis` (+ WebSocket de progreso), `/engines/config`.
+- [x] `lucia-chesscom`: descargar perfil (RF-1.1) + archivos mensuales (RF-1.2),
+      parsear PGN y relojes, guardar en SQLite vía Alembic (`players`, `games`,
+      `sync_state`). Sync incremental (RF-1.3) e idempotente (upsert por
+      `uuid`), con backoff en 429 (RF-1.4). Probado con `respx` y en vivo
+      contra la API real de chess.com. Endpoint `POST /sync` expuesto.
+      Pendiente de este bloque: RF-1.5 (importar PGN manual, P1).
+- [x] `lucia-core`: `EngineBridge` con Stockfish vía UCI (RF-2.1), MultiPV
+      configurable; `evaluate_positions`/`analyze_game` recorren la partida
+      ply a ply con una evaluación por posición. `classify_move` (RF-2.2:
+      best/excellent/good/inaccuracy/mistake/blunder/missed_win, umbrales
+      ajustables) y `accuracy` (RF-2.3: `win_percent` sobre el modelo
+      `lichess` de `python-chess`, `move_accuracy`/`game_accuracy` con la
+      fórmula pública de Lichess). 45 tests, varios contra Stockfish real
+      (detección de mate en 1, blunder de la trampa del tonto). Sin
+      dependencias nuevas. Pendiente de este bloque: caché por FEN (RF-2.7,
+      necesita `position_cache` en BD), Lc0 como segundo motor (RF-2.6),
+      categoría "book" (necesita `openings/`), MultiPV real en la
+      clasificación (RF-2.8, momentos críticos).
+- [ ] API: `/games`, `/analysis` (+ worker, WebSocket de progreso, `position_cache`, usando `lucia-core` como librería), `/engines/config` (`/sync` ya está, ver arriba).
 - [ ] Web: lista de partidas, visor con tablero + clasificaciones + gráfico de eval, análisis en vivo.
 - [ ] Dashboard básico: ratings, W/D/L, rendimiento por apertura y por fase.
 - [ ] Tablero de análisis, núcleo (RF-6.1 a 6.5): crear desde inicial / FEN / PGN / editor de posición, análisis en vivo, árbol de variantes (ramas, promover, borrar), guardar / listar / eliminar tableros, independientes del historial y de las estadísticas.

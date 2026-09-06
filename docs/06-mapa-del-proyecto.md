@@ -87,29 +87,46 @@ para el agente `minimalista`.
 
 ## 3 · Flujos principales
 
-### Sincronizar con chess.com (RF-1)
+### Sincronizar con chess.com (RF-1, implementado)
 
 ```mermaid
 sequenceDiagram
     participant U as Usuario (web)
-    participant A as apps/api
+    participant A as apps/api (routers/sync.py)
+    participant S as services/chesscom_sync.py
     participant C as lucia_chesscom
     participant CC as api.chess.com
     participant DB as SQLite
 
-    U->>A: POST /sync
-    A->>C: get_archives(username)
-    C->>CC: GET /pub/player/{u}/games/archives
+    U->>A: POST /sync {username?}
+    A->>S: sync_player(session, client, username)
+    S->>C: get_player + get_stats
+    C->>CC: GET /player/{u}, /player/{u}/stats
+    CC-->>C: perfil, ratings
+    S->>DB: upsert players (country, joined_at, ratings_json)
+    S->>C: get_archives(username)
+    C->>CC: GET /player/{u}/games/archives
     CC-->>C: lista de meses
-    A->>C: get_month_games(mes nuevo)
-    C->>CC: GET /pub/player/{u}/games/{Y}/{M}
-    CC-->>C: partidas (PGN + relojes)
-    C-->>A: partidas parseadas
-    A->>DB: INSERT games
+    S->>S: months_to_sync(archivos, sync_state) [RF-1.3]
+    loop por cada mes pendiente, secuencial
+        S->>C: get_month_games(year, month)
+        C->>CC: GET /player/{u}/games/{Y}/{M}
+        CC-->>C: partidas (PGN + relojes)
+        S->>DB: upsert games (por uuid, idempotente)
+    end
+    S->>DB: upsert sync_state (último mes)
+    S-->>A: SyncSummary
     A-->>U: resumen de sincronización
 ```
 
 ### Analizar una partida (RF-2)
+
+Estado real: el motor de análisis (`lucia_core.engine`, `.analysis`,
+`.classification`, `.accuracy`) está implementado, probado con Stockfish real
+y sin caché ni base de datos de por medio — se usa hoy como librería pura
+(`analyze_game(engine, board, moves) -> AnalyzedGame`). Lo que sigue en el
+diagrama de abajo (endpoint, worker, `position_cache`, WebSocket) es la
+integración en `apps/api`, todavía pendiente.
 
 ```mermaid
 sequenceDiagram
@@ -142,7 +159,7 @@ amplía a medida que se implementa cada RF (ver [05-roadmap.md](05-roadmap.md)).
 
 | Requerimiento | Módulo / archivo | Doc detallada |
 | --- | --- | --- |
-| RF-1 · Importación chess.com | `packages/chesscom/lucia_chesscom/client.py` | [03-arquitectura.md § chesscom](03-arquitectura.md) |
+| RF-1 · Importación chess.com | `packages/chesscom/lucia_chesscom/` (cliente, PGN, sync incremental), `apps/api/lucia_api/services/chesscom_sync.py`, `db/models.py`, `routers/sync.py` | [03-arquitectura.md § chesscom](03-arquitectura.md) |
 | RF-2 · Análisis con motores | `packages/core/lucia_core/engine/`, `analysis/`, `classification/`, `accuracy/` | [03-arquitectura.md § core](03-arquitectura.md) |
 | RF-3 · Estadísticas e insight | `packages/core/lucia_core/insights/`, `apps/api/lucia_api/routers/stats.py` (pendiente) | [03-arquitectura.md](03-arquitectura.md) |
 | RF-4 · Entrenamiento | pendiente (fase 3) | [05-roadmap.md](05-roadmap.md) |

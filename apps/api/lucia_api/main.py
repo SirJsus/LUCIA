@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
 from . import __version__
-from .routers import health
+from .routers import health, sync
 
 app = FastAPI(
     title="L.U.C.I.A. API",
@@ -10,5 +10,6 @@ app = FastAPI(
 )
 
 app.include_router(health.router)
+app.include_router(sync.router)
 
-# TODO Fase 1: routers sync, games, analysis (+ WebSocket), stats, engines
+# TODO Fase 1: routers games, analysis (+ WebSocket), stats, engines
