@@ -7,6 +7,7 @@ import datetime as dt
 import io
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from pathlib import Path
 
 import chess
 import chess.engine
@@ -24,10 +25,18 @@ ProgressCallback = Callable[[int, int], Awaitable[None]]
 class CachedEngineBridge:
     """Envuelve un `EngineBridge` real y cachea por FEN en `position_cache`.
 
-    Solo cachea cuando el límite del motor es por profundidad: con límite de
-    tiempo o de nodos, dos búsquedas "iguales sobre el papel" pueden explorar
-    cantidades distintas de posiciones (según qué tan cargada esté la
-    máquina), así que no son intercambiables y no vale la pena cachearlas.
+    No cachea con límite de **tiempo**: dos búsquedas de "un segundo" exploran
+    cantidades distintas según lo cargada que esté la máquina, así que no son
+    intercambiables. Con profundidad o con nodos sí, porque ambos son
+    deterministas — y eso importa especialmente con Lc0, que va por nodos y es
+    lento: sin caché volvería a evaluar cada posición de apertura repetida.
+
+    En la clave, el valor del límite se guarda en la columna `depth`; la
+    unidad se deduce del motor (ver `EffectiveEngineConfig.limit_kind`), y
+    como el motor forma parte de la clave, no hay ambigüedad posible. Para
+    Lc0, ese "motor" incluye el nombre de la red (`lc0/744706-conv.pb.gz`),
+    porque cambiar de red cambia por completo la evaluación.
+
     Satisface el mismo `Protocol` que `lucia_core.analysis.AnalysingEngine`
     (solo necesita `analyse(board)`), sin que `lucia_core` sepa de bases de
     datos.
@@ -36,11 +45,15 @@ class CachedEngineBridge:
     def __init__(self, session: AsyncSession, engine: EngineBridge, engine_name: str) -> None:
         self._session = session
         self._engine = engine
-        self._engine_name = engine_name
+        # La clave de caché incluye la red neuronal, no solo el nombre del
+        # motor: el mismo Lc0 con otra red da evaluaciones distintas para la
+        # misma posición, y sin esto devolvería las de la red anterior.
+        pesos = engine.config.extra_options.get("WeightsFile")
+        self._engine_name = f"{engine_name}/{Path(str(pesos)).name}" if pesos else engine_name
 
     async def analyse(self, board: chess.Board) -> list[chess.engine.InfoDict]:
         config = self._engine.config
-        if config.limit_kind != "depth":
+        if config.limit_kind == "time":
             return await self._engine.analyse(board)
 
         clave = {
@@ -117,11 +130,9 @@ async def analyse_position(
         threads=config_motor.threads,
         hash_mb=config_motor.hash_mb,
         multipv=multipv or config_motor.multipv,
-        limit_kind="depth",
+        limit_kind=config_motor.limit_kind,
         limit_value=depth or config_motor.depth,
-        extra_options=(
-            {"WeightsFile": str(config_motor.weights_path)} if config_motor.weights_path else {}
-        ),
+        extra_options=config_motor.uci_extra_options(),
     )
 
     async with EngineBridge(config) as motor_real:
@@ -189,12 +200,10 @@ async def run_analysis(
             threads=config_motor.threads,
             hash_mb=config_motor.hash_mb,
             multipv=analysis.multipv,
-            limit_kind="depth",
+            limit_kind=config_motor.limit_kind,
             limit_value=analysis.depth,
-            # Lc0 no arranca sin su red neuronal; Stockfish no usa esta opción.
-            extra_options=(
-                {"WeightsFile": str(config_motor.weights_path)} if config_motor.weights_path else {}
-            ),
+            # Lc0 necesita su red y su backend; Stockfish no usa ninguna.
+            extra_options=config_motor.uci_extra_options(),
         )
 
         analysis.status = "running"

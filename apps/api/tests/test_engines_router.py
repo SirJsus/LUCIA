@@ -112,3 +112,27 @@ async def test_put_a_motor_desconocido_da_404(db_session: AsyncSession) -> None:
         app.dependency_overrides.clear()
 
     assert respuesta.status_code == 404
+
+
+async def test_lc0_acepta_miles_de_nodos_y_stockfish_no(db_session: AsyncSession) -> None:
+    """El mismo campo significa profundidad en Stockfish y nodos en Lc0, así
+    que el rango válido no puede ser el mismo: 1600 es una profundidad
+    imposible y un número de nodos normal."""
+    _override(db_session)
+    try:
+        with TestClient(app) as http:
+            en_lc0 = http.put(
+                "/engines/config/lc0",
+                json={"threads": 2, "hash_mb": 256, "depth": 1600, "multipv": 1},
+            )
+            en_stockfish = http.put(
+                "/engines/config/stockfish",
+                json={"threads": 2, "hash_mb": 256, "depth": 1600, "multipv": 1},
+            )
+    finally:
+        app.dependency_overrides.clear()
+
+    assert en_lc0.status_code == 200, en_lc0.text
+    assert en_lc0.json()["depth"] == 1600
+    assert en_stockfish.status_code == 422
+    assert "depth" in en_stockfish.json()["detail"]

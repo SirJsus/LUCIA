@@ -35,6 +35,12 @@ class EngineConfigOut(BaseModel):
     """Si el binario existe en esa ruta. No confirma que responda UCI."""
     weights_path: str | None = None
     weights_available: bool | None = None
+    backend: str | None = None
+    """Solo Lc0. De solo lectura, como la ruta: un backend inexistente deja
+    el motor sin arrancar, y se ajusta en `.env` (LC0_BACKEND)."""
+    limit_kind: str
+    """"depth" o "nodes": en qué unidad se le pide esfuerzo a este motor. Se
+    deriva del motor, no se configura (ver `EffectiveEngineConfig`)."""
 
 
 class EnginesConfigOut(BaseModel):
@@ -42,13 +48,24 @@ class EnginesConfigOut(BaseModel):
     lc0: EngineConfigOut
 
 
+#: Topes del esfuerzo de búsqueda, por unidad. No se puede usar un solo rango:
+#: 40 es una profundidad altísima para Stockfish y un número de nodos ridículo
+#: para Lc0, donde lo normal son miles.
+LIMIT_RANGES = {
+    "depth": (1, 40),
+    "nodes": (1, 10_000_000),
+}
+
+
 class EngineConfigUpdate(BaseModel):
-    """Los rangos evitan configuraciones que colgarían la máquina (o el
-    análisis) sin darse cuenta: un `depth` de 60 no termina nunca."""
+    """Los rangos evitan configuraciones que colgarían la máquina sin darse
+    cuenta. El de `depth` se comprueba aparte, en el endpoint, porque depende
+    de la unidad del motor (ver `LIMIT_RANGES`)."""
 
     threads: int = Field(ge=1, le=64)
     hash_mb: int = Field(ge=16, le=8192)
-    depth: int = Field(ge=1, le=40)
+    depth: int = Field(ge=1)
+    """Valor del límite de búsqueda: profundidad en Stockfish, nodos en Lc0."""
     multipv: int = Field(ge=1, le=10)
 
 
@@ -63,6 +80,8 @@ def _to_out(config: EffectiveEngineConfig) -> EngineConfigOut:
         available=config.path.exists(),
         weights_path=str(config.weights_path) if config.weights_path else None,
         weights_available=config.weights_path.exists() if config.weights_path else None,
+        backend=config.backend,
+        limit_kind=config.limit_kind,
     )
 
 
@@ -87,6 +106,18 @@ async def update_engine_config(
             status_code=404,
             detail=f"motor desconocido: {engine_name!r}. Conocidos: {list(ENGINE_NAMES)}",
         )
+
+    actual = await get_effective_config(session, engine_name)
+    minimo, maximo = LIMIT_RANGES[actual.limit_kind]
+    if not minimo <= body.depth <= maximo:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"{engine_name} mide el esfuerzo en {actual.limit_kind}: "
+                f"el valor debe estar entre {minimo} y {maximo}"
+            ),
+        )
+
     config = await update_config(
         session,
         engine_name,

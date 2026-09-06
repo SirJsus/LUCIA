@@ -393,6 +393,70 @@
         }
       }
     },
+    "/analysis/compare": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Compare",
+        "description": "Dónde discrepan dos análisis de la misma partida (RF-2.6), típicamente\nuno de Stockfish y otro de Lc0.",
+        "operationId": "compare_analysis_compare_get",
+        "parameters": [
+          {
+            "name": "analysis_a",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Analysis A"
+            }
+          },
+          {
+            "name": "analysis_b",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Analysis B"
+            }
+          },
+          {
+            "name": "threshold",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 100,
+              "minimum": 0,
+              "default": 10.0,
+              "title": "Threshold"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisComparisonOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/analysis/{analysis_id}": {
       "get": {
         "tags": [
@@ -797,6 +861,62 @@
   },
   "components": {
     "schemas": {
+      "AnalysisComparisonOut": {
+        "properties": {
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "analysis_a": {
+            "type": "integer",
+            "title": "Analysis A"
+          },
+          "analysis_b": {
+            "type": "integer",
+            "title": "Analysis B"
+          },
+          "engine_a": {
+            "type": "string",
+            "title": "Engine A"
+          },
+          "engine_b": {
+            "type": "string",
+            "title": "Engine B"
+          },
+          "total_moves": {
+            "type": "integer",
+            "title": "Total Moves"
+          },
+          "agreed_best_moves": {
+            "type": "integer",
+            "title": "Agreed Best Moves"
+          },
+          "best_move_agreement_percent": {
+            "type": "number",
+            "title": "Best Move Agreement Percent"
+          },
+          "disagreements": {
+            "items": {
+              "$ref": "#/components/schemas/MoveComparisonOut"
+            },
+            "type": "array",
+            "title": "Disagreements"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game_id",
+          "analysis_a",
+          "analysis_b",
+          "engine_a",
+          "engine_b",
+          "total_moves",
+          "agreed_best_moves",
+          "best_move_agreement_percent",
+          "disagreements"
+        ],
+        "title": "AnalysisComparisonOut"
+      },
       "AnalysisDetail": {
         "properties": {
           "id": {
@@ -1335,6 +1455,21 @@
               }
             ],
             "title": "Weights Available"
+          },
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend"
+          },
+          "limit_kind": {
+            "type": "string",
+            "title": "Limit Kind"
           }
         },
         "type": "object",
@@ -1345,7 +1480,8 @@
           "depth",
           "multipv",
           "path",
-          "available"
+          "available",
+          "limit_kind"
         ],
         "title": "EngineConfigOut"
       },
@@ -1365,7 +1501,6 @@
           },
           "depth": {
             "type": "integer",
-            "maximum": 40.0,
             "minimum": 1.0,
             "title": "Depth"
           },
@@ -1384,7 +1519,7 @@
           "multipv"
         ],
         "title": "EngineConfigUpdate",
-        "description": "Los rangos evitan configuraciones que colgarían la máquina (o el\nanálisis) sin darse cuenta: un `depth` de 60 no termina nunca."
+        "description": "Los rangos evitan configuraciones que colgarían la máquina sin darse\ncuenta. El de `depth` se comprueba aparte, en el endpoint, porque depende\nde la unidad del motor (ver `LIMIT_RANGES`)."
       },
       "EngineLineOut": {
         "properties": {
@@ -1660,6 +1795,83 @@
           "games"
         ],
         "title": "MonthlyCountOut"
+      },
+      "MoveComparisonOut": {
+        "properties": {
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "san": {
+            "type": "string",
+            "title": "San"
+          },
+          "classification_a": {
+            "type": "string",
+            "title": "Classification A"
+          },
+          "classification_b": {
+            "type": "string",
+            "title": "Classification B"
+          },
+          "win_percent_after_a": {
+            "type": "number",
+            "title": "Win Percent After A"
+          },
+          "win_percent_after_b": {
+            "type": "number",
+            "title": "Win Percent After B"
+          },
+          "win_percent_gap": {
+            "type": "number",
+            "title": "Win Percent Gap"
+          },
+          "best_move_a": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Move A"
+          },
+          "best_move_b": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Move B"
+          },
+          "same_best_move": {
+            "type": "boolean",
+            "title": "Same Best Move"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ply",
+          "color",
+          "san",
+          "classification_a",
+          "classification_b",
+          "win_percent_after_a",
+          "win_percent_after_b",
+          "win_percent_gap",
+          "best_move_a",
+          "best_move_b",
+          "same_best_move"
+        ],
+        "title": "MoveComparisonOut"
       },
       "OpeningStatsOut": {
         "properties": {

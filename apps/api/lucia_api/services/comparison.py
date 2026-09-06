@@ -1,0 +1,131 @@
+"""Comparación de dos análisis de la misma partida (RF-2.6).
+
+Stockfish y Lc0 no discrepan por capricho: Stockfish busca por fuerza bruta
+con evaluación NNUE, y Lc0 explora con una red que "intuye" el valor
+posicional. Donde los dos coinciden, la jugada suele estar clara; donde
+discrepan es donde hay algo que entender, y eso es lo que este módulo
+localiza.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from lucia_api.db.models import Analysis, AnalyzedMove
+
+#: Diferencia de probabilidad de victoria (0-100) a partir de la cual se
+#: considera que los motores discrepan de verdad. Por debajo es ruido: dos
+#: motores nunca dan exactamente el mismo número.
+DEFAULT_DISAGREEMENT_THRESHOLD = 10.0
+
+
+@dataclass
+class MoveComparison:
+    ply: int
+    color: str
+    san: str
+    """Clasificación y evaluación según cada motor."""
+    classification_a: str
+    classification_b: str
+    win_percent_after_a: float
+    win_percent_after_b: float
+    best_move_a: str | None
+    best_move_b: str | None
+
+    @property
+    def win_percent_gap(self) -> float:
+        """Cuánto se separan los dos motores al valorar la posición."""
+        return abs(self.win_percent_after_a - self.win_percent_after_b)
+
+    @property
+    def same_best_move(self) -> bool:
+        return self.best_move_a == self.best_move_b
+
+
+@dataclass
+class AnalysisComparison:
+    game_id: int
+    analysis_a: int
+    analysis_b: int
+    engine_a: str
+    engine_b: str
+    total_moves: int
+    agreed_best_moves: int
+    """En cuántas jugadas ambos motores recomendaban lo mismo."""
+    disagreements: list[MoveComparison]
+    """Solo las jugadas donde la diferencia supera el umbral, de mayor a menor."""
+
+    @property
+    def best_move_agreement_percent(self) -> float:
+        if self.total_moves == 0:
+            return 0.0
+        return self.agreed_best_moves / self.total_moves * 100
+
+
+class ComparisonError(ValueError):
+    """La comparación no tiene sentido: falta un análisis, no ha terminado, o
+    son de partidas distintas."""
+
+
+async def compare_analyses(
+    session: AsyncSession,
+    analysis_a_id: int,
+    analysis_b_id: int,
+    threshold: float = DEFAULT_DISAGREEMENT_THRESHOLD,
+) -> AnalysisComparison:
+    a = await session.get(Analysis, analysis_a_id)
+    b = await session.get(Analysis, analysis_b_id)
+    if a is None or b is None:
+        raise ComparisonError("alguno de los dos análisis no existe")
+    if a.game_id != b.game_id:
+        raise ComparisonError("los análisis son de partidas distintas")
+    if a.status != "done" or b.status != "done":
+        raise ComparisonError("ambos análisis tienen que estar terminados")
+
+    jugadas_a = await _moves_by_ply(session, a.id)
+    jugadas_b = await _moves_by_ply(session, b.id)
+
+    comparadas: list[MoveComparison] = []
+    coinciden = 0
+    # Solo los plies presentes en ambos: si un análisis se cortó a medias, la
+    # parte que falta no se puede comparar.
+    for ply in sorted(set(jugadas_a) & set(jugadas_b)):
+        move_a, move_b = jugadas_a[ply], jugadas_b[ply]
+        comparacion = MoveComparison(
+            ply=ply,
+            color=move_a.color,
+            san=move_a.san,
+            classification_a=move_a.classification,
+            classification_b=move_b.classification,
+            win_percent_after_a=move_a.win_percent_after,
+            win_percent_after_b=move_b.win_percent_after,
+            best_move_a=move_a.best_move_uci,
+            best_move_b=move_b.best_move_uci,
+        )
+        if comparacion.same_best_move:
+            coinciden += 1
+        if comparacion.win_percent_gap >= threshold:
+            comparadas.append(comparacion)
+
+    comparadas.sort(key=lambda c: c.win_percent_gap, reverse=True)
+
+    return AnalysisComparison(
+        game_id=a.game_id,
+        analysis_a=a.id,
+        analysis_b=b.id,
+        engine_a=a.engine,
+        engine_b=b.engine,
+        total_moves=len(set(jugadas_a) & set(jugadas_b)),
+        agreed_best_moves=coinciden,
+        disagreements=comparadas,
+    )
+
+
+async def _moves_by_ply(session: AsyncSession, analysis_id: int) -> dict[int, AnalyzedMove]:
+    resultado = await session.execute(
+        select(AnalyzedMove).where(AnalyzedMove.analysis_id == analysis_id)
+    )
+    return {move.ply: move for move in resultado.scalars().all()}

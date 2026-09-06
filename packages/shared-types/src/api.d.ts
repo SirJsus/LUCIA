@@ -119,6 +119,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/analysis/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare
+         * @description Dónde discrepan dos análisis de la misma partida (RF-2.6), típicamente
+         *     uno de Stockfish y otro de Lc0.
+         */
+        get: operations["compare_analysis_compare_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/analysis/{analysis_id}": {
         parameters: {
             query?: never;
@@ -233,6 +254,27 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AnalysisComparisonOut */
+        AnalysisComparisonOut: {
+            /** Game Id */
+            game_id: number;
+            /** Analysis A */
+            analysis_a: number;
+            /** Analysis B */
+            analysis_b: number;
+            /** Engine A */
+            engine_a: string;
+            /** Engine B */
+            engine_b: string;
+            /** Total Moves */
+            total_moves: number;
+            /** Agreed Best Moves */
+            agreed_best_moves: number;
+            /** Best Move Agreement Percent */
+            best_move_agreement_percent: number;
+            /** Disagreements */
+            disagreements: components["schemas"]["MoveComparisonOut"][];
+        };
         /** AnalysisDetail */
         AnalysisDetail: {
             /** Id */
@@ -427,11 +469,16 @@ export interface components {
             weights_path?: string | null;
             /** Weights Available */
             weights_available?: boolean | null;
+            /** Backend */
+            backend?: string | null;
+            /** Limit Kind */
+            limit_kind: string;
         };
         /**
          * EngineConfigUpdate
-         * @description Los rangos evitan configuraciones que colgarían la máquina (o el
-         *     análisis) sin darse cuenta: un `depth` de 60 no termina nunca.
+         * @description Los rangos evitan configuraciones que colgarían la máquina sin darse
+         *     cuenta. El de `depth` se comprueba aparte, en el endpoint, porque depende
+         *     de la unidad del motor (ver `LIMIT_RANGES`).
          */
         EngineConfigUpdate: {
             /** Threads */
@@ -538,6 +585,31 @@ export interface components {
             month: number;
             /** Games */
             games: number;
+        };
+        /** MoveComparisonOut */
+        MoveComparisonOut: {
+            /** Ply */
+            ply: number;
+            /** Color */
+            color: string;
+            /** San */
+            san: string;
+            /** Classification A */
+            classification_a: string;
+            /** Classification B */
+            classification_b: string;
+            /** Win Percent After A */
+            win_percent_after_a: number;
+            /** Win Percent After B */
+            win_percent_after_b: number;
+            /** Win Percent Gap */
+            win_percent_gap: number;
+            /** Best Move A */
+            best_move_a: string | null;
+            /** Best Move B */
+            best_move_b: string | null;
+            /** Same Best Move */
+            same_best_move: boolean;
         };
         /** OpeningStatsOut */
         OpeningStatsOut: {
@@ -863,6 +935,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["EngineLineOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compare_analysis_compare_get: {
+        parameters: {
+            query: {
+                analysis_a: number;
+                analysis_b: number;
+                threshold?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisComparisonOut"];
                 };
             };
             /** @description Validation Error */

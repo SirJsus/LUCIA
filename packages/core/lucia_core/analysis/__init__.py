@@ -92,24 +92,52 @@ async def evaluate_positions(
     posiciones: list[PositionEval] = []
     actual = board.copy()
     for ply in range(len(moves) + 1):
-        lineas = await engine.analyse(actual)
-        mejor = lineas[0]
-        pv = mejor.get("pv") or []
-        posiciones.append(
-            PositionEval(
-                ply=ply,
-                fen=actual.fen(),
-                turn=actual.turn,
-                score=mejor["score"],
-                best_move=pv[0] if pv else None,
-                pv=tuple(pv),
+        if actual.is_game_over():
+            # Posición terminal: el resultado ya está decidido y no hay jugada
+            # que buscar. Además hay que evitar preguntarle al motor: Lc0 se
+            # queda colgado indefinidamente si se le pide `go` en una posición
+            # sin jugadas legales, lo que dejaba tieso el análisis de
+            # cualquier partida terminada en jaque mate.
+            posiciones.append(
+                PositionEval(
+                    ply=ply,
+                    fen=actual.fen(),
+                    turn=actual.turn,
+                    score=_score_terminal(actual),
+                    best_move=None,
+                    pv=(),
+                )
             )
-        )
+        else:
+            lineas = await engine.analyse(actual)
+            mejor = lineas[0]
+            pv = mejor.get("pv") or []
+            posiciones.append(
+                PositionEval(
+                    ply=ply,
+                    fen=actual.fen(),
+                    turn=actual.turn,
+                    score=mejor["score"],
+                    best_move=pv[0] if pv else None,
+                    pv=tuple(pv),
+                )
+            )
         if on_position is not None:
             await on_position(ply, len(moves))
         if ply < len(moves):
             actual.push(moves[ply])
     return posiciones
+
+
+def _score_terminal(board: chess.Board) -> chess.engine.PovScore:
+    """Evaluación de una posición ya terminada, sin consultar al motor.
+
+    `Mate(0)` es la forma que tiene `python-chess` de decir "a quien le toca
+    mover ya está mateado". El resto de finales (ahogado, material
+    insuficiente, repetición, 50 jugadas) son tablas.
+    """
+    puntaje = chess.engine.Mate(0) if board.is_checkmate() else chess.engine.Cp(0)
+    return chess.engine.PovScore(puntaje, board.turn)
 
 
 async def analyze_game(

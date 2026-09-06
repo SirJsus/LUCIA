@@ -33,6 +33,30 @@ class EffectiveEngineConfig:
     """De `.env`, nunca editable por HTTP (sería ejecución arbitraria)."""
     weights_path: Path | None = None
     """Solo Lc0: red neuronal a cargar."""
+    backend: str | None = None
+    """Solo Lc0: backend de cómputo (ver `Settings.lc0_backend`)."""
+
+    @property
+    def limit_kind(self) -> str:
+        """Unidad en la que se le pide esfuerzo al motor.
+
+        No se guarda en la base ni se puede configurar: se deriva del motor
+        porque es una propiedad suya, no una preferencia. Stockfish busca en
+        profundidad (alfa-beta) y "profundidad 18" significa algo concreto.
+        Lc0 explora con MCTS, donde la profundidad es un promedio del árbol y
+        pedir una concreta puede costar un número imprevisible de
+        evaluaciones de red; ahí lo predecible es acotar los nodos.
+        """
+        return "nodes" if self.name == "lc0" else "depth"
+
+    def uci_extra_options(self) -> dict[str, str | int | bool]:
+        """Opciones UCI propias del motor, más allá de hilos y hash."""
+        if self.weights_path is None:
+            return {}
+        opciones: dict[str, str | int | bool] = {"WeightsFile": str(self.weights_path)}
+        if self.backend:
+            opciones["Backend"] = self.backend
+        return opciones
 
 
 def default_config(name: str) -> EffectiveEngineConfig:
@@ -47,6 +71,7 @@ def default_config(name: str) -> EffectiveEngineConfig:
         multipv=settings.analysis_multipv,
         path=settings.stockfish_path if name == "stockfish" else settings.lc0_path,
         weights_path=None if name == "stockfish" else settings.lc0_weights,
+        backend=None if name == "stockfish" else settings.lc0_backend,
     )
 
 
@@ -63,6 +88,7 @@ async def get_effective_config(session: AsyncSession, name: str) -> EffectiveEng
         multipv=guardada.multipv,
         path=base.path,
         weights_path=base.weights_path,
+        backend=base.backend,
     )
 
 

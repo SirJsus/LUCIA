@@ -73,6 +73,9 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
         <div>
           <h2 className="font-semibold capitalize">{config.name}</h2>
           <p className="mt-0.5 break-all font-mono text-xs opacity-60">{config.path}</p>
+          {config.backend && (
+            <p className="mt-0.5 text-xs opacity-60">backend: {config.backend}</p>
+          )}
         </div>
         <AvailabilityBadge available={config.available} />
       </header>
@@ -80,6 +83,15 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
       {!config.available && (
         <p className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
           El binario no está en esa ruta. Ejecuta <code>make engines</code> para compilarlo.
+        </p>
+      )}
+
+      {config.limit_kind === "nodes" && (
+        <p className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+          Lc0 explora con MCTS, así que el esfuerzo se mide en <strong>nodos</strong>, no en
+          profundidad. En CPU con una red grande va muy lento (medido: ~200 nodos por posición
+          y minuto), así que sirve para consultar posiciones sueltas, no para analizar partidas
+          enteras. Con GPU (LC0_BACKEND=cuda) o una red pequeña cambia por completo.
         </p>
       )}
 
@@ -97,8 +109,8 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
 
       <div className="grid grid-cols-2 gap-3">
         <NumberField
-          label="Profundidad"
-          hint="1–40"
+          label={config.limit_kind === "nodes" ? "Nodos" : "Profundidad"}
+          hint={config.limit_kind === "nodes" ? "1–40 (¡ojo, ver abajo!)" : "1–40"}
           value={form.depth}
           min={1}
           max={40}

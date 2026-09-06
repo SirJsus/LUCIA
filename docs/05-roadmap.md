@@ -77,11 +77,68 @@
 
 ## Fase 2 · Insight (P1)
 
-- [ ] Lc0 integrado como segundo motor; vista de discrepancias Stockfish vs Lc0.
-- [ ] Extractores de patrones: errores por tipo, *time trouble*, momentos críticos.
-- [ ] Comparación de repertorio con Lichess Explorer.
-- [ ] Tendencias temporales.
-- [ ] Tablero de análisis, extras (RF-6.6 a 6.9): abrir partida importada como copia desacoplada, importar / exportar PGN con variantes y comentarios, auto-guardado con deshacer / rehacer, análisis completo en background bajo demanda.
+- [x] Lc0 integrado como segundo motor (RF-2.6); vista de discrepancias
+      Stockfish vs Lc0. Nunca había llegado a funcionar: `EngineBridge` le
+      mandaba la opción `Hash`, que Lc0 no soporta, y abortaba la conexión —
+      ahora las opciones genéricas se filtran contra las que declara cada
+      motor (esto además cumple RNF-9: enchufar otro motor UCI no necesita
+      tocar código). El límite se mide en nodos para Lc0 y en profundidad
+      para Stockfish, porque en MCTS la profundidad es un promedio del árbol
+      y pedir una concreta cuesta un número imprevisible de evaluaciones.
+      Endpoint `GET /analysis/compare` y panel en el visor con las jugadas
+      donde los motores no coinciden.
+      **Sobre el rendimiento de Lc0** (medido en un portátil con i7 y GTX
+      1060). El backend y la red deciden si sirve o no:
+
+      | Red | Backend | Velocidad |
+      |---|---|---|
+      | grande (transformer, 313 MB) | CPU/BLAS | 2,5 nodos/s |
+      | grande (transformer) | OpenCL | **no soportada** |
+      | T74 convolucional (6 MB) | OpenCL | ~4.000 nodos/s |
+      | Maia (1 MB) | OpenCL | ~12.500 nodos/s |
+
+      El instalador descargaba solo la red grande, que es transformer: OpenCL
+      no acepta esa arquitectura y en CPU tarda 80 s por cada 200 nodos, así
+      que Lc0 era inservible. Ahora descarga también una red convolucional
+      T74, que es la recomendada por defecto, y detecta el soporte de GPU al
+      compilar (CUDA si hay `nvcc`, si no OpenCL, si no CPU). Con eso,
+      analizar una partida de 14 jugadas a 1.600 nodos por posición baja a
+      8 segundos.
+
+      Con dos motores fuertes de verdad coinciden en la mejor jugada el 86 %
+      de las veces y no hay discrepancias de valoración relevantes; el 64 %
+      y las 3 discrepancias que salían antes eran un artefacto de usar la red
+      Maia, que imita a un humano de ~1500 en vez de buscar la mejor jugada.
+
+      Tres bugs encontrados solo al analizar partidas reales:
+      1. El rango de validación del esfuerzo era el mismo para ambos motores
+         (1.600 nodos es normal en Lc0 e imposible como profundidad).
+      2. La caché de posiciones no incluía la red neuronal en su clave, así
+         que al cambiar de red devolvía las evaluaciones de la anterior.
+      3. **`evaluate_positions` le pedía al motor que buscara también en la
+         posición final.** Si la partida acaba en jaque mate o ahogado, no
+         hay jugada que devolver: Stockfish responde igual, pero Lc0 se queda
+         colgado para siempre. Cualquier partida terminada en mate dejaba el
+         análisis tieso. Ahora las posiciones terminales no se consultan: su
+         evaluación se deduce (mate o tablas). La misma partida pasó de no
+         terminar nunca a analizarse en 6 s.
+- [ ] Extractores de patrones: errores por tipo, *time trouble*, momentos
+      críticos (RF-2.8, con MultiPV real en la clasificación) y "eval al salir
+      de la apertura" (lo que falta de RF-3.2).
+- [ ] `lucia_core.openings`: tabla ECO (chess-openings de Lichess, CC0) para
+      clasificar aperturas sin depender de lo que reporte chess.com, y con
+      ella la categoría "book" de `classify_move` (lo que falta de RF-2.2).
+- [ ] Comparación de repertorio con Lichess Explorer (RF-3.6).
+- [ ] Importar PGN manual de otras fuentes —OTB, lichess— al historial (RF-1.5).
+- [ ] Filtros de `/games` por apertura, rango de fechas y rival (lo que falta
+      de RF-5.3; con cientos de partidas ya se nota).
+- [ ] Tendencias temporales (RF-3.7).
+- [ ] Tablero de análisis, extras (RF-6.6 a 6.9): abrir partida importada como
+      copia desacoplada (esto también cubre "explorar variantes desde el
+      visor", RF-5.2), importar / exportar PGN con variantes y comentarios,
+      auto-guardado con deshacer / rehacer, análisis completo en background
+      bajo demanda, y editor de posición pieza a pieza (lo que falta de
+      RF-6.1; hoy se puede partir de un FEN, que cubre el caso).
 - [ ] Capa de ocupación del tablero (RF-7.1 a 7.7): sub-modo mapa de calor, sub-modo cobertura directa del turno, inspección por casilla, piezas colgadas, rayos X aparte y clavadas marcadas, reglas de conteo (rey, peones en diagonal, al paso). Cálculo en cliente con chess.js, activable en visor, tablero de análisis y entrenamiento.
 - [ ] Exportar PGN anotado.
 

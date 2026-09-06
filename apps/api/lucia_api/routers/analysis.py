@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,6 +14,11 @@ from lucia_api.db import get_session
 from lucia_api.db.models import Analysis, AnalyzedMove, Game
 from lucia_api.dependencies import get_worker
 from lucia_api.services.analysis import analyse_position
+from lucia_api.services.comparison import (
+    DEFAULT_DISAGREEMENT_THRESHOLD,
+    ComparisonError,
+    compare_analyses,
+)
 from lucia_api.services.engines import get_effective_config
 from lucia_api.worker import AnalysisWorker
 
@@ -156,6 +161,74 @@ async def list_analyses(
         consulta = consulta.where(Analysis.game_id == game_id)
     resultado = await session.execute(consulta)
     return [AnalysisSummary.model_validate(a) for a in resultado.scalars().all()]
+
+
+class MoveComparisonOut(BaseModel):
+    ply: int
+    color: str
+    san: str
+    classification_a: str
+    classification_b: str
+    win_percent_after_a: float
+    win_percent_after_b: float
+    win_percent_gap: float
+    best_move_a: str | None
+    best_move_b: str | None
+    same_best_move: bool
+
+
+class AnalysisComparisonOut(BaseModel):
+    game_id: int
+    analysis_a: int
+    analysis_b: int
+    engine_a: str
+    engine_b: str
+    total_moves: int
+    agreed_best_moves: int
+    best_move_agreement_percent: float
+    disagreements: list[MoveComparisonOut]
+
+
+@router.get("/analysis/compare", response_model=AnalysisComparisonOut)
+async def compare(
+    session: Annotated[AsyncSession, Depends(get_session)],
+    analysis_a: int,
+    analysis_b: int,
+    threshold: Annotated[float, Query(ge=0, le=100)] = DEFAULT_DISAGREEMENT_THRESHOLD,
+) -> AnalysisComparisonOut:
+    """Dónde discrepan dos análisis de la misma partida (RF-2.6), típicamente
+    uno de Stockfish y otro de Lc0."""
+    try:
+        comparacion = await compare_analyses(session, analysis_a, analysis_b, threshold)
+    except ComparisonError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
+
+    return AnalysisComparisonOut(
+        game_id=comparacion.game_id,
+        analysis_a=comparacion.analysis_a,
+        analysis_b=comparacion.analysis_b,
+        engine_a=comparacion.engine_a,
+        engine_b=comparacion.engine_b,
+        total_moves=comparacion.total_moves,
+        agreed_best_moves=comparacion.agreed_best_moves,
+        best_move_agreement_percent=comparacion.best_move_agreement_percent,
+        disagreements=[
+            MoveComparisonOut(
+                ply=d.ply,
+                color=d.color,
+                san=d.san,
+                classification_a=d.classification_a,
+                classification_b=d.classification_b,
+                win_percent_after_a=d.win_percent_after_a,
+                win_percent_after_b=d.win_percent_after_b,
+                win_percent_gap=d.win_percent_gap,
+                best_move_a=d.best_move_a,
+                best_move_b=d.best_move_b,
+                same_best_move=d.same_best_move,
+            )
+            for d in comparacion.disagreements
+        ],
+    )
 
 
 @router.get("/analysis/{analysis_id}", response_model=AnalysisDetail)

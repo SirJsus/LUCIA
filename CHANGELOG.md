@@ -13,7 +13,23 @@ SemVer para la serie `0.x`).
 
 Camino a v1.0.0 — ver progreso en [docs/05-roadmap.md](docs/05-roadmap.md) y
 alcance congelado en [docs/02-requerimientos.md](docs/02-requerimientos.md).
-Siguiente: fase 2 (insight), empezando por Lc0 como segundo motor.
+
+### Añadido
+
+- Lc0 como segundo motor, con detección de GPU al compilar y vista de
+  discrepancias entre motores (RF-2.6).
+
+### Corregido
+
+- El visor de partidas fallaba con "Cannot set properties of undefined
+  (setting 'dests')". Se le pasaban a chessground claves en `undefined`
+  (`movable`, `turnColor`) para las cosas que el visor no usa, y su
+  `deepMerge` hace `base[clave] = nuevo[clave]` sin comprobar nada: eso
+  borraba su estado interno y la siguiente actualización reventaba. Ahora las
+  claves que no aplican se omiten.
+- El análisis se colgaba para siempre en cualquier partida terminada en jaque
+  mate: se le pedía al motor que buscara en la posición final, donde no hay
+  jugada que devolver, y Lc0 se queda esperando.
 
 ## [0.2.0] - 2026-09-06
 

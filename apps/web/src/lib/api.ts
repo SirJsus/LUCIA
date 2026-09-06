@@ -8,6 +8,7 @@
  * vite.config.ts), así que en desarrollo no hay CORS de por medio.
  */
 import type {
+  AnalysisComparison,
   AnalysisDetail,
   AnalysisSummary,
   BoardDetail,
@@ -100,6 +101,11 @@ export const api = {
 
   listAnalyses: (gameId?: number) =>
     request<AnalysisSummary[]>(`/analysis${gameId === undefined ? "" : `?game_id=${gameId}`}`),
+
+  compareAnalyses: (analysisA: number, analysisB: number) =>
+    request<AnalysisComparison>(
+      `/analysis/compare?analysis_a=${analysisA}&analysis_b=${analysisB}`,
+    ),
 
   getAnalysis: (analysisId: number) => request<AnalysisDetail>(`/analysis/${analysisId}`),
 

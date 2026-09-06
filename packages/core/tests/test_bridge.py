@@ -1,4 +1,5 @@
 import chess
+import chess.engine
 import pytest
 from lucia_core.engine import EngineBridge, EngineConfig
 
@@ -47,3 +48,25 @@ async def test_analizar_sin_abrir_el_motor_falla_claro() -> None:
     motor = EngineBridge(_config())
     with pytest.raises(RuntimeError):
         await motor.analyse(chess.Board())
+
+
+@requiere_stockfish
+async def test_solo_manda_opciones_que_el_motor_declara() -> None:
+    """Lc0 no soporta `Hash` (usa `NNCacheSize`, que ni siquiera se mide en
+    MB). Mandarle una opción desconocida aborta la conexión, así que las
+    genéricas se filtran contra las que el motor declara."""
+    async with EngineBridge(_config()) as motor:
+        opciones = motor._opciones_a_aplicar()
+
+    assert "Threads" in opciones  # Stockfish sí la declara
+    assert set(opciones) <= set(motor.config.extra_options) | {"Threads", "Hash"}
+
+
+@requiere_stockfish
+async def test_las_extra_options_no_se_filtran() -> None:
+    """A diferencia de las genéricas, una `extra_option` la pidió alguien a
+    propósito: si el motor no la conoce, debe fallar y notarse."""
+    config = _config(extra_options={"OpcionQueNoExiste": 1})
+    with pytest.raises(chess.engine.EngineError):
+        async with EngineBridge(config):
+            pass

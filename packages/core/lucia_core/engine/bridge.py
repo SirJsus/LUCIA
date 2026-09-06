@@ -17,12 +17,33 @@ class EngineBridge:
     async def open(self) -> None:
         _transport, engine = await chess.engine.popen_uci(str(self.config.path))
         self._engine = engine
-        opciones: dict[str, str | int | bool] = {
+        await self._engine.configure(self._opciones_a_aplicar())
+
+    def _opciones_a_aplicar(self) -> dict[str, str | int | bool]:
+        """Qué opciones UCI mandarle a este motor en concreto.
+
+        `Threads` y `Hash` son "estándar" de facto, pero no universales: Lc0
+        acepta `Threads` y no `Hash` (usa `NNCacheSize`, que además se mide en
+        posiciones, no en MB, así que no es un equivalente). Mandar una opción
+        que el motor no conoce aborta la conexión, así que las genéricas se
+        aplican solo si el motor las declara — eso también hace que enchufar
+        un motor UCI cualquiera funcione sin tocar código (RNF-9).
+
+        `extra_options` es la excepción: se aplican siempre, sin filtrar,
+        porque las pidió explícitamente quien configuró el motor. Si no
+        existen, es un error de configuración y conviene que se note.
+        """
+        if self._engine is None:
+            raise RuntimeError("el motor no está abierto")
+
+        soportadas = self._engine.options
+        genericas: dict[str, str | int | bool] = {
             "Threads": self.config.threads,
             "Hash": self.config.hash_mb,
         }
+        opciones = {k: v for k, v in genericas.items() if k in soportadas}
         opciones.update(self.config.extra_options)
-        await self._engine.configure(opciones)
+        return opciones
 
     async def close(self) -> None:
         if self._engine is not None:

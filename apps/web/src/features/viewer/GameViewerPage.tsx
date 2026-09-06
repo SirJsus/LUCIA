@@ -9,6 +9,7 @@ import { api } from "../../lib/api";
 import { classificationStyle } from "../../lib/classification";
 import { formatAccuracy, formatDate, gameResult } from "../../lib/format";
 import { Chessboard } from "./Chessboard";
+import { EngineComparison } from "./EngineComparison";
 import { EvalChart } from "./EvalChart";
 import { MoveList } from "./MoveList";
 import { useAnalysisProgress } from "./useAnalysisProgress";
@@ -30,6 +31,7 @@ export function GameViewerPage() {
   const [currentPly, setCurrentPly] = useState(-1); // -1 = posición inicial
   const [analysisId, setAnalysisId] = useState<number | null>(null);
   const [orientation, setOrientation] = useState<"white" | "black">("white");
+  const [engine, setEngine] = useState<"stockfish" | "lc0">("stockfish");
 
   const gameQuery = useQuery({ queryKey: ["game", id], queryFn: () => api.getGame(id) });
 
@@ -64,8 +66,25 @@ export function GameViewerPage() {
   const progress = useAnalysisProgress(isRunning ? analysisId : null, refetchAnalysis);
 
   const analyzeMutation = useMutation({
-    mutationFn: () => api.createAnalysis({ game_ids: [id] }),
-    onSuccess: (created) => setAnalysisId(created[0].id),
+    mutationFn: () => api.createAnalysis({ game_ids: [id], engine }),
+    onSuccess: (created) => {
+      setAnalysisId(created[0].id);
+      void existingQuery.refetch(); // para que aparezca en el selector de motor
+    },
+  });
+
+  // Con análisis terminados de dos motores distintos se puede comparar (RF-2.6).
+  const terminados = (existingQuery.data ?? []).filter((a) => a.status === "done");
+  const porMotor = new Map(terminados.map((a) => [a.engine, a]));
+  const puedeComparar = porMotor.size >= 2;
+
+  const comparisonQuery = useQuery({
+    queryKey: ["comparison", [...porMotor.values()].map((a) => a.id).sort()],
+    queryFn: () => {
+      const [a, b] = [...porMotor.values()];
+      return api.compareAnalyses(a.id, b.id);
+    },
+    enabled: puedeComparar,
   });
 
   const positions = useMemo(() => parsePgn(gameQuery.data?.pgn), [gameQuery.data?.pgn]);
@@ -128,6 +147,15 @@ export function GameViewerPage() {
           >
             Girar tablero
           </button>
+          <select
+            value={engine}
+            onChange={(event) => setEngine(event.target.value as "stockfish" | "lc0")}
+            title="Motor con el que analizar"
+            className="rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+          >
+            <option value="stockfish">Stockfish</option>
+            <option value="lc0">Lc0</option>
+          </select>
           <button
             type="button"
             onClick={() => analyzeMutation.mutate()}
@@ -136,9 +164,9 @@ export function GameViewerPage() {
           >
             {isRunning || analyzeMutation.isPending
               ? "Analizando…"
-              : analysis?.status === "done"
-                ? "Analizar de nuevo"
-                : "Analizar"}
+              : porMotor.has(engine)
+                ? `Reanalizar con ${engine}`
+                : `Analizar con ${engine}`}
           </button>
         </div>
       </div>
@@ -229,6 +257,16 @@ export function GameViewerPage() {
             <EmptyState title="Sin analizar">
               Pulsa <strong>Analizar</strong> para que el motor evalúe cada jugada.
             </EmptyState>
+          )}
+
+          {comparisonQuery.data && (
+            <EngineComparison comparison={comparisonQuery.data} onSelectPly={goTo} />
+          )}
+
+          {!puedeComparar && analysis?.status === "done" && (
+            <p className="rounded border border-dashed border-slate-300 px-3 py-2 text-xs opacity-70 dark:border-slate-700">
+              Analiza también con el otro motor para ver dónde discrepan.
+            </p>
           )}
 
           {analysis?.status === "done" && (

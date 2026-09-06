@@ -30,6 +30,8 @@ export type MonthlyCount = Schemas["MonthlyCountOut"];
 export type BoardSummary = Schemas["BoardSummary"];
 export type BoardDetail = Schemas["BoardDetail"];
 export type EngineLine = Schemas["EngineLineOut"];
+export type AnalysisComparison = Schemas["AnalysisComparisonOut"];
+export type MoveComparison = Schemas["MoveComparisonOut"];
 
 /** Categorías de `classify_move` (lucia_core.classification). El OpenAPI las
  * expone como `string` porque en la BD se guardan así, de modo que este tipo

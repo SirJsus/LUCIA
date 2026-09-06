@@ -17,6 +17,10 @@ class Settings(BaseSettings):
     stockfish_path: Path = Path("./engines/bin/stockfish")
     lc0_path: Path = Path("./engines/bin/lc0")
     lc0_weights: Path = Path("./engines/networks/default.pb.gz")
+    lc0_backend: str = "blas"
+    """Backend de cómputo de Lc0. Sin especificarlo, Lc0 elige uno por su
+    cuenta y puede ser ~20x más lento (medido: 74 s contra ~4 s la misma
+    búsqueda). "blas" va bien en CPU; con GPU NVIDIA, "cuda"."""
     analysis_depth: int = 18
     analysis_multipv: int = 3
 

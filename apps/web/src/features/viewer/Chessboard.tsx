@@ -4,11 +4,14 @@
  * crea una sola vez con `useRef` y después solo se le pasan actualizaciones
  * con `set()`. Volver a construirlo en cada render rompería las animaciones
  * y perdería el estado de arrastre.
+ *
+ * La configuración se arma en `buildBoardConfig`, aparte, porque hay que
+ * tener cuidado con las claves `undefined` (ver su docstring).
  */
 import { Chessground } from "chessground";
 import type { Api } from "chessground/api";
-import type { Key } from "chessground/types";
 import { useEffect, useRef } from "react";
+import { buildBoardConfig } from "./boardConfig";
 
 export interface ChessboardProps {
   fen: string;
@@ -44,13 +47,14 @@ export function Chessboard({
   useEffect(() => {
     if (!containerRef.current) return;
     apiRef.current = Chessground(containerRef.current, {
-      fen,
-      orientation,
+      ...buildBoardConfig({ fen, orientation, bestMoveUci, lastMoveUci, legalMoves, turnColor }),
       viewOnly: !onMoveRef.current,
       coordinates: true,
       animation: { enabled: true, duration: 150 },
       movable: {
         free: false,
+        color: turnColor,
+        dests: legalMoves as never,
         events: { after: (from, to) => onMoveRef.current?.(from, to) },
       },
     });
@@ -63,33 +67,10 @@ export function Chessboard({
   }, []);
 
   useEffect(() => {
-    apiRef.current?.set({
-      fen,
-      orientation,
-      turnColor,
-      lastMove: toSquares(lastMoveUci),
-      movable: legalMoves
-        ? { free: false, color: turnColor, dests: legalMoves as never }
-        : undefined,
-      drawable: {
-        autoShapes: bestMoveUci
-          ? [{ orig: uciOrig(bestMoveUci), dest: uciDest(bestMoveUci), brush: "green" }]
-          : [],
-      },
-    });
+    apiRef.current?.set(
+      buildBoardConfig({ fen, orientation, bestMoveUci, lastMoveUci, legalMoves, turnColor }),
+    );
   }, [fen, orientation, bestMoveUci, lastMoveUci, legalMoves, turnColor]);
 
   return <div ref={containerRef} className="aspect-square w-full" />;
-}
-
-function uciOrig(uci: string): Key {
-  return uci.slice(0, 2) as Key;
-}
-
-function uciDest(uci: string): Key {
-  return uci.slice(2, 4) as Key;
-}
-
-function toSquares(uci: string | null | undefined): Key[] | undefined {
-  return uci ? [uciOrig(uci), uciDest(uci)] : undefined;
 }

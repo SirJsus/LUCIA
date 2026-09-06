@@ -49,3 +49,51 @@ async def test_analyze_game_clasifica_el_blunder_final() -> None:
     assert jugada_g4.uci == "g2g4"
     assert jugada_g4.classification in {"mistake", "blunder"}
     assert resultado.white_accuracy < 90  # el blunder tiene que notarse
+
+
+class MotorQueSeQueja:
+    """Motor falso que falla si se le pide analizar una posición terminada,
+    que es justo lo que hacía colgarse a Lc0."""
+
+    def __init__(self) -> None:
+        self.llamadas = 0
+
+    async def analyse(self, board: chess.Board) -> list[dict]:
+        if board.is_game_over():
+            raise AssertionError("no se debe consultar al motor en una posición terminal")
+        self.llamadas += 1
+        return [
+            {
+                "score": chess.engine.PovScore(chess.engine.Cp(10), board.turn),
+                "pv": [next(iter(board.legal_moves))],
+            }
+        ]
+
+
+async def test_no_consulta_al_motor_en_posiciones_terminales() -> None:
+    """Lc0 se queda colgado si se le pide `go` en una posición sin jugadas
+    legales, así que cualquier partida acabada en mate dejaba tieso el
+    análisis."""
+    board = chess.Board()
+    # Mate del pastor: la última posición es jaque mate.
+    jugadas = ["e2e4", "e7e5", "d1h5", "b8c6", "f1c4", "g8f6", "h5f7"]
+    moves = [chess.Move.from_uci(u) for u in jugadas]
+
+    motor = MotorQueSeQueja()
+    posiciones = await evaluate_positions(motor, board, moves)
+
+    assert len(posiciones) == len(moves) + 1
+    assert motor.llamadas == len(moves)  # una menos: la final no se consulta
+
+    final = posiciones[-1]
+    assert final.best_move is None
+    assert final.score.pov(final.turn).is_mate()
+
+
+async def test_las_tablas_terminales_valen_cero() -> None:
+    # Rey ahogado: sin jugadas legales pero sin jaque.
+    board = chess.Board("7k/5Q2/6K1/8/8/8/8/8 b - - 0 1")
+    posiciones = await evaluate_positions(MotorQueSeQueja(), board, [])
+
+    assert board.is_stalemate()
+    assert posiciones[0].score.pov(chess.WHITE).score() == 0
