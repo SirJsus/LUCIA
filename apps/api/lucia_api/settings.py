@@ -1,6 +1,11 @@
 from pathlib import Path
 
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# apps/api/lucia_api/settings.py -> lucia_api -> api -> apps -> raíz del repo.
+_PROJECT_ROOT = Path(__file__).resolve().parents[3]
+_SQLITE_PREFIX = "sqlite+aiosqlite:///"
 
 
 class Settings(BaseSettings):
@@ -14,6 +19,27 @@ class Settings(BaseSettings):
     lc0_weights: Path = Path("./engines/networks/default.pb.gz")
     analysis_depth: int = 18
     analysis_multipv: int = 3
+
+    @model_validator(mode="after")
+    def _anclar_rutas_relativas_a_la_raiz_del_repo(self) -> "Settings":
+        """Una ruta relativa apunta a un sitio distinto según el directorio
+        desde el que arranque el proceso (`make up`, `alembic`, `pytest`, un
+        servicio de systemd...). Se anclan todas a la raíz del repo para que
+        API, Alembic, worker y tests coincidan siempre."""
+        if self.database_url.startswith(_SQLITE_PREFIX):
+            raw_path = self.database_url.removeprefix(_SQLITE_PREFIX)
+            if raw_path not in (":memory:", "") and not Path(raw_path).is_absolute():
+                absolute = (_PROJECT_ROOT / raw_path).resolve()
+                self.database_url = f"{_SQLITE_PREFIX}{absolute}"
+
+        self.stockfish_path = _absoluta(self.stockfish_path)
+        self.lc0_path = _absoluta(self.lc0_path)
+        self.lc0_weights = _absoluta(self.lc0_weights)
+        return self
+
+
+def _absoluta(path: Path) -> Path:
+    return path if path.is_absolute() else (_PROJECT_ROOT / path).resolve()
 
 
 settings = Settings()

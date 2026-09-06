@@ -16,13 +16,64 @@
 
 ## Fase 1 · MVP "Game Review propio" (P0)
 
-- [ ] `lucia-chesscom`: descargar perfil + archivos mensuales, parsear PGN y relojes, guardar en SQLite. Sync incremental.
-- [ ] `lucia-core`: `EngineBridge` con Stockfish; `GameAnalyzer` ply a ply con MultiPV; caché por FEN.
-- [ ] `MoveClassifier` + `Accuracy` con tests contra partidas de referencia.
-- [ ] API: `/sync`, `/games`, `/analysis` (+ WebSocket de progreso), `/engines/config`.
-- [ ] Web: lista de partidas, visor con tablero + clasificaciones + gráfico de eval, análisis en vivo.
-- [ ] Dashboard básico: ratings, W/D/L, rendimiento por apertura y por fase.
-- [ ] Tablero de análisis, núcleo (RF-6.1 a 6.5): crear desde inicial / FEN / PGN / editor de posición, análisis en vivo, árbol de variantes (ramas, promover, borrar), guardar / listar / eliminar tableros, independientes del historial y de las estadísticas.
+- [x] `lucia-chesscom`: descargar perfil (RF-1.1) + archivos mensuales (RF-1.2),
+      parsear PGN y relojes, guardar en SQLite vía Alembic (`players`, `games`,
+      `sync_state`). Sync incremental (RF-1.3) e idempotente (upsert por
+      `uuid`), con backoff en 429 (RF-1.4). Probado con `respx` y en vivo
+      contra la API real de chess.com. Endpoint `POST /sync` expuesto.
+      Pendiente de este bloque: RF-1.5 (importar PGN manual, P1).
+- [x] `lucia-core`: `EngineBridge` con Stockfish vía UCI (RF-2.1), MultiPV
+      configurable; `evaluate_positions`/`analyze_game` recorren la partida
+      ply a ply con una evaluación por posición. `classify_move` (RF-2.2:
+      best/excellent/good/inaccuracy/mistake/blunder/missed_win, umbrales
+      ajustables) y `accuracy` (RF-2.3: `win_percent` sobre el modelo
+      `lichess` de `python-chess`, `move_accuracy`/`game_accuracy` con la
+      fórmula pública de Lichess). 45 tests, varios contra Stockfish real
+      (detección de mate en 1, blunder de la trampa del tonto). Sin
+      dependencias nuevas. Pendiente de este bloque: Lc0 como segundo motor
+      (RF-2.6), categoría "book" (necesita `openings/`), MultiPV real en la
+      clasificación (RF-2.8, momentos críticos).
+- [x] API: `/games` (RF-5.3: listar y filtrar por username/color/time_class/
+      rated, con paginación), `/analysis` + `AnalysisWorker` (RF-2.4: cola en
+      proceso con `asyncio.Queue`, un consumidor) + `WS /ws/analysis/{id}`
+      (progreso en vivo, con `GET /analysis/{id}` como respaldo) +
+      `position_cache` (RF-2.7: caché por FEN+motor+profundidad+MultiPV, solo
+      con límite por profundidad) usando `lucia-core` como librería pura,
+      `/engines/config` (RF-5.4, lectura y escritura). 19 tests nuevos,
+      incluido el flujo completo POST → WebSocket → GET contra Stockfish
+      real. Encontrado y corregido en el camino: un bug de aislamiento entre
+      tests por compartir el `AnalysisWorker` (y su cola de asyncio) entre
+      tests con distinto event loop. Pendiente: filtros de `/games` por
+      apertura, rango de fechas y rival específico.
+- [x] Web: lista de partidas con filtros y paginación, visor con tablero
+      (chessground), jugadas clasificadas, gráfico de evaluación (en
+      probabilidad de victoria) y navegación con teclado; análisis en vivo con
+      barra de progreso por WebSocket. Pantalla de motores con la
+      configuración **editable** (RF-5.4: hilos, hash, profundidad, MultiPV;
+      la ruta del binario queda en solo lectura a propósito — aceptarla por
+      HTTP sería ejecución arbitraria de comandos). Tema claro/oscuro.
+      Tipos TS generados desde el OpenAPI real (`make types`), con
+      verificación en CI de que no se desincronizan. 10 tests de front.
+      Pendiente: reordenar/explorar variantes desde el visor (RF-5.2),
+      exportar PGN anotado (RF-5.5).
+- [x] Dashboard (RF-3.1 a 3.3): marcador y rating por control de tiempo,
+      partidas por mes, rendimiento por apertura separando blancas de negras,
+      y pérdida de ventaja por fase, resaltando la peor. Necesitó implementar
+      `lucia_core.phases` (fase por material y desarrollo, monotónica a lo
+      largo de la partida) y añadir la columna `phase` a `analyzed_moves`.
+      Verificado contra 324 partidas reales. Pendiente: "eval promedio al
+      salir de la apertura" (RF-3.2), que se hará con los extractores de
+      patrones de fase 2.
+- [x] Tablero de análisis, núcleo (RF-6.1 a 6.5): crear desde posición
+      inicial, FEN o PGN pegado; mover piezas arrastrando; árbol de variantes
+      con ramas, promover y borrar; guardar, listar y eliminar; autoguardado;
+      análisis en vivo del motor sobre la posición actual
+      (`POST /analysis/position`, con tope de profundidad porque es síncrono);
+      exportación a PGN con variantes. Independiente del historial: los
+      tableros no cuentan en estadísticas salvo que se marquen como partida
+      propia. 17 tests del árbol de variantes. Pendiente: editor de posición
+      pieza a pieza (RF-6.1 permite FEN, que cubre el caso), deshacer/rehacer
+      explícito (RF-6.8).
 
 ## Fase 2 · Insight (P1)
 

@@ -43,7 +43,15 @@ make doctor    # qué tienes, qué falta y cómo instalarlo
 make engines   # clona submódulos, compila Stockfish y Lc0, descarga red (una sola vez)
 make up        # crea .env si falta, instala dependencias si faltan, levanta api + web
 make up S=api  # solo un servicio (api | web)
+make types     # regenera los tipos TS del front desde el OpenAPI de la API
 ```
+
+La web tiene cinco pantallas: **Partidas** (lista con filtros y sincronización
+desde chess.com), **Visor** (tablero, jugadas clasificadas, gráfico de
+evaluación y análisis con progreso en vivo), **Tableros** (análisis libre desde
+FEN o PGN, con árbol de variantes y motor en vivo), **Estadísticas** (marcador,
+ratings, aperturas y en qué fase se pierde más ventaja) y **Motores**
+(profundidad, MultiPV, hilos y hash, editables).
 
 Ctrl+C apaga todos los servicios. Los logs también quedan en `data/logs/<servicio>.log`.
 

@@ -1,4 +1,4 @@
-.PHONY: help doctor up setup engines api web test lint
+.PHONY: help doctor up setup engines types api web test lint
 
 help:
 	@echo "make doctor   - diagnostica el entorno (que falta y como instalarlo)"
@@ -7,6 +7,7 @@ help:
 	@echo "make engines  - clona y compila Stockfish y Lc0, descarga red por defecto"
 	@echo "make api      - levanta la API FastAPI en :8000"
 	@echo "make web      - levanta el frontend en :5173"
+	@echo "make types    - regenera los tipos TS del front desde el OpenAPI de la API"
 	@echo "make test     - corre pytest"
 	@echo "make lint     - ruff + eslint"
 
@@ -28,6 +29,10 @@ api:
 
 web:
 	pnpm dev:web
+
+types:
+	uv run python3 scripts/export-openapi.py
+	pnpm --filter @lucia/shared-types generate
 
 test:
 	uv run pytest

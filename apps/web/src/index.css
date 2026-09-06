@@ -1,3 +1,18 @@
+/* Tablero de lichess (GPL-3.0, misma licencia del proyecto: ver ADR-0004).
+   Los @import van antes que nada: CSS exige que precedan a cualquier otra
+   regla, y si no Vite los descarta con un aviso y el tablero sale sin
+   estilos. */
+@import "chessground/assets/chessground.base.css";
+@import "chessground/assets/chessground.brown.css";
+@import "chessground/assets/chessground.cburnett.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Chessground se dimensiona con su contenedor; sin esto el tablero queda de
+   1px de alto porque `cg-wrap` no tiene tamaño propio. */
+.cg-wrap {
+  width: 100%;
+  height: 100%;
+}
