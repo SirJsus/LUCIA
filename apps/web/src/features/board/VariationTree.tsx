@@ -1,5 +1,6 @@
 /** Árbol de variantes navegable (RF-6.3): la línea principal en línea, las
  * variantes indentadas, con acciones de promover y borrar. */
+import { EmptyState } from "../../components/Feedback";
 import type { TreeNode } from "./tree";
 
 interface VariationTreeProps {
@@ -19,9 +20,11 @@ export function VariationTree({
 }: VariationTreeProps) {
   if (root.children.length === 0) {
     return (
-      <p className="p-3 text-sm opacity-60">
-        Mueve una pieza en el tablero para empezar la variante.
-      </p>
+      <div className="p-3">
+        <EmptyState title="Sin variantes todavía">
+          Mueve una pieza en el tablero para empezar la variante.
+        </EmptyState>
+      </div>
     );
   }
 
@@ -57,36 +60,36 @@ function Variation({
   depth?: number;
 }) {
   if (node.children.length === 0) return null;
-  const [principal, ...variantes] = node.children;
+  const [mainChild, ...variations] = node.children;
 
   return (
     <>
       <MoveChip
-        node={principal}
+        node={mainChild}
         ply={ply}
-        isCurrent={principal.id === currentId}
+        isCurrent={mainChild.id === currentId}
         onSelect={onSelect}
         onPromote={onPromote}
         onDelete={onDelete}
         canPromote={depth > 0}
       />
 
-      {variantes.map((variante) => (
+      {variations.map((variation) => (
         <div
-          key={variante.id}
+          key={variation.id}
           className="my-1 border-l-2 border-slate-200 pl-2 opacity-90 dark:border-slate-700"
         >
           <MoveChip
-            node={variante}
+            node={variation}
             ply={ply}
-            isCurrent={variante.id === currentId}
+            isCurrent={variation.id === currentId}
             onSelect={onSelect}
             onPromote={onPromote}
             onDelete={onDelete}
             canPromote
           />
           <Variation
-            node={variante}
+            node={variation}
             ply={ply + 1}
             currentId={currentId}
             onSelect={onSelect}
@@ -98,7 +101,7 @@ function Variation({
       ))}
 
       <Variation
-        node={principal}
+        node={mainChild}
         ply={ply + 1}
         currentId={currentId}
         onSelect={onSelect}
@@ -144,6 +147,7 @@ function MoveChip({
           <button
             type="button"
             onClick={() => onPromote(node.id)}
+            aria-label={`Convertir ${node.san} en línea principal`}
             title="Convertir en línea principal"
             className="rounded px-1 text-xs opacity-60 hover:bg-slate-200 hover:opacity-100 dark:hover:bg-slate-700"
           >
@@ -153,6 +157,7 @@ function MoveChip({
         <button
           type="button"
           onClick={() => onDelete(node.id)}
+          aria-label={`Borrar ${node.san} y lo que sigue`}
           title="Borrar esta jugada y lo que sigue"
           className="rounded px-1 text-xs opacity-60 hover:bg-red-100 hover:opacity-100 dark:hover:bg-red-900/60"
         >

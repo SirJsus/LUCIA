@@ -37,8 +37,8 @@ class CachedEngineBridge:
     Lc0, ese "motor" incluye el nombre de la red (`lc0/744706-conv.pb.gz`),
     porque cambiar de red cambia por completo la evaluación.
 
-    Satisface el mismo `Protocol` que `lucia_core.analysis.AnalysingEngine`
-    (solo necesita `analyse(board)`), sin que `lucia_core` sepa de bases de
+    Satisface el mismo `Protocol` que `lucia_core.analysis.AnalyzingEngine`
+    (solo necesita `analyze(board)`), sin que `lucia_core` sepa de bases de
     datos.
     """
 
@@ -48,50 +48,54 @@ class CachedEngineBridge:
         # La clave de caché incluye la red neuronal, no solo el nombre del
         # motor: el mismo Lc0 con otra red da evaluaciones distintas para la
         # misma posición, y sin esto devolvería las de la red anterior.
-        pesos = engine.config.extra_options.get("WeightsFile")
-        self._engine_name = f"{engine_name}/{Path(str(pesos)).name}" if pesos else engine_name
+        weights_file = engine.config.extra_options.get("WeightsFile")
+        self._engine_name = (
+            f"{engine_name}/{Path(str(weights_file)).name}" if weights_file else engine_name
+        )
 
-    async def analyse(self, board: chess.Board) -> list[chess.engine.InfoDict]:
+    async def analyze(self, board: chess.Board) -> list[chess.engine.InfoDict]:
         config = self._engine.config
         if config.limit_kind == "time":
-            return await self._engine.analyse(board)
+            return await self._engine.analyze(board)
 
-        clave = {
+        cache_key = {
             "fen": board.fen(),
             "engine": self._engine_name,
             "depth": config.limit_value,
             "multipv": config.multipv,
         }
-        en_cache = await self._session.get(PositionCache, clave)
-        if en_cache is not None:
-            return [_deserializar_linea(linea) for linea in en_cache.lines_json]
+        cached_position = await self._session.get(PositionCache, cache_key)
+        if cached_position is not None:
+            return [
+                _deserialize_line(serialized_line) for serialized_line in cached_position.lines_json
+            ]
 
-        lineas = await self._engine.analyse(board)
+        lines = await self._engine.analyze(board)
         self._session.add(
-            PositionCache(**clave, lines_json=[_serializar_linea(linea) for linea in lineas])
+            PositionCache(**cache_key, lines_json=[_serialize_line(line) for line in lines])
         )
         await self._session.flush()
-        return lineas
+        return lines
 
 
-def _serializar_linea(linea: chess.engine.InfoDict) -> dict:
-    score = linea["score"].white()
+def _serialize_line(line: chess.engine.InfoDict) -> dict:
+    score = line["score"].white()
     return {
         "score_cp": None if score.is_mate() else score.score(),
         "score_mate": score.mate() if score.is_mate() else None,
-        "pv": [m.uci() for m in (linea.get("pv") or [])],
+        "pv": [m.uci() for m in (line.get("pv") or [])],
     }
 
 
-def _deserializar_linea(data: dict) -> chess.engine.InfoDict:
-    puntaje = (
-        chess.engine.Mate(data["score_mate"])
-        if data["score_mate"] is not None
-        else chess.engine.Cp(data["score_cp"])
+def _deserialize_line(serialized_line: dict) -> chess.engine.InfoDict:
+    score = (
+        chess.engine.Mate(serialized_line["score_mate"])
+        if serialized_line["score_mate"] is not None
+        else chess.engine.Cp(serialized_line["score_cp"])
     )
     return {
-        "score": chess.engine.PovScore(puntaje, chess.WHITE),
-        "pv": [chess.Move.from_uci(u) for u in data["pv"]],
+        "score": chess.engine.PovScore(score, chess.WHITE),
+        "pv": [chess.Move.from_uci(move_uci) for move_uci in serialized_line["pv"]],
     }
 
 
@@ -107,7 +111,7 @@ class EngineLine:
     pv_san: list[str]
 
 
-async def analyse_position(
+async def analyze_position(
     session: AsyncSession,
     fen: str,
     *,
@@ -123,30 +127,30 @@ async def analyse_position(
     la acota.
     """
     board = chess.Board(fen)  # lanza ValueError si el FEN es inválido
-    config_motor = await get_effective_config(session, engine_name)
+    effective_config = await get_effective_config(session, engine_name)
     config = EngineConfig(
         name=engine_name,
-        path=config_motor.path,
-        threads=config_motor.threads,
-        hash_mb=config_motor.hash_mb,
-        multipv=multipv or config_motor.multipv,
-        limit_kind=config_motor.limit_kind,
-        limit_value=depth or config_motor.depth,
-        extra_options=config_motor.uci_extra_options(),
+        path=effective_config.path,
+        threads=effective_config.threads,
+        hash_mb=effective_config.hash_mb,
+        multipv=multipv or effective_config.multipv,
+        limit_kind=effective_config.limit_kind,
+        limit_value=depth or effective_config.depth,
+        extra_options=effective_config.uci_extra_options(),
     )
 
-    async with EngineBridge(config) as motor_real:
+    async with EngineBridge(config) as real_engine:
         # Se reutiliza la misma caché que el análisis de partidas: explorar
         # variantes suele volver a posiciones ya vistas.
-        motor = CachedEngineBridge(session, motor_real, engine_name)
-        lineas = await motor.analyse(board)
+        cached_engine = CachedEngineBridge(session, real_engine, engine_name)
+        raw_lines = await cached_engine.analyze(board)
     await session.commit()
 
-    resultado: list[EngineLine] = []
-    for rank, linea in enumerate(lineas, start=1):
-        score = linea["score"].white()
-        pv = list(linea.get("pv") or [])
-        resultado.append(
+    lines: list[EngineLine] = []
+    for rank, raw_line in enumerate(raw_lines, start=1):
+        score = raw_line["score"].white()
+        pv = list(raw_line.get("pv") or [])
+        lines.append(
             EngineLine(
                 rank=rank,
                 score_cp=None if score.is_mate() else score.score(),
@@ -155,19 +159,19 @@ async def analyse_position(
                 pv_san=_pv_to_san(board, pv),
             )
         )
-    return resultado
+    return lines
 
 
 def _pv_to_san(board: chess.Board, pv: list[chess.Move]) -> list[str]:
     """La notación SAN depende de la posición, así que hay que ir aplicando
     las jugadas para nombrarlas bien (`Nf3` puede ser `Ngf3` según el caso)."""
-    tablero = board.copy()
+    replay_board = board.copy()
     san: list[str] = []
     for move in pv:
-        if move not in tablero.legal_moves:
+        if move not in replay_board.legal_moves:
             break  # una PV de la caché puede no encajar si el FEN no coincide
-        san.append(tablero.san(move))
-        tablero.push(move)
+        san.append(replay_board.san(move))
+        replay_board.push(move)
     return san
 
 
@@ -185,53 +189,55 @@ async def run_analysis(
     error no se pierda en silencio es guardarlo en la fila.
     """
     try:
-        partida = chess.pgn.read_game(io.StringIO(game.pgn))
-        if partida is None:
+        pgn_game = chess.pgn.read_game(io.StringIO(game.pgn))
+        if pgn_game is None:
             raise ValueError(f"PGN inválido en la partida {game.id}")
-        jugadas = list(partida.mainline_moves())
+        moves = list(pgn_game.mainline_moves())
 
         # `depth` y `multipv` salen de la fila `Analysis` (quedaron fijados al
         # encolar, para que el resultado sea reproducible aunque después se
         # cambie la config); `threads` y `hash_mb`, de la config vigente.
-        config_motor = await get_effective_config(session, analysis.engine)
+        effective_config = await get_effective_config(session, analysis.engine)
         config = EngineConfig(
             name=analysis.engine,
-            path=config_motor.path,
-            threads=config_motor.threads,
-            hash_mb=config_motor.hash_mb,
+            path=effective_config.path,
+            threads=effective_config.threads,
+            hash_mb=effective_config.hash_mb,
             multipv=analysis.multipv,
-            limit_kind=config_motor.limit_kind,
+            limit_kind=effective_config.limit_kind,
             limit_value=analysis.depth,
             # Lc0 necesita su red y su backend; Stockfish no usa ninguna.
-            extra_options=config_motor.uci_extra_options(),
+            extra_options=effective_config.uci_extra_options(),
         )
 
         analysis.status = "running"
         await session.commit()
 
-        async with EngineBridge(config) as motor_real:
-            motor = CachedEngineBridge(session, motor_real, analysis.engine)
-            resultado = await analyze_game(motor, chess.Board(), jugadas, on_position=on_progress)
+        async with EngineBridge(config) as real_engine:
+            cached_engine = CachedEngineBridge(session, real_engine, analysis.engine)
+            analysis_result = await analyze_game(
+                cached_engine, chess.Board(), moves, on_position=on_progress
+            )
 
-        for jugada in resultado.moves:
+        for analyzed_move in analysis_result.moves:
             session.add(
                 AnalyzedMove(
                     analysis_id=analysis.id,
-                    ply=jugada.ply,
-                    color="white" if jugada.color == chess.WHITE else "black",
-                    san=jugada.san,
-                    uci=jugada.uci,
-                    fen_before=jugada.fen_before,
-                    classification=jugada.classification,
-                    phase=jugada.phase,
-                    move_accuracy=jugada.accuracy,
-                    win_percent_before=jugada.win_percent_before,
-                    win_percent_after=jugada.win_percent_after,
-                    best_move_uci=jugada.best_move_uci,
+                    ply=analyzed_move.ply,
+                    color="white" if analyzed_move.color == chess.WHITE else "black",
+                    san=analyzed_move.san,
+                    uci=analyzed_move.uci,
+                    fen_before=analyzed_move.fen_before,
+                    classification=analyzed_move.classification,
+                    phase=analyzed_move.phase,
+                    move_accuracy=analyzed_move.accuracy,
+                    win_percent_before=analyzed_move.win_percent_before,
+                    win_percent_after=analyzed_move.win_percent_after,
+                    best_move_uci=analyzed_move.best_move_uci,
                 )
             )
-        analysis.white_accuracy = resultado.white_accuracy
-        analysis.black_accuracy = resultado.black_accuracy
+        analysis.white_accuracy = analysis_result.white_accuracy
+        analysis.black_accuracy = analysis_result.black_accuracy
         analysis.status = "done"
     except Exception as error:  # noqa: BLE001 — se guarda el motivo, no se traga
         analysis.status = "error"

@@ -3,7 +3,7 @@
   "info": {
     "title": "L.U.C.I.A. API",
     "description": "Logic & Ultimate Chess Insight Algorithm",
-    "version": "0.2.0"
+    "version": "0.2.1"
   },
   "paths": {
     "/health": {
@@ -352,9 +352,9 @@
         "tags": [
           "analysis"
         ],
-        "summary": "Analyze Position",
+        "summary": "Position Analysis",
         "description": "Analiza una posición suelta y devuelve las mejores líneas (RF-5.2 /\nRF-6.2). Para el tablero de análisis y la exploración en vivo.",
-        "operationId": "analyze_position_analysis_position_post",
+        "operationId": "position_analysis_analysis_position_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -375,7 +375,7 @@
                     "$ref": "#/components/schemas/EngineLineOut"
                   },
                   "type": "array",
-                  "title": "Response Analyze Position Analysis Position Post"
+                  "title": "Response Position Analysis Analysis Position Post"
                 }
               }
             }

@@ -7,8 +7,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { EmptyState, ErrorBox, Spinner } from "../../components/Feedback";
 import { api } from "../../lib/api";
 import { classificationStyle } from "../../lib/classification";
-import { formatAccuracy, formatDate, gameResult } from "../../lib/format";
+import { formatAccuracy, formatDate, formatDuration, gameResult } from "../../lib/format";
+import { whiteWinPercentAfterMove } from "../../lib/score";
 import { Chessboard } from "./Chessboard";
+import { EvalBar } from "./EvalBar";
 import { EngineComparison } from "./EngineComparison";
 import { EvalChart } from "./EvalChart";
 import { MoveList } from "./MoveList";
@@ -59,11 +61,10 @@ export function GameViewerPage() {
   const analysis = analysisQuery.data;
   const isRunning = analysis?.status === "queued" || analysis?.status === "running";
 
-  const refetchAnalysis = useCallback(() => {
-    void analysisQuery.refetch();
-  }, [analysisQuery]);
-
-  const progress = useAnalysisProgress(isRunning ? analysisId : null, refetchAnalysis);
+  const progress = useAnalysisProgress(isRunning ? analysisId : null, () =>
+    analysisQuery.refetch(),
+  );
+  const elapsedSeconds = useElapsedSeconds(isRunning);
 
   const analyzeMutation = useMutation({
     mutationFn: () => api.createAnalysis({ game_ids: [id], engine }),
@@ -74,17 +75,17 @@ export function GameViewerPage() {
   });
 
   // Con análisis terminados de dos motores distintos se puede comparar (RF-2.6).
-  const terminados = (existingQuery.data ?? []).filter((a) => a.status === "done");
-  const porMotor = new Map(terminados.map((a) => [a.engine, a]));
-  const puedeComparar = porMotor.size >= 2;
+  const doneAnalyses = (existingQuery.data ?? []).filter((a) => a.status === "done");
+  const doneAnalysisByEngine = new Map(doneAnalyses.map((a) => [a.engine, a]));
+  const canCompareEngines = doneAnalysisByEngine.size >= 2;
 
   const comparisonQuery = useQuery({
-    queryKey: ["comparison", [...porMotor.values()].map((a) => a.id).sort()],
+    queryKey: ["comparison", [...doneAnalysisByEngine.values()].map((a) => a.id).sort()],
     queryFn: () => {
-      const [a, b] = [...porMotor.values()];
+      const [a, b] = [...doneAnalysisByEngine.values()];
       return api.compareAnalyses(a.id, b.id);
     },
-    enabled: puedeComparar,
+    enabled: canCompareEngines,
   });
 
   const positions = useMemo(() => parsePgn(gameQuery.data?.pgn), [gameQuery.data?.pgn]);
@@ -114,13 +115,31 @@ export function GameViewerPage() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [currentPly, goTo, positions.length]);
 
+  // El análisis guardado solo tiene la mejor jugada de cada posición, no el
+  // MultiPV completo (eso vive en el tablero de análisis, que consulta al
+  // motor en vivo), así que aquí la flecha es una sola. RF-10 es justamente
+  // persistir las alternativas; hasta entonces no hay más que dibujar.
+  const bestMoveUci = analysis?.moves[currentPly + 1]?.best_move_uci ?? null;
+  const engineArrows = useMemo(
+    () => (bestMoveUci ? [{ uci: bestMoveUci, brush: "green" as const }] : []),
+    [bestMoveUci],
+  );
+
+  // En la posición inicial nadie ha movido todavía: 50-50 mientras haya
+  // análisis, y sin barra si no lo hay.
+  const currentAnalyzedMove = currentPly >= 0 ? analysis?.moves[currentPly] : undefined;
+  const whiteWinPercent = currentAnalyzedMove
+    ? whiteWinPercentAfterMove(currentAnalyzedMove)
+    : analysis?.status === "done"
+      ? 50
+      : null;
+
   if (gameQuery.isPending) return <Spinner label="Cargando la partida…" />;
   if (gameQuery.isError) return <ErrorBox error={gameQuery.error} onRetry={gameQuery.refetch} />;
 
   const game = gameQuery.data;
   const currentFen = currentPly < 0 ? STARTING_FEN : positions[currentPly].fen;
   const lastMoveUci = currentPly < 0 ? null : positions[currentPly].lan;
-  const bestMoveUci = analysis?.moves[currentPly + 1]?.best_move_uci ?? null;
 
   return (
     <div className="space-y-4">
@@ -164,7 +183,7 @@ export function GameViewerPage() {
           >
             {isRunning || analyzeMutation.isPending
               ? "Analizando…"
-              : porMotor.has(engine)
+              : doneAnalysisByEngine.has(engine)
                 ? `Reanalizar con ${engine}`
                 : `Analizar con ${engine}`}
           </button>
@@ -181,7 +200,8 @@ export function GameViewerPage() {
           <div className="flex justify-between">
             <span>Analizando con el motor…</span>
             <span className="tabular-nums opacity-70">
-              {progress ? `${progress.ply} / ${progress.total}` : "en cola"}
+              {progress ? `posición ${progress.ply} de ${progress.total}` : "en cola"} ·{" "}
+              {formatDuration(elapsedSeconds)}
             </span>
           </div>
           <div className="mt-1.5 h-1.5 overflow-hidden rounded bg-indigo-200 dark:bg-indigo-900">
@@ -195,30 +215,47 @@ export function GameViewerPage() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-3">
-          <div className="mx-auto w-full max-w-[34rem]">
-            <Chessboard
-              fen={currentFen}
-              orientation={orientation}
-              lastMoveUci={lastMoveUci}
-              bestMoveUci={bestMoveUci}
-            />
+          <div className="mx-auto flex w-full max-w-[36rem] gap-3">
+            {analysis?.status === "done" && (
+              <EvalBar whiteWinPercent={whiteWinPercent} orientation={orientation} />
+            )}
+            <div className="min-w-0 flex-1">
+              <Chessboard
+                fen={currentFen}
+                orientation={orientation}
+                lastMoveUci={lastMoveUci}
+                engineArrows={engineArrows}
+              />
+            </div>
           </div>
 
           <div className="flex items-center justify-center gap-2 text-sm">
-            <NavButton onClick={() => goTo(-1)} disabled={currentPly === -1} label="⏮" />
-            <NavButton onClick={() => goTo(currentPly - 1)} disabled={currentPly === -1} label="◀" />
+            <NavButton
+              onClick={() => goTo(-1)}
+              disabled={currentPly === -1}
+              symbol="⏮"
+              accessibleName="Ir a la posición inicial"
+            />
+            <NavButton
+              onClick={() => goTo(currentPly - 1)}
+              disabled={currentPly === -1}
+              symbol="◀"
+              accessibleName="Jugada anterior"
+            />
             <span className="w-24 text-center tabular-nums opacity-70">
               {currentPly + 1} / {positions.length}
             </span>
             <NavButton
               onClick={() => goTo(currentPly + 1)}
               disabled={currentPly >= positions.length - 1}
-              label="▶"
+              symbol="▶"
+              accessibleName="Jugada siguiente"
             />
             <NavButton
               onClick={() => goTo(positions.length - 1)}
               disabled={currentPly >= positions.length - 1}
-              label="⏭"
+              symbol="⏭"
+              accessibleName="Ir a la última jugada"
             />
           </div>
 
@@ -263,7 +300,7 @@ export function GameViewerPage() {
             <EngineComparison comparison={comparisonQuery.data} onSelectPly={goTo} />
           )}
 
-          {!puedeComparar && analysis?.status === "done" && (
+          {!canCompareEngines && analysis?.status === "done" && (
             <p className="rounded border border-dashed border-slate-300 px-3 py-2 text-xs opacity-70 dark:border-slate-700">
               Analiza también con el otro motor para ver dónde discrepan.
             </p>
@@ -280,23 +317,59 @@ export function GameViewerPage() {
   );
 }
 
+/** Segundos que lleva corriendo el análisis, mientras `isRunning` sea cierto.
+ *
+ * Acompaña a la barra de progreso en vez de sustituirla porque miden cosas
+ * distintas: la barra va por posición evaluada, y esas no tardan lo mismo —
+ * las que ya están en `position_cache` salen al instante y Lc0 tarda distinto
+ * en cada una. El reloj es lo único que dice cuánto se lleva esperado de
+ * verdad. Cuenta desde que esta pantalla ve el análisis en marcha, así que al
+ * recargar la página empieza de cero; para que sobreviviera habría que
+ * exponer `created_at` de la fila `analyses`, que hoy no sale en la API.
+ */
+function useElapsedSeconds(isRunning: boolean): number {
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!isRunning) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = setInterval(
+      () => setElapsedSeconds(Math.round((Date.now() - startedAt) / 1000)),
+      1000,
+    );
+    return () => clearInterval(timer);
+  }, [isRunning]);
+
+  return elapsedSeconds;
+}
+
+/** Botón de navegación del visor. `symbol` es lo que se ve y `accessibleName`
+ * lo que se lee: un botón cuyo contenido es solo un símbolo no tiene nombre
+ * accesible propio (C-7 de docs/07-coherencia-ui.md). */
 function NavButton({
   onClick,
   disabled,
-  label,
+  symbol,
+  accessibleName,
 }: {
   onClick: () => void;
   disabled: boolean;
-  label: string;
+  symbol: string;
+  accessibleName: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-label={accessibleName}
+      title={accessibleName}
       className="rounded border border-slate-300 px-2.5 py-1 disabled:opacity-40 dark:border-slate-700"
     >
-      {label}
+      {symbol}
     </button>
   );
 }

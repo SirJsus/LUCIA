@@ -16,39 +16,39 @@ def _override(db_session: AsyncSession) -> None:
     app.dependency_overrides[get_session] = _session
 
 
-async def test_engines_config_reporta_rutas_y_disponibilidad(db_session: AsyncSession) -> None:
+async def test_engines_config_reports_paths_and_availability(db_session: AsyncSession) -> None:
     _override(db_session)
     try:
         with TestClient(app) as http:
-            respuesta = http.get("/engines/config")
+            response = http.get("/engines/config")
     finally:
         app.dependency_overrides.clear()
 
-    assert respuesta.status_code == 200
-    body = respuesta.json()
+    assert response.status_code == 200
+    body = response.json()
     assert body["stockfish"]["name"] == "stockfish"
     assert isinstance(body["stockfish"]["available"], bool)
     assert isinstance(body["lc0"]["weights_available"], bool)
     assert body["stockfish"]["weights_path"] is None  # solo Lc0 usa red
 
 
-async def test_put_actualiza_y_persiste_la_configuracion(db_session: AsyncSession) -> None:
+async def test_put_updates_and_persists_the_config(db_session: AsyncSession) -> None:
     _override(db_session)
     try:
         with TestClient(app) as http:
-            respuesta = http.put(
+            response = http.put(
                 "/engines/config/stockfish",
                 json={"threads": 4, "hash_mb": 512, "depth": 20, "multipv": 5},
             )
-            assert respuesta.status_code == 200, respuesta.text
-            assert respuesta.json()["threads"] == 4
+            assert response.status_code == 200, response.text
+            assert response.json()["threads"] == 4
 
             # Vuelve a leerse desde la BD, no solo del eco del PUT.
-            leida = http.get("/engines/config").json()["stockfish"]
-            assert leida["threads"] == 4
-            assert leida["hash_mb"] == 512
-            assert leida["depth"] == 20
-            assert leida["multipv"] == 5
+            stored_config = http.get("/engines/config").json()["stockfish"]
+            assert stored_config["threads"] == 4
+            assert stored_config["hash_mb"] == 512
+            assert stored_config["depth"] == 20
+            assert stored_config["multipv"] == 5
     finally:
         app.dependency_overrides.clear()
 
@@ -56,13 +56,13 @@ async def test_put_actualiza_y_persiste_la_configuracion(db_session: AsyncSessio
     assert config.depth == 20
 
 
-async def test_put_no_permite_cambiar_la_ruta_del_binario(db_session: AsyncSession) -> None:
+async def test_put_does_not_allow_changing_the_binary_path(db_session: AsyncSession) -> None:
     """La ruta es de solo lectura a propósito: aceptarla por HTTP sería
     ejecución arbitraria de comandos desde el navegador."""
     _override(db_session)
     try:
         with TestClient(app) as http:
-            antes = http.get("/engines/config").json()["stockfish"]["path"]
+            path_before = http.get("/engines/config").json()["stockfish"]["path"]
             http.put(
                 "/engines/config/stockfish",
                 json={
@@ -73,66 +73,68 @@ async def test_put_no_permite_cambiar_la_ruta_del_binario(db_session: AsyncSessi
                     "path": "/bin/sh",  # campo extra: debe ignorarse
                 },
             )
-            despues = http.get("/engines/config").json()["stockfish"]["path"]
+            path_after = http.get("/engines/config").json()["stockfish"]["path"]
     finally:
         app.dependency_overrides.clear()
 
-    assert despues == antes
-    assert "/bin/sh" not in despues
+    assert path_after == path_before
+    assert "/bin/sh" not in path_after
 
 
-async def test_put_rechaza_valores_fuera_de_rango(db_session: AsyncSession) -> None:
+async def test_put_rejects_out_of_range_values(db_session: AsyncSession) -> None:
     _override(db_session)
     try:
         with TestClient(app) as http:
-            demasiados_hilos = http.put(
+            too_many_threads = http.put(
                 "/engines/config/stockfish",
                 json={"threads": 999, "hash_mb": 256, "depth": 18, "multipv": 3},
             )
-            profundidad_absurda = http.put(
+            absurd_depth = http.put(
                 "/engines/config/stockfish",
                 json={"threads": 2, "hash_mb": 256, "depth": 100, "multipv": 3},
             )
     finally:
         app.dependency_overrides.clear()
 
-    assert demasiados_hilos.status_code == 422
-    assert profundidad_absurda.status_code == 422
+    assert too_many_threads.status_code == 422
+    assert absurd_depth.status_code == 422
 
 
-async def test_put_a_motor_desconocido_da_404(db_session: AsyncSession) -> None:
+async def test_put_to_an_unknown_engine_returns_404(db_session: AsyncSession) -> None:
     _override(db_session)
     try:
         with TestClient(app) as http:
-            respuesta = http.put(
+            response = http.put(
                 "/engines/config/komodo",
                 json={"threads": 2, "hash_mb": 256, "depth": 18, "multipv": 3},
             )
     finally:
         app.dependency_overrides.clear()
 
-    assert respuesta.status_code == 404
+    assert response.status_code == 404
 
 
-async def test_lc0_acepta_miles_de_nodos_y_stockfish_no(db_session: AsyncSession) -> None:
+async def test_lc0_accepts_thousands_of_nodes_and_stockfish_does_not(
+    db_session: AsyncSession,
+) -> None:
     """El mismo campo significa profundidad en Stockfish y nodos en Lc0, así
     que el rango válido no puede ser el mismo: 1600 es una profundidad
     imposible y un número de nodos normal."""
     _override(db_session)
     try:
         with TestClient(app) as http:
-            en_lc0 = http.put(
+            lc0_response = http.put(
                 "/engines/config/lc0",
                 json={"threads": 2, "hash_mb": 256, "depth": 1600, "multipv": 1},
             )
-            en_stockfish = http.put(
+            stockfish_response = http.put(
                 "/engines/config/stockfish",
                 json={"threads": 2, "hash_mb": 256, "depth": 1600, "multipv": 1},
             )
     finally:
         app.dependency_overrides.clear()
 
-    assert en_lc0.status_code == 200, en_lc0.text
-    assert en_lc0.json()["depth"] == 1600
-    assert en_stockfish.status_code == 422
-    assert "depth" in en_stockfish.json()["detail"]
+    assert lc0_response.status_code == 200, lc0_response.text
+    assert lc0_response.json()["depth"] == 1600
+    assert stockfish_response.status_code == 422
+    assert "depth" in stockfish_response.json()["detail"]

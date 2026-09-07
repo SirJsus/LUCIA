@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 PGN = '[White "a"]\n[Black "b"]\n[Result "1-0"]\n\n1. e4 e5 1-0\n'
 
 
-async def _crear_partida(
+async def _create_game(
     session: AsyncSession,
     *,
     platform_id: str,
@@ -21,17 +21,17 @@ async def _crear_partida(
     black: str,
     time_class: str = "blitz",
     rated: bool = True,
-    dias_atras: int = 0,
+    days_ago: int = 0,
 ) -> Game:
-    jugador = (
+    player = (
         await session.execute(select(Player).where(Player.username == white))
     ).scalar_one_or_none()
-    if jugador is None:
-        jugador = Player(platform="chesscom", username=white)
-        session.add(jugador)
+    if player is None:
+        player = Player(platform="chesscom", username=white)
+        session.add(player)
         await session.flush()
-    partida = Game(
-        player_id=jugador.id,
+    game = Game(
+        player_id=player.id,
         platform="chesscom",
         platform_id=platform_id,
         pgn=PGN,
@@ -45,13 +45,13 @@ async def _crear_partida(
         time_class=time_class,
         rules="chess",
         rated=rated,
-        played_at=dt.datetime.now(dt.UTC) - dt.timedelta(days=dias_atras),
+        played_at=dt.datetime.now(dt.UTC) - dt.timedelta(days=days_ago),
         year=2024,
         month=1,
     )
-    session.add(partida)
+    session.add(game)
     await session.commit()
-    return partida
+    return game
 
 
 def _override(db_session: AsyncSession) -> None:
@@ -61,68 +61,68 @@ def _override(db_session: AsyncSession) -> None:
     app.dependency_overrides[get_session] = _session
 
 
-async def test_list_games_ordena_por_mas_reciente_primero(db_session: AsyncSession) -> None:
-    await _crear_partida(db_session, platform_id="g1", white="ana", black="beto", dias_atras=5)
-    await _crear_partida(db_session, platform_id="g2", white="ana", black="beto", dias_atras=1)
+async def test_list_games_orders_most_recent_first(db_session: AsyncSession) -> None:
+    await _create_game(db_session, platform_id="g1", white="ana", black="beto", days_ago=5)
+    await _create_game(db_session, platform_id="g2", white="ana", black="beto", days_ago=1)
 
     _override(db_session)
     try:
         with TestClient(app) as http:
-            respuesta = http.get("/games")
-        assert respuesta.status_code == 200
-        partidas = respuesta.json()
-        assert len(partidas) == 2
-        assert partidas[0]["white_rating"] == 1500
-        # la más reciente (dias_atras=1) va primero
-        fechas = [p["played_at"] for p in partidas]
-        assert fechas == sorted(fechas, reverse=True)
+            response = http.get("/games")
+        assert response.status_code == 200
+        games = response.json()
+        assert len(games) == 2
+        assert games[0]["white_rating"] == 1500
+        # la más reciente (days_ago=1) va primero
+        played_at_dates = [p["played_at"] for p in games]
+        assert played_at_dates == sorted(played_at_dates, reverse=True)
     finally:
         app.dependency_overrides.clear()
 
 
-async def test_list_games_filtra_por_username_y_color(db_session: AsyncSession) -> None:
-    await _crear_partida(db_session, platform_id="g1", white="ana", black="beto")
-    await _crear_partida(db_session, platform_id="g2", white="beto", black="ana")
-    await _crear_partida(db_session, platform_id="g3", white="carla", black="dario")
+async def test_list_games_filters_by_username_and_color(db_session: AsyncSession) -> None:
+    await _create_game(db_session, platform_id="g1", white="ana", black="beto")
+    await _create_game(db_session, platform_id="g2", white="beto", black="ana")
+    await _create_game(db_session, platform_id="g3", white="carla", black="dario")
 
     _override(db_session)
     try:
         with TestClient(app) as http:
-            todas_de_ana = http.get("/games", params={"username": "ana"}).json()
-            solo_blancas = http.get("/games", params={"username": "ana", "color": "white"}).json()
+            all_ana_games = http.get("/games", params={"username": "ana"}).json()
+            only_white_games = http.get(
+                "/games", params={"username": "ana", "color": "white"}
+            ).json()
     finally:
         app.dependency_overrides.clear()
 
-    assert len(todas_de_ana) == 2
-    assert len(solo_blancas) == 1
-    assert solo_blancas[0]["white_username"] == "ana"
+    assert len(all_ana_games) == 2
+    assert len(only_white_games) == 1
+    assert only_white_games[0]["white_username"] == "ana"
 
 
-async def test_list_games_encuentra_al_jugador_sin_importar_mayusculas(
+async def test_list_games_finds_the_player_regardless_of_case(
     db_session: AsyncSession,
 ) -> None:
-    await _crear_partida(db_session, platform_id="g1", white="SirJsus", black="Rival")
+    await _create_game(db_session, platform_id="g1", white="SirJsus", black="Rival")
 
     _override(db_session)
     try:
         with TestClient(app) as http:
-            en_minusculas = http.get("/games", params={"username": "sirjsus"}).json()
-            con_color = http.get("/games", params={"username": "sirjsus", "color": "white"}).json()
+            lowercase_games = http.get("/games", params={"username": "sirjsus"}).json()
+            lowercase_white_games = http.get(
+                "/games", params={"username": "sirjsus", "color": "white"}
+            ).json()
     finally:
         app.dependency_overrides.clear()
 
-    assert len(en_minusculas) == 1
-    assert len(con_color) == 1
+    assert len(lowercase_games) == 1
+    assert len(lowercase_white_games) == 1
 
 
-async def test_list_games_filtra_por_time_class_y_rated(db_session: AsyncSession) -> None:
-    await _crear_partida(
-        db_session, platform_id="g1", white="ana", black="beto", time_class="bullet"
-    )
-    await _crear_partida(
-        db_session, platform_id="g2", white="ana", black="beto", time_class="blitz"
-    )
-    await _crear_partida(
+async def test_list_games_filters_by_time_class_and_rated(db_session: AsyncSession) -> None:
+    await _create_game(db_session, platform_id="g1", white="ana", black="beto", time_class="bullet")
+    await _create_game(db_session, platform_id="g2", white="ana", black="beto", time_class="blitz")
+    await _create_game(
         db_session, platform_id="g3", white="ana", black="beto", time_class="blitz", rated=False
     )
 
@@ -138,45 +138,43 @@ async def test_list_games_filtra_por_time_class_y_rated(db_session: AsyncSession
     assert len(blitz_rated) == 1
 
 
-async def test_list_games_pagina_con_limit_y_offset(db_session: AsyncSession) -> None:
+async def test_list_games_paginates_with_limit_and_offset(db_session: AsyncSession) -> None:
     for i in range(5):
-        await _crear_partida(
-            db_session, platform_id=f"g{i}", white="ana", black="beto", dias_atras=i
-        )
+        await _create_game(db_session, platform_id=f"g{i}", white="ana", black="beto", days_ago=i)
 
     _override(db_session)
     try:
         with TestClient(app) as http:
-            pagina1 = http.get("/games", params={"limit": 2, "offset": 0}).json()
-            pagina2 = http.get("/games", params={"limit": 2, "offset": 2}).json()
+            page1 = http.get("/games", params={"limit": 2, "offset": 0}).json()
+            page2 = http.get("/games", params={"limit": 2, "offset": 2}).json()
     finally:
         app.dependency_overrides.clear()
 
-    assert len(pagina1) == 2
-    assert len(pagina2) == 2
-    assert {p["played_at"] for p in pagina1}.isdisjoint({p["played_at"] for p in pagina2})
+    assert len(page1) == 2
+    assert len(page2) == 2
+    assert {p["played_at"] for p in page1}.isdisjoint({p["played_at"] for p in page2})
 
 
-async def test_get_game_incluye_pgn(db_session: AsyncSession) -> None:
-    partida = await _crear_partida(db_session, platform_id="g1", white="ana", black="beto")
+async def test_get_game_includes_pgn(db_session: AsyncSession) -> None:
+    game = await _create_game(db_session, platform_id="g1", white="ana", black="beto")
 
     _override(db_session)
     try:
         with TestClient(app) as http:
-            respuesta = http.get(f"/games/{partida.id}")
+            response = http.get(f"/games/{game.id}")
     finally:
         app.dependency_overrides.clear()
 
-    assert respuesta.status_code == 200
-    assert respuesta.json()["pgn"] == PGN
+    assert response.status_code == 200
+    assert response.json()["pgn"] == PGN
 
 
-async def test_get_game_inexistente_da_404(db_session: AsyncSession) -> None:
+async def test_get_game_with_unknown_id_returns_404(db_session: AsyncSession) -> None:
     _override(db_session)
     try:
         with TestClient(app) as http:
-            respuesta = http.get("/games/999999")
+            response = http.get("/games/999999")
     finally:
         app.dependency_overrides.clear()
 
-    assert respuesta.status_code == 404
+    assert response.status_code == 404

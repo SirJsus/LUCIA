@@ -166,39 +166,39 @@ export function mainLine(root: TreeNode): TreeNode[] {
 
 /** Exporta el árbol a PGN con variantes entre paréntesis (RF-6.7). */
 export function toPgn(root: TreeNode): string {
-  const cuerpo = renderVariation(root, plyOf(root.fen));
+  const movetext = renderVariation(root, plyOf(root.fen));
   const setup =
     root.fen === new Chess().fen() ? "" : `[SetUp "1"]\n[FEN "${root.fen}"]\n\n`;
-  return `${setup}${cuerpo.trim()} *\n`;
+  return `${setup}${movetext.trim()} *\n`;
 }
 
 function plyOf(fen: string): number {
   // Del FEN salen el número de jugada y el turno, que dan el ply inicial.
-  const partes = fen.split(" ");
-  const fullmove = Number(partes[5] ?? 1);
-  const turno = partes[1] ?? "w";
-  return (fullmove - 1) * 2 + (turno === "b" ? 1 : 0);
+  const fenFields = fen.split(" ");
+  const fullmove = Number(fenFields[5] ?? 1);
+  const sideToMove = fenFields[1] ?? "w";
+  return (fullmove - 1) * 2 + (sideToMove === "b" ? 1 : 0);
 }
 
 function renderVariation(node: TreeNode, ply: number): string {
   if (node.children.length === 0) return "";
 
-  const [principal, ...variantes] = node.children;
-  let texto = `${moveNumber(ply)}${principal.san}`;
-  if (principal.comment) texto += ` {${principal.comment}}`;
+  const [mainChild, ...variations] = node.children;
+  let movetext = `${moveNumber(ply)}${mainChild.san}`;
+  if (mainChild.comment) movetext += ` {${mainChild.comment}}`;
 
-  for (const variante of variantes) {
-    let sub = `${moveNumber(ply)}${variante.san}`;
-    if (variante.comment) sub += ` {${variante.comment}}`;
-    const resto = renderVariation(variante, ply + 1);
-    texto += ` (${sub}${resto ? ` ${resto}` : ""})`;
+  for (const variation of variations) {
+    let sub = `${moveNumber(ply)}${variation.san}`;
+    if (variation.comment) sub += ` {${variation.comment}}`;
+    const variationContinuation = renderVariation(variation, ply + 1);
+    movetext += ` (${sub}${variationContinuation ? ` ${variationContinuation}` : ""})`;
   }
 
-  const resto = renderVariation(principal, ply + 1);
-  return resto ? `${texto} ${resto}` : texto;
+  const mainContinuation = renderVariation(mainChild, ply + 1);
+  return mainContinuation ? `${movetext} ${mainContinuation}` : movetext;
 }
 
 function moveNumber(ply: number): string {
-  const numero = Math.floor(ply / 2) + 1;
-  return ply % 2 === 0 ? `${numero}. ` : `${numero}... `;
+  const fullmoveNumber = Math.floor(ply / 2) + 1;
+  return ply % 2 === 0 ? `${fullmoveNumber}. ` : `${fullmoveNumber}... `;
 }

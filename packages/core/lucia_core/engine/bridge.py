@@ -17,9 +17,9 @@ class EngineBridge:
     async def open(self) -> None:
         _transport, engine = await chess.engine.popen_uci(str(self.config.path))
         self._engine = engine
-        await self._engine.configure(self._opciones_a_aplicar())
+        await self._engine.configure(self._options_to_apply())
 
-    def _opciones_a_aplicar(self) -> dict[str, str | int | bool]:
+    def _options_to_apply(self) -> dict[str, str | int | bool]:
         """Qué opciones UCI mandarle a este motor en concreto.
 
         `Threads` y `Hash` son "estándar" de facto, pero no universales: Lc0
@@ -36,14 +36,14 @@ class EngineBridge:
         if self._engine is None:
             raise RuntimeError("el motor no está abierto")
 
-        soportadas = self._engine.options
-        genericas: dict[str, str | int | bool] = {
+        supported_options = self._engine.options
+        generic_options: dict[str, str | int | bool] = {
             "Threads": self.config.threads,
             "Hash": self.config.hash_mb,
         }
-        opciones = {k: v for k, v in genericas.items() if k in soportadas}
-        opciones.update(self.config.extra_options)
-        return opciones
+        options = {k: v for k, v in generic_options.items() if k in supported_options}
+        options.update(self.config.extra_options)
+        return options
 
     async def close(self) -> None:
         if self._engine is not None:
@@ -57,7 +57,7 @@ class EngineBridge:
     async def __aexit__(self, *exc_info: object) -> None:
         await self.close()
 
-    async def analyse(self, board: chess.Board) -> list[chess.engine.InfoDict]:
+    async def analyze(self, board: chess.Board) -> list[chess.engine.InfoDict]:
         """Analiza `board` y devuelve una línea por cada `multipv` configurado,
         ordenadas de mejor a peor (índice 0 = mejor jugada del motor)."""
         if self._engine is None:

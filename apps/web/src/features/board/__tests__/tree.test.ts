@@ -42,17 +42,17 @@ describe("addMove", () => {
 
   it("reutiliza la rama si la jugada ya existe, en vez de duplicarla", () => {
     const { root } = lineFrom(START, ["e4"]);
-    const otraVez = addMove(root, "root", "e4");
+    const repeatedResult = addMove(root, "root", "e4");
 
-    expect(otraVez!.existed).toBe(true);
-    expect(otraVez!.root.children).toHaveLength(1);
+    expect(repeatedResult!.existed).toBe(true);
+    expect(repeatedResult!.root.children).toHaveLength(1);
   });
 
   it("crea una variante cuando la jugada es distinta", () => {
     const { root } = lineFrom(START, ["e4"]);
-    const conVariante = addMove(root, "root", "d4")!.root;
+    const rootWithVariation = addMove(root, "root", "d4")!.root;
 
-    expect(conVariante.children.map((c) => c.san)).toEqual(["e4", "d4"]);
+    expect(rootWithVariation.children.map((c) => c.san)).toEqual(["e4", "d4"]);
   });
 
   it("devuelve null si el nodo padre no existe", () => {
@@ -69,11 +69,11 @@ describe("addMove", () => {
 describe("promoteNode", () => {
   it("convierte una variante en línea principal", () => {
     const { root } = lineFrom(START, ["e4"]);
-    const conVariante = addMove(root, "root", "d4")!;
-    expect(mainLine(conVariante.root)[0].san).toBe("e4");
+    const addedVariation = addMove(root, "root", "d4")!;
+    expect(mainLine(addedVariation.root)[0].san).toBe("e4");
 
-    const promovido = promoteNode(conVariante.root, conVariante.nodeId);
-    expect(mainLine(promovido)[0].san).toBe("d4");
+    const rootAfterPromote = promoteNode(addedVariation.root, addedVariation.nodeId);
+    expect(mainLine(rootAfterPromote)[0].san).toBe("d4");
   });
 
   it("promover la raíz no cambia nada", () => {
@@ -85,12 +85,12 @@ describe("promoteNode", () => {
 describe("deleteNode", () => {
   it("borra el nodo y todo lo que cuelga de él", () => {
     const { root, cursor } = lineFrom(START, ["e4", "e5", "Nf3"]);
-    const nodoE5 = pathToNode(root, cursor)[2];
+    const e5Node = pathToNode(root, cursor)[2];
 
-    const podado = deleteNode(root, nodoE5.id);
+    const rootAfterDelete = deleteNode(root, e5Node.id);
 
-    expect(mainLine(podado).map((n) => n.san)).toEqual(["e4"]);
-    expect(findNode(podado, cursor)).toBeNull();
+    expect(mainLine(rootAfterDelete).map((n) => n.san)).toEqual(["e4"]);
+    expect(findNode(rootAfterDelete, cursor)).toBeNull();
   });
 
   it("no permite borrar la raíz", () => {
@@ -102,9 +102,9 @@ describe("deleteNode", () => {
 describe("pathToNode", () => {
   it("devuelve el camino desde la raíz, ambos incluidos", () => {
     const { root, cursor } = lineFrom(START, ["e4", "e5"]);
-    const camino = pathToNode(root, cursor);
+    const path = pathToNode(root, cursor);
 
-    expect(camino.map((n) => n.san)).toEqual([null, "e4", "e5"]);
+    expect(path.map((n) => n.san)).toEqual([null, "e4", "e5"]);
   });
 
   it("devuelve vacío si el nodo no existe", () => {
@@ -120,9 +120,9 @@ describe("toPgn", () => {
 
   it("mete las variantes entre paréntesis", () => {
     const { root } = lineFrom(START, ["e4"]);
-    const conVariante = addMove(root, "root", "d4")!.root;
+    const rootWithVariation = addMove(root, "root", "d4")!.root;
 
-    expect(toPgn(conVariante)).toContain("(1. d4)");
+    expect(toPgn(rootWithVariation)).toContain("(1. d4)");
   });
 
   it("añade la cabecera FEN cuando no arranca de la posición inicial", () => {

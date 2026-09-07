@@ -107,14 +107,14 @@ async def update_engine_config(
             detail=f"motor desconocido: {engine_name!r}. Conocidos: {list(ENGINE_NAMES)}",
         )
 
-    actual = await get_effective_config(session, engine_name)
-    minimo, maximo = LIMIT_RANGES[actual.limit_kind]
-    if not minimo <= body.depth <= maximo:
+    current_config = await get_effective_config(session, engine_name)
+    min_limit, max_limit = LIMIT_RANGES[current_config.limit_kind]
+    if not min_limit <= body.depth <= max_limit:
         raise HTTPException(
             status_code=422,
             detail=(
-                f"{engine_name} mide el esfuerzo en {actual.limit_kind}: "
-                f"el valor debe estar entre {minimo} y {maximo}"
+                f"{engine_name} mide el esfuerzo en {current_config.limit_kind}: "
+                f"el valor debe estar entre {min_limit} y {max_limit}"
             ),
         )
 

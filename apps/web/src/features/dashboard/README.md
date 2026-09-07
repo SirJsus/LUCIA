@@ -1,1 +1,6 @@
-// Feature 'dashboard' — ver docs/02-requerimientos.md (RF-5 / RF-3 / RF-4). TODO.
+# `features/dashboard`
+
+Estadísticas de la práctica propia (RF-3.1 a RF-3.3): marcador y rating por
+control de tiempo, partidas por mes, rendimiento por apertura y pérdida de
+ventaja por fase. Todo se agrega en la API (`GET /stats/...`); aquí solo se
+presenta.

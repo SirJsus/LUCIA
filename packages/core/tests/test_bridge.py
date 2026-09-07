@@ -3,7 +3,7 @@ import chess.engine
 import pytest
 from lucia_core.engine import EngineBridge, EngineConfig
 
-from .conftest import STOCKFISH_PATH, requiere_stockfish
+from .conftest import STOCKFISH_PATH, requires_stockfish
 
 
 def _config(**overrides: object) -> EngineConfig:
@@ -12,58 +12,58 @@ def _config(**overrides: object) -> EngineConfig:
     return EngineConfig(**base)
 
 
-@requiere_stockfish
-async def test_analiza_posicion_inicial_con_una_sola_linea() -> None:
-    async with EngineBridge(_config(multipv=1)) as motor:
-        lineas = await motor.analyse(chess.Board())
+@requires_stockfish
+async def test_analyzes_the_starting_position_with_a_single_line() -> None:
+    async with EngineBridge(_config(multipv=1)) as engine:
+        engine_lines = await engine.analyze(chess.Board())
 
-    assert len(lineas) == 1
-    assert lineas[0]["pv"][0] in chess.Board().legal_moves
+    assert len(engine_lines) == 1
+    assert engine_lines[0]["pv"][0] in chess.Board().legal_moves
 
 
-@requiere_stockfish
-async def test_multipv_devuelve_varias_lineas_ordenadas() -> None:
-    async with EngineBridge(_config(multipv=3)) as motor:
-        lineas = await motor.analyse(chess.Board())
+@requires_stockfish
+async def test_multipv_returns_several_ordered_lines() -> None:
+    async with EngineBridge(_config(multipv=3)) as engine:
+        engine_lines = await engine.analyze(chess.Board())
 
-    assert len(lineas) == 3
-    evals = [linea["score"].white().score(mate_score=100_000) for linea in lineas]
+    assert len(engine_lines) == 3
+    evals = [engine_line["score"].white().score(mate_score=100_000) for engine_line in engine_lines]
     assert evals == sorted(evals, reverse=True)  # blancas mueven: mejor línea primero
 
 
-@requiere_stockfish
-async def test_detecta_mate_en_una_posicion_forzada() -> None:
+@requires_stockfish
+async def test_detects_mate_in_a_forced_position() -> None:
     # Mate en 1 para las blancas (Re1-e8#), verificado con
     # `board.is_checkmate()` antes de fijarlo como fixture.
-    tablero = chess.Board("6k1/5ppp/8/8/8/8/8/4R2K w - - 0 1")
-    async with EngineBridge(_config(multipv=1)) as motor:
-        lineas = await motor.analyse(tablero)
+    mate_in_one_board = chess.Board("6k1/5ppp/8/8/8/8/8/4R2K w - - 0 1")
+    async with EngineBridge(_config(multipv=1)) as engine:
+        engine_lines = await engine.analyze(mate_in_one_board)
 
-    score = lineas[0]["score"].white()
+    score = engine_lines[0]["score"].white()
     assert score.is_mate()
     assert score.mate() == 1
 
 
-async def test_analizar_sin_abrir_el_motor_falla_claro() -> None:
-    motor = EngineBridge(_config())
+async def test_analyzing_without_opening_the_engine_fails_clearly() -> None:
+    engine = EngineBridge(_config())
     with pytest.raises(RuntimeError):
-        await motor.analyse(chess.Board())
+        await engine.analyze(chess.Board())
 
 
-@requiere_stockfish
-async def test_solo_manda_opciones_que_el_motor_declara() -> None:
+@requires_stockfish
+async def test_only_sends_options_the_engine_declares() -> None:
     """Lc0 no soporta `Hash` (usa `NNCacheSize`, que ni siquiera se mide en
     MB). Mandarle una opción desconocida aborta la conexión, así que las
     genéricas se filtran contra las que el motor declara."""
-    async with EngineBridge(_config()) as motor:
-        opciones = motor._opciones_a_aplicar()
+    async with EngineBridge(_config()) as engine:
+        options = engine._options_to_apply()
 
-    assert "Threads" in opciones  # Stockfish sí la declara
-    assert set(opciones) <= set(motor.config.extra_options) | {"Threads", "Hash"}
+    assert "Threads" in options  # Stockfish sí la declara
+    assert set(options) <= set(engine.config.extra_options) | {"Threads", "Hash"}
 
 
-@requiere_stockfish
-async def test_las_extra_options_no_se_filtran() -> None:
+@requires_stockfish
+async def test_extra_options_are_not_filtered() -> None:
     """A diferencia de las genéricas, una `extra_option` la pidió alguien a
     propósito: si el motor no la conoce, debe fallar y notarse."""
     config = _config(extra_options={"OpcionQueNoExiste": 1})

@@ -101,7 +101,7 @@ class PlayerStats:
     average_accuracy: float | None = None
 
 
-def _es_blancas(username: str):
+def _is_white(username: str):
     """Comparación insensible a mayúsculas.
 
     chess.com devuelve el perfil con el nombre canónico en minúsculas
@@ -112,7 +112,7 @@ def _es_blancas(username: str):
     return func.lower(Game.white_username) == username.lower()
 
 
-def _es_negras(username: str):
+def _is_black(username: str):
     return func.lower(Game.black_username) == username.lower()
 
 
@@ -122,19 +122,19 @@ def _outcome_for(username: str):
     chess.com guarda el resultado por bando ("win", "checkmated"...), así que
     hay que mirar de qué color jugó el usuario en cada partida.
     """
-    resultado_del_jugador = case(
-        (_es_blancas(username), Game.white_result),
+    player_result = case(
+        (_is_white(username), Game.white_result),
         else_=Game.black_result,
     )
     return case(
-        (resultado_del_jugador == "win", "win"),
-        (resultado_del_jugador.in_(DRAW_RESULTS), "draw"),
+        (player_result == "win", "win"),
+        (player_result.in_(DRAW_RESULTS), "draw"),
         else_="loss",
     )
 
 
 def _is_player(username: str):
-    return _es_blancas(username) | _es_negras(username)
+    return _is_white(username) | _is_black(username)
 
 
 async def get_player_stats(
@@ -143,7 +143,7 @@ async def get_player_stats(
     outcome = _outcome_for(username)
 
     # --- Resultados globales y por control de tiempo (RF-3.1) ---
-    filas = (
+    outcome_rows = (
         await session.execute(
             select(Game.time_class, outcome.label("outcome"), func.count())
             .where(_is_player(username))
@@ -152,17 +152,17 @@ async def get_player_stats(
     ).all()
 
     overall = RecordSummary()
-    por_control: dict[str, RecordSummary] = {}
-    for time_class, resultado, cuantas in filas:
-        registro = por_control.setdefault(time_class, RecordSummary())
-        _add(registro, resultado, cuantas)
-        _add(overall, resultado, cuantas)
+    by_time_class: dict[str, RecordSummary] = {}
+    for time_class, player_outcome, game_count in outcome_rows:
+        record = by_time_class.setdefault(time_class, RecordSummary())
+        _add(record, player_outcome, game_count)
+        _add(overall, player_outcome, game_count)
 
     # Rating actual por control: el de la partida más reciente de cada tipo.
     ratings = await _current_ratings(session, username)
 
     # --- Partidas por mes (RF-3.1) ---
-    meses = (
+    monthly_rows = (
         await session.execute(
             select(Game.year, Game.month, func.count())
             .where(_is_player(username))
@@ -172,7 +172,7 @@ async def get_player_stats(
     ).all()
 
     # --- Precisión media y partidas analizadas ---
-    analizadas, precision_media = await _accuracy_summary(session, username)
+    analyzed_games, average_accuracy = await _accuracy_summary(session, username)
 
     return PlayerStats(
         username=username,
@@ -180,40 +180,42 @@ async def get_player_stats(
         overall=overall,
         by_time_class=[
             TimeClassStats(
-                time_class=time_class, record=registro, current_rating=ratings.get(time_class)
+                time_class=time_class, record=record, current_rating=ratings.get(time_class)
             )
-            for time_class, registro in sorted(por_control.items())
+            for time_class, record in sorted(by_time_class.items())
         ],
-        by_month=[MonthlyCount(year=y, month=m, games=c) for y, m, c in meses],
+        by_month=[
+            MonthlyCount(year=year, month=month, games=games) for year, month, games in monthly_rows
+        ],
         by_opening=await _opening_stats(session, username, limit_openings),
         by_phase=await _phase_stats(session, username),
-        analyzed_games=analizadas,
-        average_accuracy=precision_media,
+        analyzed_games=analyzed_games,
+        average_accuracy=average_accuracy,
     )
 
 
-def _add(registro: RecordSummary, resultado: str, cuantas: int) -> None:
-    if resultado == "win":
-        registro.wins += cuantas
-    elif resultado == "draw":
-        registro.draws += cuantas
+def _add(record: RecordSummary, outcome: str, game_count: int) -> None:
+    if outcome == "win":
+        record.wins += game_count
+    elif outcome == "draw":
+        record.draws += game_count
     else:
-        registro.losses += cuantas
+        record.losses += game_count
 
 
 async def _current_ratings(session: AsyncSession, username: str) -> dict[str, int]:
     """Rating por control de tiempo, tomado de la partida más reciente."""
-    rating_del_jugador = case((_es_blancas(username), Game.white_rating), else_=Game.black_rating)
-    filas = (
+    player_rating = case((_is_white(username), Game.white_rating), else_=Game.black_rating)
+    rating_rows = (
         await session.execute(
-            select(Game.time_class, rating_del_jugador, Game.played_at)
+            select(Game.time_class, player_rating, Game.played_at)
             .where(_is_player(username))
             .order_by(Game.played_at.desc())
         )
     ).all()
 
     ratings: dict[str, int] = {}
-    for time_class, rating, _played_at in filas:
+    for time_class, rating, _played_at in rating_rows:
         ratings.setdefault(time_class, rating)  # la primera es la más reciente
     return ratings
 
@@ -221,27 +223,27 @@ async def _current_ratings(session: AsyncSession, username: str) -> dict[str, in
 async def _accuracy_summary(session: AsyncSession, username: str) -> tuple[int, float | None]:
     """Cuántas partidas tienen análisis terminado y la precisión media del
     usuario en ellas."""
-    precision_del_jugador = case(
-        (_es_blancas(username), Analysis.white_accuracy),
+    player_accuracy = case(
+        (_is_white(username), Analysis.white_accuracy),
         else_=Analysis.black_accuracy,
     )
-    fila = (
+    accuracy_row = (
         await session.execute(
-            select(func.count(), func.avg(precision_del_jugador))
+            select(func.count(), func.avg(player_accuracy))
             .select_from(Analysis)
             .join(Game, Analysis.game_id == Game.id)
             .where(_is_player(username), Analysis.status == "done")
         )
     ).one()
-    cuantas, media = fila
-    return cuantas, float(media) if media is not None else None
+    analyzed_games, average_accuracy = accuracy_row
+    return analyzed_games, float(average_accuracy) if average_accuracy is not None else None
 
 
-async def _opening_stats(session: AsyncSession, username: str, limite: int) -> list[OpeningStats]:
-    color = case((_es_blancas(username), "white"), else_="black")
+async def _opening_stats(session: AsyncSession, username: str, limit: int) -> list[OpeningStats]:
+    color = case((_is_white(username), "white"), else_="black")
     outcome = _outcome_for(username)
 
-    filas = (
+    opening_rows = (
         await session.execute(
             select(Game.eco, color.label("color"), outcome.label("outcome"), func.count())
             .where(_is_player(username), Game.eco.is_not(None))
@@ -249,21 +251,25 @@ async def _opening_stats(session: AsyncSession, username: str, limite: int) -> l
         )
     ).all()
 
-    agrupadas: dict[tuple[str, str], RecordSummary] = {}
-    for eco, color_jugado, resultado, cuantas in filas:
-        clave = (_opening_name(eco), color_jugado)
-        _add(agrupadas.setdefault(clave, RecordSummary()), resultado, cuantas)
+    records_by_opening: dict[tuple[str, str], RecordSummary] = {}
+    for eco, played_color, player_outcome, game_count in opening_rows:
+        opening_key = (_opening_name(eco), played_color)
+        _add(
+            records_by_opening.setdefault(opening_key, RecordSummary()), player_outcome, game_count
+        )
 
-    precisiones = await _accuracy_by_opening(session, username)
-    ordenadas = sorted(agrupadas.items(), key=lambda item: item[1].total, reverse=True)
+    accuracy_by_opening = await _accuracy_by_opening(session, username)
+    sorted_openings = sorted(
+        records_by_opening.items(), key=lambda item: item[1].total, reverse=True
+    )
     return [
         OpeningStats(
-            opening=nombre,
-            color=color_jugado,
-            record=registro,
-            average_accuracy=precisiones.get((nombre, color_jugado)),
+            opening=opening_name,
+            color=played_color,
+            record=record,
+            average_accuracy=accuracy_by_opening.get((opening_name, played_color)),
         )
-        for (nombre, color_jugado), registro in ordenadas[:limite]
+        for (opening_name, played_color), record in sorted_openings[:limit]
     ]
 
 
@@ -272,14 +278,14 @@ async def _accuracy_by_opening(
 ) -> dict[tuple[str, str], float]:
     """Precisión media del usuario en cada apertura, solo con las partidas que
     ya tienen análisis terminado."""
-    color = case((_es_blancas(username), "white"), else_="black")
-    precision_del_jugador = case(
-        (_es_blancas(username), Analysis.white_accuracy),
+    color = case((_is_white(username), "white"), else_="black")
+    player_accuracy = case(
+        (_is_white(username), Analysis.white_accuracy),
         else_=Analysis.black_accuracy,
     )
-    filas = (
+    accuracy_rows = (
         await session.execute(
-            select(Game.eco, color.label("color"), func.avg(precision_del_jugador))
+            select(Game.eco, color.label("color"), func.avg(player_accuracy))
             .select_from(Analysis)
             .join(Game, Analysis.game_id == Game.id)
             .where(_is_player(username), Analysis.status == "done", Game.eco.is_not(None))
@@ -287,9 +293,9 @@ async def _accuracy_by_opening(
         )
     ).all()
     return {
-        (_opening_name(eco), color_jugado): float(media)
-        for eco, color_jugado, media in filas
-        if media is not None
+        (_opening_name(eco), played_color): float(average_accuracy)
+        for eco, played_color, average_accuracy in accuracy_rows
+        if average_accuracy is not None
     }
 
 
@@ -297,8 +303,8 @@ def _opening_name(eco_url: str) -> str:
     """chess.com da la apertura como URL
     (`https://www.chess.com/openings/Italian-Game-2.Nf3`); aquí solo se
     extrae el nombre legible."""
-    nombre = eco_url.rstrip("/").rsplit("/", 1)[-1]
-    return nombre.replace("-", " ")
+    name = eco_url.rstrip("/").rsplit("/", 1)[-1]
+    return name.replace("-", " ")
 
 
 async def _phase_stats(session: AsyncSession, username: str) -> list[PhaseStats]:
@@ -307,16 +313,16 @@ async def _phase_stats(session: AsyncSession, username: str) -> list[PhaseStats]
     Solo cuentan las jugadas *del usuario*: mezclar las del rival diría más
     sobre cómo juega el otro que sobre uno mismo.
     """
-    color_del_jugador = case((_es_blancas(username), "white"), else_="black")
-    perdida = AnalyzedMove.win_percent_before - AnalyzedMove.win_percent_after
+    player_color = case((_is_white(username), "white"), else_="black")
+    win_percent_lost = AnalyzedMove.win_percent_before - AnalyzedMove.win_percent_after
 
-    filas = (
+    phase_rows = (
         await session.execute(
             select(
                 AnalyzedMove.phase,
                 func.count(),
                 func.avg(AnalyzedMove.move_accuracy),
-                func.avg(perdida),
+                func.avg(win_percent_lost),
                 func.sum(case((AnalyzedMove.classification == "blunder", 1), else_=0)),
             )
             .select_from(AnalyzedMove)
@@ -325,21 +331,21 @@ async def _phase_stats(session: AsyncSession, username: str) -> list[PhaseStats]
             .where(
                 _is_player(username),
                 Analysis.status == "done",
-                AnalyzedMove.color == color_del_jugador,
+                AnalyzedMove.color == player_color,
             )
             .group_by(AnalyzedMove.phase)
         )
     ).all()
 
-    orden = {"opening": 0, "middlegame": 1, "endgame": 2}
-    resultado = [
+    phase_order = {"opening": 0, "middlegame": 1, "endgame": 2}
+    phase_stats = [
         PhaseStats(
-            phase=fase,
-            moves=jugadas,
-            average_accuracy=float(precision or 0),
-            average_win_percent_lost=float(perdida_media or 0),
+            phase=phase,
+            moves=moves,
+            average_accuracy=float(accuracy or 0),
+            average_win_percent_lost=float(average_win_percent_lost or 0),
             blunders=int(blunders or 0),
         )
-        for fase, jugadas, precision, perdida_media, blunders in filas
+        for phase, moves, accuracy, average_win_percent_lost, blunders in phase_rows
     ]
-    return sorted(resultado, key=lambda p: orden.get(p.phase, 99))
+    return sorted(phase_stats, key=lambda p: phase_order.get(p.phase, 99))

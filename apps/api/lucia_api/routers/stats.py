@@ -124,10 +124,10 @@ async def player_stats(
     """Estadísticas del jugador indicado, o del de `CHESSCOM_USERNAME` si se
     omite. Se pide el nombre porque la base guarda partidas de ambos bandos:
     sin saber quién es "yo", un marcador de victorias no significa nada."""
-    jugador = username or settings.chesscom_username
-    if not jugador:
+    resolved_username = username or settings.chesscom_username
+    if not resolved_username:
         raise HTTPException(
             status_code=422,
             detail="indica un username, o configura CHESSCOM_USERNAME en .env",
         )
-    return _stats_out(await get_player_stats(session, jugador, limit_openings))
+    return _stats_out(await get_player_stats(session, resolved_username, limit_openings))

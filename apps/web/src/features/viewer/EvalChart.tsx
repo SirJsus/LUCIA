@@ -16,6 +16,7 @@ import {
   YAxis,
 } from "recharts";
 import { classificationStyle } from "../../lib/classification";
+import { whiteWinPercentAfterMove } from "../../lib/score";
 
 interface EvalChartProps {
   moves: AnalyzedMoveOut[];
@@ -24,12 +25,9 @@ interface EvalChartProps {
 }
 
 export function EvalChart({ moves, currentPly, onSelectPly }: EvalChartProps) {
-  // `win_percent_after` viene desde el punto de vista de quien movió; para un
-  // gráfico continuo hay que llevarlo todo a la perspectiva de las blancas.
   const data = moves.map((move) => ({
     ply: move.ply,
-    whiteWinPercent:
-      move.color === "white" ? move.win_percent_after : 100 - move.win_percent_after,
+    whiteWinPercent: whiteWinPercentAfterMove(move),
     san: move.san,
     classification: move.classification,
   }));

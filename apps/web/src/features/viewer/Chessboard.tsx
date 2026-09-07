@@ -11,12 +11,15 @@
 import { Chessground } from "chessground";
 import type { Api } from "chessground/api";
 import { useEffect, useRef } from "react";
-import { buildBoardConfig } from "./boardConfig";
+import { buildBoardConfig, type EngineArrow } from "./boardConfig";
 
 export interface ChessboardProps {
   fen: string;
-  /** Flecha de la mejor jugada del motor, en UCI (p. ej. "e2e4"). */
-  bestMoveUci?: string | null;
+  /** Flechas del motor sobre el tablero: sus mejores líneas, o la
+   * continuación que se está previsualizando. Memorízalas en quien llama
+   * (`useMemo`): si llegan recreadas en cada render, el tablero se
+   * reconfigura en cada render. */
+  engineArrows?: EngineArrow[];
   /** Última jugada jugada, para resaltar las dos casillas. */
   lastMoveUci?: string | null;
   orientation?: "white" | "black";
@@ -30,7 +33,7 @@ export interface ChessboardProps {
 
 export function Chessboard({
   fen,
-  bestMoveUci,
+  engineArrows,
   lastMoveUci,
   orientation = "white",
   legalMoves,
@@ -47,7 +50,7 @@ export function Chessboard({
   useEffect(() => {
     if (!containerRef.current) return;
     apiRef.current = Chessground(containerRef.current, {
-      ...buildBoardConfig({ fen, orientation, bestMoveUci, lastMoveUci, legalMoves, turnColor }),
+      ...buildBoardConfig({ fen, orientation, engineArrows, lastMoveUci, legalMoves, turnColor }),
       viewOnly: !onMoveRef.current,
       coordinates: true,
       animation: { enabled: true, duration: 150 },
@@ -68,9 +71,9 @@ export function Chessboard({
 
   useEffect(() => {
     apiRef.current?.set(
-      buildBoardConfig({ fen, orientation, bestMoveUci, lastMoveUci, legalMoves, turnColor }),
+      buildBoardConfig({ fen, orientation, engineArrows, lastMoveUci, legalMoves, turnColor }),
     );
-  }, [fen, orientation, bestMoveUci, lastMoveUci, legalMoves, turnColor]);
+  }, [fen, orientation, engineArrows, lastMoveUci, legalMoves, turnColor]);
 
   return <div ref={containerRef} className="aspect-square w-full" />;
 }

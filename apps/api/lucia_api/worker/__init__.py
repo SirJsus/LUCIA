@@ -51,19 +51,19 @@ class AnalysisWorker:
 
     def subscribe(self, analysis_id: int) -> asyncio.Queue[Event]:
         """Un WebSocket llama esto para recibir eventos de progreso."""
-        cola: asyncio.Queue[Event] = asyncio.Queue()
-        self._subscribers[analysis_id].append(cola)
-        return cola
+        subscriber_queue: asyncio.Queue[Event] = asyncio.Queue()
+        self._subscribers[analysis_id].append(subscriber_queue)
+        return subscriber_queue
 
-    def unsubscribe(self, analysis_id: int, cola: asyncio.Queue[Event]) -> None:
+    def unsubscribe(self, analysis_id: int, subscriber_queue: asyncio.Queue[Event]) -> None:
         with contextlib.suppress(ValueError):
-            self._subscribers[analysis_id].remove(cola)
+            self._subscribers[analysis_id].remove(subscriber_queue)
         if not self._subscribers[analysis_id]:
             self._subscribers.pop(analysis_id, None)
 
-    async def _publish(self, analysis_id: int, evento: Event) -> None:
-        for cola in self._subscribers.get(analysis_id, []):
-            await cola.put(evento)
+    async def _publish(self, analysis_id: int, event: Event) -> None:
+        for subscriber_queue in self._subscribers.get(analysis_id, []):
+            await subscriber_queue.put(event)
 
     async def _consume(self) -> None:
         while True:
@@ -86,8 +86,8 @@ class AnalysisWorker:
                 await self._publish(analysis_id, {"status": "error", "error": analysis.error})
                 return
 
-            async def progreso(ply: int, total: int) -> None:
+            async def publish_progress(ply: int, total: int) -> None:
                 await self._publish(analysis_id, {"status": "running", "ply": ply, "total": total})
 
-            await run_analysis(session, analysis, game, on_progress=progreso)
+            await run_analysis(session, analysis, game, on_progress=publish_progress)
             await self._publish(analysis_id, {"status": analysis.status, "error": analysis.error})

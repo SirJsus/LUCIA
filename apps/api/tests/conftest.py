@@ -21,14 +21,14 @@ from sqlalchemy.ext.asyncio import (
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 STOCKFISH_PATH = _PROJECT_ROOT / "engines" / "bin" / "stockfish"
 
-requiere_stockfish = pytest.mark.skipif(
+requires_stockfish = pytest.mark.skipif(
     not STOCKFISH_PATH.exists(),
     reason="Stockfish no está compilado; ejecuta 'make engines' para correr estos tests.",
 )
 
 
 @pytest.fixture(autouse=True)
-def _worker_limpio() -> Iterator[None]:
+def _clean_worker() -> Iterator[None]:
     """`app` es un singleton de módulo compartido entre tests. Sin esto, el
     segundo test que entra a `TestClient(app)` heredaría el `AnalysisWorker`
     (y su `asyncio.Queue`) del test anterior, atado a un event loop ya
@@ -94,7 +94,7 @@ def _make_game(
         {
             "url": f"https://www.chess.com/game/live/{uuid}",
             "uuid": uuid,
-            "pgn": pgn or _pgn_de_ejemplo(white, black),
+            "pgn": pgn or _sample_pgn(white, black),
             "time_control": "600",
             "end_time": end_time,
             "rated": True,
@@ -107,7 +107,7 @@ def _make_game(
     )
 
 
-def _pgn_de_ejemplo(white: str, black: str) -> str:
+def _sample_pgn(white: str, black: str) -> str:
     return (
         f'[White "{white}"]\n[Black "{black}"]\n[Result "1-0"]\n\n'
         "1. e4 {[%clk 0:09:58.1]} 1... e5 {[%clk 0:09:57.5]} 1-0\n"

@@ -9,13 +9,18 @@
   explicitud sobre origen/destino de los datos siguen siendo obligatorias; el
   agente `bautizador` vela por eso, no por traducir nada.
 - Calidad de código: antes de comitear una tarea, pasar por los agentes
-  `minimalista` (simplicidad, sin código de más), `bautizador` (nombres),
-  `documentador` (docs y comentarios) y `mapeador` (mapa Mermaid del proyecto),
-  en ese orden — o usar la skill `/revision-lucia` que encadena los cuatro.
+  `minimalista` (simplicidad, sin código de más), `coherencia-ui` (solo si el
+  cambio toca `apps/web`), `bautizador` (nombres), `documentador` (docs y
+  comentarios) y `mapeador` (mapa Mermaid del proyecto), en ese orden — o usar
+  la skill `/revision-lucia` que los encadena.
 - Mapa del proyecto: `docs/06-mapa-del-proyecto.md` tiene los diagramas Mermaid
   (flujo general, módulos, secuencias) y la tabla de qué RF vive en qué
   archivo. Consultarlo antes de tocar algo que no se conoce; lo mantiene el
   agente `mapeador`.
+- Coherencia de interfaz: `docs/07-coherencia-ui.md` tiene los criterios (C-1 a
+  C-7) y el inventario de incumplimientos abiertos. Recorrerlos antes de
+  comitear cualquier cambio en `apps/web`; una incoherencia que no se arregle
+  en el mismo commit se apunta en el inventario.
 - Versión y alcance: `docs/02-requerimientos.md` tiene el alcance congelado de
   v1.0 (todo lo que ya está ahí, con la fecha de corte); un RF/RNF añadido
   después va a su sección `Post 1.0 (futuro)`. `CHANGELOG.md` lleva el

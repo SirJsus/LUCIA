@@ -108,11 +108,11 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Analyze Position
+         * Position Analysis
          * @description Analiza una posición suelta y devuelve las mejores líneas (RF-5.2 /
          *     RF-6.2). Para el tablero de análisis y la exploración en vivo.
          */
-        post: operations["analyze_position_analysis_position_post"];
+        post: operations["position_analysis_analysis_position_post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -915,7 +915,7 @@ export interface operations {
             };
         };
     };
-    analyze_position_analysis_position_post: {
+    position_analysis_analysis_position_post: {
         parameters: {
             query?: never;
             header?: never;

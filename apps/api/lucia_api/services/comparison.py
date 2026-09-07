@@ -85,16 +85,16 @@ async def compare_analyses(
     if a.status != "done" or b.status != "done":
         raise ComparisonError("ambos análisis tienen que estar terminados")
 
-    jugadas_a = await _moves_by_ply(session, a.id)
-    jugadas_b = await _moves_by_ply(session, b.id)
+    moves_a = await _moves_by_ply(session, a.id)
+    moves_b = await _moves_by_ply(session, b.id)
 
-    comparadas: list[MoveComparison] = []
-    coinciden = 0
+    disagreements: list[MoveComparison] = []
+    agreed_best_moves = 0
     # Solo los plies presentes en ambos: si un análisis se cortó a medias, la
     # parte que falta no se puede comparar.
-    for ply in sorted(set(jugadas_a) & set(jugadas_b)):
-        move_a, move_b = jugadas_a[ply], jugadas_b[ply]
-        comparacion = MoveComparison(
+    for ply in sorted(set(moves_a) & set(moves_b)):
+        move_a, move_b = moves_a[ply], moves_b[ply]
+        move_comparison = MoveComparison(
             ply=ply,
             color=move_a.color,
             san=move_a.san,
@@ -105,12 +105,12 @@ async def compare_analyses(
             best_move_a=move_a.best_move_uci,
             best_move_b=move_b.best_move_uci,
         )
-        if comparacion.same_best_move:
-            coinciden += 1
-        if comparacion.win_percent_gap >= threshold:
-            comparadas.append(comparacion)
+        if move_comparison.same_best_move:
+            agreed_best_moves += 1
+        if move_comparison.win_percent_gap >= threshold:
+            disagreements.append(move_comparison)
 
-    comparadas.sort(key=lambda c: c.win_percent_gap, reverse=True)
+    disagreements.sort(key=lambda c: c.win_percent_gap, reverse=True)
 
     return AnalysisComparison(
         game_id=a.game_id,
@@ -118,14 +118,14 @@ async def compare_analyses(
         analysis_b=b.id,
         engine_a=a.engine,
         engine_b=b.engine,
-        total_moves=len(set(jugadas_a) & set(jugadas_b)),
-        agreed_best_moves=coinciden,
-        disagreements=comparadas,
+        total_moves=len(set(moves_a) & set(moves_b)),
+        agreed_best_moves=agreed_best_moves,
+        disagreements=disagreements,
     )
 
 
 async def _moves_by_ply(session: AsyncSession, analysis_id: int) -> dict[int, AnalyzedMove]:
-    resultado = await session.execute(
+    move_rows = await session.execute(
         select(AnalyzedMove).where(AnalyzedMove.analysis_id == analysis_id)
     )
-    return {move.ply: move for move in resultado.scalars().all()}
+    return {move.ply: move for move in move_rows.scalars().all()}

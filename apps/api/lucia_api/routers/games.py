@@ -51,32 +51,32 @@ async def list_games(
 ) -> list[GameSummary]:
     """Filtros según RF-5.3. `color` sin `username` se ignora: "blancas" o
     "negras" no significa nada sin decir de quién."""
-    consulta = select(Game).order_by(Game.played_at.desc()).limit(limit).offset(offset)
+    query = select(Game).order_by(Game.played_at.desc()).limit(limit).offset(offset)
     if username:
         # Insensible a mayúsculas: chess.com da el perfil en minúsculas pero
         # el PGN conserva el casing original ("sirjsus" vs "SirJsus").
-        es_blancas = func.lower(Game.white_username) == username.lower()
-        es_negras = func.lower(Game.black_username) == username.lower()
+        is_white = func.lower(Game.white_username) == username.lower()
+        is_black = func.lower(Game.black_username) == username.lower()
         if color == "white":
-            consulta = consulta.where(es_blancas)
+            query = query.where(is_white)
         elif color == "black":
-            consulta = consulta.where(es_negras)
+            query = query.where(is_black)
         else:
-            consulta = consulta.where(es_blancas | es_negras)
+            query = query.where(is_white | is_black)
     if time_class:
-        consulta = consulta.where(Game.time_class == time_class)
+        query = query.where(Game.time_class == time_class)
     if rated is not None:
-        consulta = consulta.where(Game.rated == rated)
+        query = query.where(Game.rated == rated)
 
-    resultado = await session.execute(consulta)
-    return [GameSummary.model_validate(g) for g in resultado.scalars().all()]
+    result = await session.execute(query)
+    return [GameSummary.model_validate(game) for game in result.scalars().all()]
 
 
 @router.get("/games/{game_id}", response_model=GameDetail)
 async def get_game(
     game_id: int, session: Annotated[AsyncSession, Depends(get_session)]
 ) -> GameDetail:
-    juego = await session.get(Game, game_id)
-    if juego is None:
+    game = await session.get(Game, game_id)
+    if game is None:
         raise HTTPException(status_code=404, detail="no existe esa partida")
-    return GameDetail.model_validate(juego)
+    return GameDetail.model_validate(game)

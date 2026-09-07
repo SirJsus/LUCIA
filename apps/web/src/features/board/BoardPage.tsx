@@ -1,12 +1,21 @@
 /** Tablero de análisis (RF-6.2 a RF-6.5): mover piezas, ramificar variantes,
- * ver lo que dice el motor en vivo y autoguardar. */
+ * ver lo que dice el motor en vivo y autoguardar.
+ *
+ * El tablero, la barra de evaluación y las flechas se comparten con el visor
+ * de partidas: viven en `features/viewer/` (`Chessboard`, `EvalBar`,
+ * `boardConfig`) para que las dos pantallas enseñen lo mismo de la misma
+ * forma. Lo propio de aquí es el árbol de variantes (`tree.ts`,
+ * `VariationTree`) y el panel del motor (`EngineLines`). */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { Chess } from "chess.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ErrorBox, Spinner } from "../../components/Feedback";
 import { api } from "../../lib/api";
+import { whiteWinPercentFromScore } from "../../lib/score";
+import { arrowsFromEngineLines, arrowsFromPreviewLine } from "../viewer/boardConfig";
 import { Chessboard } from "../viewer/Chessboard";
+import { EvalBar } from "../viewer/EvalBar";
 import { EngineLines } from "./EngineLines";
 import { VariationTree } from "./VariationTree";
 import {
@@ -36,6 +45,7 @@ export function BoardPage() {
   const [currentId, setCurrentId] = useState("root");
   const [orientation, setOrientation] = useState<"white" | "black">("white");
   const [engineOn, setEngineOn] = useState(true);
+  const [previewPvUci, setPreviewPvUci] = useState<string[] | null>(null);
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
 
   // Carga inicial del árbol guardado. Un `tree_json` con forma inesperada
@@ -43,8 +53,8 @@ export function BoardPage() {
   // de cero desde el FEN raíz, que sí es fiable.
   useEffect(() => {
     if (!boardQuery.data || tree) return;
-    const guardado = boardQuery.data.tree_json;
-    setTree(isTreeNode(guardado) ? guardado : createRoot(boardQuery.data.root_fen));
+    const savedTree = boardQuery.data.tree_json;
+    setTree(isTreeNode(savedTree) ? savedTree : createRoot(boardQuery.data.root_fen));
   }, [boardQuery.data, tree]);
 
   const saveMutation = useMutation({
@@ -78,10 +88,30 @@ export function BoardPage() {
 
   const analysisQuery = useQuery({
     queryKey: ["position", analysisFen],
-    queryFn: () => api.analysePosition({ fen: analysisFen }),
+    queryFn: () => api.analyzePosition({ fen: analysisFen }),
     enabled: engineOn && analysisFen !== "",
     staleTime: Infinity, // la evaluación de una posición no cambia sola
   });
+
+  // Al cambiar de posición, la línea previsualizada deja de tener sentido:
+  // sus jugadas eran continuaciones de la posición anterior. Se limpia aquí y
+  // no en cada acción porque la posición cambia por muchas vías (jugar,
+  // teclado, árbol de variantes).
+  useEffect(() => setPreviewPvUci(null), [currentId]);
+
+  // Lo que se dibuja sobre el tablero: la línea que se está señalando en el
+  // panel manda sobre las recomendaciones del motor, porque es lo que el
+  // usuario está mirando en ese momento.
+  const bestLine = analysisQuery.data?.[0];
+  const engineArrows = useMemo(
+    () =>
+      previewPvUci
+        ? arrowsFromPreviewLine(previewPvUci)
+        : engineOn
+          ? arrowsFromEngineLines(analysisQuery.data)
+          : [],
+    [previewPvUci, engineOn, analysisQuery.data],
+  );
 
   const legalMoves = useMemo(() => movesByOrigin(currentFen), [currentFen]);
   const turnColor = currentFen.split(" ")[1] === "b" ? "black" : "white";
@@ -125,27 +155,30 @@ export function BoardPage() {
   // Navegación con teclado por la línea actual. El camino va en `useMemo`
   // porque es dependencia del efecto de abajo: recalcularlo en cada render
   // volvería a registrar el listener continuamente.
-  const camino = useMemo(() => (tree ? pathToNode(tree, currentId) : []), [tree, currentId]);
+  const pathToCurrent = useMemo(
+    () => (tree ? pathToNode(tree, currentId) : []),
+    [tree, currentId],
+  );
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
         return;
       }
-      if (event.key === "ArrowLeft" && camino.length > 1) {
+      if (event.key === "ArrowLeft" && pathToCurrent.length > 1) {
         event.preventDefault();
-        setCurrentId(camino[camino.length - 2].id);
+        setCurrentId(pathToCurrent[pathToCurrent.length - 2].id);
       }
       if (event.key === "ArrowRight") {
-        const siguiente = findNode(tree ?? createRoot(""), currentId)?.children[0];
-        if (siguiente) {
+        const nextNode = findNode(tree ?? createRoot(""), currentId)?.children[0];
+        if (nextNode) {
           event.preventDefault();
-          setCurrentId(siguiente.id);
+          setCurrentId(nextNode.id);
         }
       }
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [camino, currentId, tree]);
+  }, [pathToCurrent, currentId, tree]);
 
   if (boardQuery.isPending) return <Spinner label="Cargando el tablero…" />;
   if (boardQuery.isError) return <ErrorBox error={boardQuery.error} onRetry={boardQuery.refetch} />;
@@ -211,15 +244,24 @@ export function BoardPage() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="space-y-3">
-          <div className="mx-auto w-full max-w-[34rem]">
-            <Chessboard
-              fen={currentFen}
-              orientation={orientation}
-              lastMoveUci={lastMoveUci}
-              legalMoves={legalMoves}
-              turnColor={turnColor}
-              onMove={handleBoardMove}
-            />
+          <div className="mx-auto flex w-full max-w-[36rem] gap-3">
+            {engineOn && (
+              <EvalBar
+                whiteWinPercent={bestLine ? whiteWinPercentFromScore(bestLine) : null}
+                orientation={orientation}
+              />
+            )}
+            <div className="min-w-0 flex-1">
+              <Chessboard
+                fen={currentFen}
+                orientation={orientation}
+                engineArrows={engineArrows}
+                lastMoveUci={lastMoveUci}
+                legalMoves={legalMoves}
+                turnColor={turnColor}
+                onMove={handleBoardMove}
+              />
+            </div>
           </div>
           <p className="text-center text-xs opacity-60">
             Arrastra una pieza para añadir la jugada. ← y → recorren la línea actual.
@@ -232,6 +274,7 @@ export function BoardPage() {
               lines={analysisQuery.data}
               isLoading={analysisQuery.isFetching}
               onPlayMove={playSan}
+              onPreviewLine={setPreviewPvUci}
             />
           )}
 
@@ -258,15 +301,15 @@ export function BoardPage() {
 /** Jugadas legales agrupadas por casilla de origen, en el formato que espera
  * chessground para permitir el arrastre. */
 function movesByOrigin(fen: string): Map<string, string[]> {
-  const destinos = new Map<string, string[]>();
-  if (!fen) return destinos;
+  const destsByOrigin = new Map<string, string[]>();
+  if (!fen) return destsByOrigin;
   try {
     const chess = new Chess(fen);
     for (const move of chess.moves({ verbose: true })) {
-      destinos.set(move.from, [...(destinos.get(move.from) ?? []), move.to]);
+      destsByOrigin.set(move.from, [...(destsByOrigin.get(move.from) ?? []), move.to]);
     }
   } catch {
     // FEN inválido: sin jugadas, el tablero queda en modo lectura
   }
-  return destinos;
+  return destsByOrigin;
 }

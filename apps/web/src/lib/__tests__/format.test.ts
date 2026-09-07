@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatAccuracy, formatTimeControl, gameResult } from "../format";
+import { formatAccuracy, formatDuration, formatTimeControl, gameResult } from "../format";
 
 describe("gameResult", () => {
   it("traduce la victoria de las blancas", () => {
@@ -43,5 +43,24 @@ describe("formatAccuracy", () => {
 
   it("redondea a un decimal", () => {
     expect(formatAccuracy(93.4567)).toBe("93.5");
+  });
+});
+
+describe("formatDuration", () => {
+  it("muestra minutos y segundos con los segundos a dos cifras", () => {
+    expect(formatDuration(0)).toBe("0:00");
+    expect(formatDuration(9)).toBe("0:09");
+    expect(formatDuration(75)).toBe("1:15");
+  });
+
+  it("añade las horas solo cuando las hay", () => {
+    expect(formatDuration(3599)).toBe("59:59");
+    expect(formatDuration(3600)).toBe("1:00:00");
+    expect(formatDuration(3725)).toBe("1:02:05");
+  });
+
+  it("no rompe con entradas fraccionarias ni negativas", () => {
+    expect(formatDuration(12.7)).toBe("0:12");
+    expect(formatDuration(-5)).toBe("0:00");
   });
 });

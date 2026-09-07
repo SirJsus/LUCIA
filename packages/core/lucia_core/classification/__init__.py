@@ -62,37 +62,37 @@ def classify_move(
     desde el punto de vista de quien jugó (`before.turn`).
     """
     thresholds = thresholds or DEFAULT_THRESHOLDS
-    mover = before.turn
-    win_before = win_percent(before.score.pov(mover), ply=before.ply)
-    win_after = win_percent(after.score.pov(mover), ply=after.ply)
+    mover_color = before.turn
+    win_before = win_percent(before.score.pov(mover_color), ply=before.ply)
+    win_after = win_percent(after.score.pov(mover_color), ply=after.ply)
 
-    if _perdio_mate_forzado(before, after, mover):
+    if _missed_forced_mate(before, after, mover_color):
         return "missed_win", win_before, win_after
 
     if before.best_move is not None and played == before.best_move:
         return "best", win_before, win_after
 
-    perdida = max(0.0, win_before - win_after)
-    if perdida < thresholds.excellent_max_loss:
+    win_percent_loss = max(0.0, win_before - win_after)
+    if win_percent_loss < thresholds.excellent_max_loss:
         return "excellent", win_before, win_after
-    if perdida < thresholds.good_max_loss:
+    if win_percent_loss < thresholds.good_max_loss:
         return "good", win_before, win_after
-    if perdida < thresholds.inaccuracy_max_loss:
+    if win_percent_loss < thresholds.inaccuracy_max_loss:
         return "inaccuracy", win_before, win_after
-    if perdida < thresholds.mistake_max_loss:
+    if win_percent_loss < thresholds.mistake_max_loss:
         return "mistake", win_before, win_after
     return "blunder", win_before, win_after
 
 
-def _perdio_mate_forzado(
-    before: EvaluatedPosition, after: EvaluatedPosition, mover: chess.Color
+def _missed_forced_mate(
+    before: EvaluatedPosition, after: EvaluatedPosition, mover_color: chess.Color
 ) -> bool:
     """Tenía mate forzado a favor y la jugada lo dejó escapar, aunque la
     posición siga siendo ganadora en centipawns: los umbrales de win% no
     distinguen bien entre "mate en 3" y "ganando por una torre" porque ambos
     saturan cerca del 100%, así que se comprueba aparte."""
-    antes = before.score.pov(mover)
-    despues = after.score.pov(mover)
-    tenia_mate = antes.is_mate() and (antes.mate() or 0) > 0
-    sigue_con_mate = despues.is_mate() and (despues.mate() or 0) > 0
-    return tenia_mate and not sigue_con_mate
+    score_before = before.score.pov(mover_color)
+    score_after = after.score.pov(mover_color)
+    had_forced_mate = score_before.is_mate() and (score_before.mate() or 0) > 0
+    still_has_forced_mate = score_after.is_mate() and (score_after.mate() or 0) > 0
+    return had_forced_mate and not still_has_forced_mate

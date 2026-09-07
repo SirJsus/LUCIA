@@ -8,11 +8,13 @@ qué requerimiento o decisión la justifica. Sirve para dos lectores distintos:
   qué módulo toca, con qué otros habla, y qué doc detallada corresponde.
 
 Lo mantiene actualizado el agente **`mapeador`**, y es un **cruce** del trabajo de
-los otros tres agentes de calidad del proyecto: toma los nombres que fija
+los demás agentes de calidad del proyecto: toma los nombres que fija
 `bautizador`, la estructura que deja `minimalista` tras simplificar, y los
 RF/RNF/ADR que registra `documentador`, y los refleja aquí. No repite la
-narrativa de [03-arquitectura.md](03-arquitectura.md) ni de
-[02-requerimientos.md](02-requerimientos.md); apunta a ellas.
+narrativa de [03-arquitectura.md](03-arquitectura.md), de
+[02-requerimientos.md](02-requerimientos.md) ni de
+[07-coherencia-ui.md](07-coherencia-ui.md) (criterios de interfaz, del agente
+`coherencia-ui`); apunta a ellas.
 
 > Si un diagrama de aquí contradice el código actual, el código manda: es señal
 > de que el mapeador necesita pasar. Ver [CLAUDE.md](../CLAUDE.md).
@@ -47,6 +49,7 @@ flowchart TB
     WEB -- "WebSocket /ws" --> ROUTERS
     ROUTERS --> WORKER
     ROUTERS --> DB
+    ROUTERS -- "POST /analysis/position<br/>(síncrono, sin cola)" --> BRIDGE
     WORKER --> BRIDGE
     WORKER --> ANALYSIS
     ANALYSIS --> CLASS
@@ -65,7 +68,11 @@ Detalle narrativo y modelo de datos completo: [03-arquitectura.md](03-arquitectu
 ```mermaid
 graph LR
     subgraph JS["Workspace pnpm"]
-        web["@lucia/web"]
+        subgraph WEB["@lucia/web"]
+            board["features/board<br/>tablero de análisis"]
+            viewer["features/viewer<br/>visor + piezas de tablero<br/>compartidas"]
+            lib["lib/<br/>api · score · format"]
+        end
         types["@lucia/shared-types"]
     end
 
@@ -75,7 +82,10 @@ graph LR
         chesscom["lucia_chesscom"]
     end
 
-    web --> types
+    board -- "Chessboard · EvalBar<br/>boardConfig" --> viewer
+    board --> lib
+    viewer --> lib
+    lib --> types
     api --> core
     api --> chesscom
     types -. "make types:<br/>export-openapi.py + openapi-typescript" .-> api
@@ -84,6 +94,12 @@ graph LR
 Regla: `lucia_core` y `lucia_chesscom` no dependen de `lucia_api` (evita ciclos);
 `lucia_api` orquesta a ambos. Si un cambio rompe esta dirección, es una señal
 para el agente `minimalista`.
+
+Dentro de `@lucia/web` la dirección también es de una sola vía:
+`features/board` importa de `features/viewer` (que es donde viven el tablero,
+la barra de evaluación y las flechas que usan las dos pantallas), nunca al
+revés. Si `features/viewer` empieza a importar de `features/board`, esas piezas
+compartidas ya no son del visor y toca sacarlas a un módulo propio.
 
 ## 3 · Flujos principales
 
@@ -158,6 +174,51 @@ sequenceDiagram
 perdió algún evento (hay una ventana de carrera pequeña y documentada entre
 suscribirse y el estado real, ver docstring de `analysis_progress`).
 
+### Analizar una posición en vivo (RF-5.2 / RF-6.2, implementado)
+
+Flujo 3 de [03-arquitectura.md § Flujos principales](03-arquitectura.md): no
+hay fila `Analysis` ni cola, la petición es síncrona y el cliente es quien
+traduce la evaluación a probabilidad de victoria ([ADR-0006](adr/0006-probabilidad-de-victoria-en-el-cliente.md)).
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant B as BoardPage (features/board)
+    participant V as features/viewer<br/>Chessboard · EvalBar · boardConfig
+    participant A as apps/api (routers/analysis.py)
+    participant S as services/analysis.py
+    participant E as CachedEngineBridge → EngineBridge
+    participant DB as SQLite (position_cache)
+
+    U->>B: jugar / navegar (tablero, teclado, árbol)
+    B->>B: esperar ANALYSIS_DELAY_MS antes de pedir
+    B->>A: POST /analysis/position {fen, engine, depth, multipv}
+    A->>S: analyse_position(session, fen, ...)
+    S->>DB: ¿FEN+engine+depth+multipv en position_cache?
+    alt no está en caché
+        S->>E: analyse(board)
+        E-->>S: líneas MultiPV (cp o mate)
+        S->>DB: guardar en position_cache
+    end
+    S-->>A: EngineLine[] (rank, score_cp/score_mate, pv_uci, pv_san)
+    A-->>B: 200: líneas del motor
+    B->>V: arrowsFromEngineLines(lines) → engineArrows
+    B->>B: whiteWinPercentFromScore(línea 1) [lib/score.ts]
+    B->>V: EvalBar(whiteWinPercent, orientation)
+    V-->>U: flechas sobre el tablero + barra de evaluación
+
+    opt señalar una jugada en EngineLines (previsualización)
+        U->>B: hover/foco sobre una jugada de una línea
+        B->>V: arrowsFromPreviewLine(pv recortado) → engineArrows
+        V-->>U: la continuación previsualizada sustituye a las flechas del motor
+    end
+```
+
+En el visor de partidas la fuente es distinta: no llama a este endpoint, pinta
+el análisis ya guardado (`GET /analysis/{id}`), que hoy solo trae una jugada
+por posición — de ahí una sola flecha hasta que RF-10 persista las
+alternativas.
+
 ## 4 · Ubicación por requerimiento
 
 Tabla de cruce: requerimiento → dónde vive → qué doc lo explica en detalle. Se
@@ -171,15 +232,21 @@ amplía a medida que se implementa cada RF (ver [05-roadmap.md](05-roadmap.md)).
 | RF-3.1-3.3 · Dashboard | `apps/api/lucia_api/services/stats.py` + `routers/stats.py`, `packages/core/lucia_core/phases/`, `apps/web/src/features/dashboard/` | [03-arquitectura.md](03-arquitectura.md) |
 | RF-3.4+ · Insight avanzado | `packages/core/lucia_core/insights/` (pendiente, fase 2) | [05-roadmap.md](05-roadmap.md) |
 | RF-4 · Entrenamiento | pendiente (fase 3) | [05-roadmap.md](05-roadmap.md) |
-| RF-5.1 · Visor de partida | `apps/web/src/features/viewer/` (Chessboard, MoveList, EvalChart, useAnalysisProgress) | [03-arquitectura.md § web](03-arquitectura.md) |
+| RF-5.1 · Visor de partida | `apps/web/src/features/viewer/` (`GameViewerPage`, `MoveList`, `EvalChart`, `useAnalysisProgress`) + las piezas compartidas de esa misma carpeta | [03-arquitectura.md § web](03-arquitectura.md) |
+| RF-5.2 · Análisis en vivo y flechas del motor | entregado en el tablero de análisis; en el visor solo la barra y una flecha, el resto depende de RF-10.2 y RF-6.6 (fase 2). `apps/api/lucia_api/routers/analysis.py` (`POST /analysis/position`) + `services/analysis.py::analyse_position`; `apps/web/src/features/viewer/boardConfig.ts` (`arrowsFromEngineLines`, `arrowsFromPreviewLine`), `EvalBar.tsx`, `Chessboard.tsx` (prop `engineArrows`) | [03-arquitectura.md § flujo 3](03-arquitectura.md) |
 | RF-5.3 · Listado de partidas | `apps/api/lucia_api/routers/games.py`, `apps/web/src/features/games/` | [03-arquitectura.md](03-arquitectura.md) |
 | RF-5.4 · Config. de motores | `apps/api/lucia_api/routers/engines.py` + `services/engines.py`, `apps/web/src/features/engines/` | [03-arquitectura.md](03-arquitectura.md) |
 | RF-5.6 · Tema claro/oscuro | `apps/web/src/components/ThemeToggle.tsx` | [02-requerimientos.md § RF-5](02-requerimientos.md) |
 | Contrato API ↔ front | `scripts/export-openapi.py`, `openapi.json`, `packages/shared-types/` | [03-arquitectura.md § api](03-arquitectura.md) |
-| RF-6 · Tablero de análisis | `apps/api/lucia_api/routers/boards.py`, `apps/web/src/features/board/` (`tree.ts` = árbol de variantes) | [03-arquitectura.md § web](03-arquitectura.md) |
+| RF-6 · Tablero de análisis | `apps/api/lucia_api/routers/boards.py`, `apps/web/src/features/board/` (`tree.ts` = árbol de variantes, `EngineLines.tsx` = MultiPV en vivo y previsualización de línea, RF-6.2); tablero, barra y flechas se importan de `features/viewer/` | [03-arquitectura.md § web](03-arquitectura.md) |
 | RF-7 · Ocupación del tablero | pendiente (fase 2/4) | [02-requerimientos.md § RF-7](02-requerimientos.md) |
+| RF-10 · Alternativas por jugada en el análisis guardado | pendiente (fase 2); el dato de partida está en `position_cache.lines_json`, falta persistirlo en `analyzed_moves` (`apps/api/lucia_api/db/models.py`) y leerlo desde el visor | [02-requerimientos.md § RF-10](02-requerimientos.md), [05-roadmap.md § fase 2](05-roadmap.md) |
+| RF-8 · Personalización de interfaz | pendiente (Post 1.0, fase 5) | [02-requerimientos.md § RF-8](02-requerimientos.md) |
+| RF-9 · Comparación entre motores (tabla y flechas) | pendiente (Post 1.0); amplía lo que hoy hace `services/comparison.py` + `EngineComparison.tsx` | [02-requerimientos.md § RF-9](02-requerimientos.md) |
+| RNF-11 · Coherencia de interfaz | transversal a `apps/web/` (piezas compartidas en `features/viewer/`, estados en `src/components/Feedback.tsx`); criterios C-1 a C-7 e inventario abierto | [07-coherencia-ui.md](07-coherencia-ui.md) |
 | Motores UCI | `engines/`, `scripts/setup-engines.sh` | [ADR-0002](adr/0002-motores-como-submodulos.md) |
 | Persistencia | `apps/api/lucia_api/db/` | [ADR-0005](adr/0005-sqlite-local-first.md) |
+| Probabilidad de victoria (win%) | `packages/core/lucia_core/accuracy/__init__.py` (backend) y `apps/web/src/lib/score.ts` (`whiteWinPercentFromScore`, cliente) | [ADR-0006](adr/0006-probabilidad-de-victoria-en-el-cliente.md) |
 | Orquestación nativa (`make up`) | `scripts/dev.sh`, `scripts/doctor.sh` | [README.md § arranque rápido](../README.md) |
 
 *Filas "pendiente" se completan cuando el módulo exista de verdad; el

@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     analysis_multipv: int = 3
 
     @model_validator(mode="after")
-    def _anclar_rutas_relativas_a_la_raiz_del_repo(self) -> "Settings":
+    def _anchor_relative_paths_to_repo_root(self) -> "Settings":
         """Una ruta relativa apunta a un sitio distinto según el directorio
         desde el que arranque el proceso (`make up`, `alembic`, `pytest`, un
         servicio de systemd...). Se anclan todas a la raíz del repo para que
@@ -36,13 +36,13 @@ class Settings(BaseSettings):
                 absolute = (_PROJECT_ROOT / raw_path).resolve()
                 self.database_url = f"{_SQLITE_PREFIX}{absolute}"
 
-        self.stockfish_path = _absoluta(self.stockfish_path)
-        self.lc0_path = _absoluta(self.lc0_path)
-        self.lc0_weights = _absoluta(self.lc0_weights)
+        self.stockfish_path = _absolute_path(self.stockfish_path)
+        self.lc0_path = _absolute_path(self.lc0_path)
+        self.lc0_weights = _absolute_path(self.lc0_weights)
         return self
 
 
-def _absoluta(path: Path) -> Path:
+def _absolute_path(path: Path) -> Path:
     return path if path.is_absolute() else (_PROJECT_ROOT / path).resolve()
 
 

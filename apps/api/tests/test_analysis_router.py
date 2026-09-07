@@ -14,17 +14,17 @@ from lucia_api.main import app
 from lucia_api.worker import AnalysisWorker
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from .conftest import requiere_stockfish
+from .conftest import requires_stockfish
 
 PGN = '[White "a"]\n[Black "b"]\n[Result "0-1"]\n\n1. f3 e5 2. g4 Qh4# 0-1\n'
 
 
-async def _crear_partida(session: AsyncSession) -> int:
-    jugador = Player(platform="chesscom", username="prueba")
-    session.add(jugador)
+async def _create_game(session: AsyncSession) -> int:
+    player = Player(platform="chesscom", username="prueba")
+    session.add(player)
     await session.flush()
-    partida = Game(
-        player_id=jugador.id,
+    game = Game(
+        player_id=player.id,
         platform="chesscom",
         platform_id="partida-api-1",
         pgn=PGN,
@@ -42,16 +42,16 @@ async def _crear_partida(session: AsyncSession) -> int:
         year=2024,
         month=1,
     )
-    session.add(partida)
+    session.add(game)
     await session.commit()
-    return partida.id
+    return game.id
 
 
-@requiere_stockfish
-async def test_flujo_completo_post_analysis_y_websocket_de_progreso(
+@requires_stockfish
+async def test_full_flow_post_analysis_and_progress_websocket(
     db_session: AsyncSession, db_session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
-    game_id = await _crear_partida(db_session)
+    game_id = await _create_game(db_session)
 
     async def _session() -> AsyncIterator[AsyncSession]:
         yield db_session
@@ -64,38 +64,38 @@ async def test_flujo_completo_post_analysis_y_websocket_de_progreso(
 
     try:
         with TestClient(app) as http:
-            respuesta = http.post(
+            response = http.post(
                 "/analysis", json={"game_ids": [game_id], "engine": "stockfish", "depth": 8}
             )
-            assert respuesta.status_code == 200, respuesta.text
-            analysis_id = respuesta.json()[0]["id"]
-            assert respuesta.json()[0]["status"] == "queued"
+            assert response.status_code == 200, response.text
+            analysis_id = response.json()[0]["id"]
+            assert response.json()[0]["status"] == "queued"
 
-            eventos = []
+            events = []
             with http.websocket_connect(f"/ws/analysis/{analysis_id}") as ws:
                 while True:
-                    evento = ws.receive_json()
-                    eventos.append(evento)
-                    if evento["status"] in ("done", "error"):
+                    event = ws.receive_json()
+                    events.append(event)
+                    if event["status"] in ("done", "error"):
                         break
 
-            assert eventos[-1]["status"] == "done"
-            assert any(e["status"] == "running" for e in eventos)
+            assert events[-1]["status"] == "done"
+            assert any(e["status"] == "running" for e in events)
 
-            detalle = http.get(f"/analysis/{analysis_id}").json()
-            assert detalle["status"] == "done"
-            assert len(detalle["moves"]) == 4
-            assert detalle["moves"][2]["uci"] == "g2g4"
-            assert detalle["white_accuracy"] < 90
+            detail = http.get(f"/analysis/{analysis_id}").json()
+            assert detail["status"] == "done"
+            assert len(detail["moves"]) == 4
+            assert detail["moves"][2]["uci"] == "g2g4"
+            assert detail["white_accuracy"] < 90
     finally:
         app.dependency_overrides.clear()
 
 
-@requiere_stockfish
-async def test_websocket_conecta_despues_de_terminado_recibe_resultado_final(
+@requires_stockfish
+async def test_websocket_connecting_after_the_end_receives_the_final_result(
     db_session: AsyncSession, db_session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
-    game_id = await _crear_partida(db_session)
+    game_id = await _create_game(db_session)
 
     async def _session() -> AsyncIterator[AsyncSession]:
         yield db_session
@@ -105,8 +105,8 @@ async def test_websocket_conecta_despues_de_terminado_recibe_resultado_final(
 
     try:
         with TestClient(app) as http:
-            respuesta = http.post("/analysis", json={"game_ids": [game_id], "depth": 8})
-            analysis_id = respuesta.json()[0]["id"]
+            response = http.post("/analysis", json={"game_ids": [game_id], "depth": 8})
+            analysis_id = response.json()[0]["id"]
 
             # Deja que el worker termine antes de conectar el WebSocket.
             with http.websocket_connect(f"/ws/analysis/{analysis_id}") as ws:
@@ -116,46 +116,46 @@ async def test_websocket_conecta_despues_de_terminado_recibe_resultado_final(
             # Segunda conexión, ya con el análisis terminado: debe recibir
             # el resultado final de una sola vez, sin esperar progreso.
             with http.websocket_connect(f"/ws/analysis/{analysis_id}") as ws:
-                evento = ws.receive_json()
-                assert evento["status"] == "done"
+                event = ws.receive_json()
+                assert event["status"] == "done"
     finally:
         app.dependency_overrides.clear()
 
 
-async def test_post_analysis_con_game_id_inexistente_da_404(db_session: AsyncSession) -> None:
+async def test_post_analysis_with_unknown_game_id_returns_404(db_session: AsyncSession) -> None:
     async def _session() -> AsyncIterator[AsyncSession]:
         yield db_session
 
     app.dependency_overrides[get_session] = _session
     try:
         with TestClient(app) as http:
-            respuesta = http.post("/analysis", json={"game_ids": [999999]})
-        assert respuesta.status_code == 404
+            response = http.post("/analysis", json={"game_ids": [999999]})
+        assert response.status_code == 404
     finally:
         app.dependency_overrides.clear()
 
 
-async def test_post_analysis_sin_game_ids_da_422(db_session: AsyncSession) -> None:
+async def test_post_analysis_without_game_ids_returns_422(db_session: AsyncSession) -> None:
     async def _session() -> AsyncIterator[AsyncSession]:
         yield db_session
 
     app.dependency_overrides[get_session] = _session
     try:
         with TestClient(app) as http:
-            respuesta = http.post("/analysis", json={"game_ids": []})
-        assert respuesta.status_code == 422
+            response = http.post("/analysis", json={"game_ids": []})
+        assert response.status_code == 422
     finally:
         app.dependency_overrides.clear()
 
 
-async def test_get_analysis_inexistente_da_404(db_session: AsyncSession) -> None:
+async def test_get_analysis_with_unknown_id_returns_404(db_session: AsyncSession) -> None:
     async def _session() -> AsyncIterator[AsyncSession]:
         yield db_session
 
     app.dependency_overrides[get_session] = _session
     try:
         with TestClient(app) as http:
-            respuesta = http.get("/analysis/999999")
-        assert respuesta.status_code == 404
+            response = http.get("/analysis/999999")
+        assert response.status_code == 404
     finally:
         app.dependency_overrides.clear()

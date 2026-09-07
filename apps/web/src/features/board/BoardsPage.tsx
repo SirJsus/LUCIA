@@ -150,11 +150,11 @@ interface ParsedSource {
 /** Acepta un FEN, un PGN o nada (RF-6.1). Se intenta primero como FEN porque
  * es más específico: un PGN nunca se confunde con un FEN válido. */
 function parseSource(source: string): ParsedSource | null {
-  const texto = source.trim();
-  if (!texto) return { rootFen: STARTING_FEN, tree: createRoot(STARTING_FEN) };
+  const trimmedSource = source.trim();
+  if (!trimmedSource) return { rootFen: STARTING_FEN, tree: createRoot(STARTING_FEN) };
 
   try {
-    const chess = new Chess(texto);
+    const chess = new Chess(trimmedSource);
     return { rootFen: chess.fen(), tree: createRoot(chess.fen()) };
   } catch {
     // no era un FEN; se intenta como PGN
@@ -162,14 +162,14 @@ function parseSource(source: string): ParsedSource | null {
 
   try {
     const chess = new Chess();
-    chess.loadPgn(texto);
-    const historial = chess.history({ verbose: true });
-    if (historial.length === 0) return null;
+    chess.loadPgn(trimmedSource);
+    const pgnMoves = chess.history({ verbose: true });
+    if (pgnMoves.length === 0) return null;
 
-    const rootFen = historial[0].before;
+    const rootFen = pgnMoves[0].before;
     let tree = createRoot(rootFen);
     let cursor = tree.id;
-    for (const move of historial) {
+    for (const move of pgnMoves) {
       const result = addMove(tree, cursor, move.san);
       if (!result) break;
       tree = result.root;

@@ -6,7 +6,7 @@ from lucia_core.classification import ClassificationThresholds, classify_move
 
 
 @dataclass
-class PosicionFalsa:
+class FakeEvaluatedPosition:
     """Satisface el `Protocol EvaluatedPosition` sin depender de
     `lucia_core.analysis` (ver docstring de `EvaluatedPosition`)."""
 
@@ -20,55 +20,57 @@ E4 = chess.Move.from_uci("e2e4")
 D4 = chess.Move.from_uci("d2d4")
 
 
-def _pos(ply: int, cp: int, mejor: chess.Move | None, mate: int | None = None) -> PosicionFalsa:
-    puntaje = chess.engine.Mate(mate) if mate is not None else chess.engine.Cp(cp)
-    return PosicionFalsa(
+def _pos(
+    ply: int, cp: int, best_move: chess.Move | None, mate: int | None = None
+) -> FakeEvaluatedPosition:
+    score = chess.engine.Mate(mate) if mate is not None else chess.engine.Cp(cp)
+    return FakeEvaluatedPosition(
         ply=ply,
         turn=chess.WHITE,
-        score=chess.engine.PovScore(puntaje, chess.WHITE),
-        best_move=mejor,
+        score=chess.engine.PovScore(score, chess.WHITE),
+        best_move=best_move,
     )
 
 
-def test_jugar_la_mejor_jugada_del_motor_es_best() -> None:
-    antes = _pos(0, cp=20, mejor=E4)
-    despues = _pos(1, cp=25, mejor=D4)
-    clasificacion, _, _ = classify_move(antes, despues, played=E4)
-    assert clasificacion == "best"
+def test_playing_the_engine_best_move_is_best() -> None:
+    before = _pos(0, cp=20, best_move=E4)
+    after = _pos(1, cp=25, best_move=D4)
+    classification, _, _ = classify_move(before, after, played=E4)
+    assert classification == "best"
 
 
-def test_pequena_perdida_es_excelente() -> None:
-    antes = _pos(10, cp=50, mejor=D4)
-    despues = _pos(11, cp=48, mejor=D4)  # casi la misma eval: perdida de win% mínima
-    clasificacion, _, _ = classify_move(antes, despues, played=E4)
-    assert clasificacion == "excellent"
+def test_small_win_percent_loss_is_excellent() -> None:
+    before = _pos(10, cp=50, best_move=D4)
+    after = _pos(11, cp=48, best_move=D4)  # casi la misma eval: perdida de win% mínima
+    classification, _, _ = classify_move(before, after, played=E4)
+    assert classification == "excellent"
 
 
-def test_perdida_grande_es_blunder() -> None:
-    antes = _pos(10, cp=200, mejor=D4)  # muy buena posición
-    despues = _pos(11, cp=-400, mejor=D4)  # se hunde tras la jugada
-    clasificacion, win_antes, win_despues = classify_move(antes, despues, played=E4)
-    assert clasificacion == "blunder"
-    assert win_antes > win_despues
+def test_big_win_percent_loss_is_blunder() -> None:
+    before = _pos(10, cp=200, best_move=D4)  # muy buena posición
+    after = _pos(11, cp=-400, best_move=D4)  # se hunde tras la jugada
+    classification, win_before, win_after = classify_move(before, after, played=E4)
+    assert classification == "blunder"
+    assert win_before > win_after
 
 
-def test_umbrales_son_ajustables() -> None:
-    antes = _pos(10, cp=100, mejor=D4)
-    despues = _pos(11, cp=50, mejor=D4)
-    umbrales_estrictos = ClassificationThresholds(excellent_max_loss=0.1)
-    clasificacion, _, _ = classify_move(antes, despues, played=E4, thresholds=umbrales_estrictos)
-    assert clasificacion != "excellent"  # con el umbral por defecto sí lo sería
+def test_thresholds_are_adjustable() -> None:
+    before = _pos(10, cp=100, best_move=D4)
+    after = _pos(11, cp=50, best_move=D4)
+    strict_thresholds = ClassificationThresholds(excellent_max_loss=0.1)
+    classification, _, _ = classify_move(before, after, played=E4, thresholds=strict_thresholds)
+    assert classification != "excellent"  # con el umbral por defecto sí lo sería
 
 
-def test_perder_mate_forzado_es_missed_win_aunque_siga_ganando() -> None:
-    antes = _pos(10, cp=0, mejor=D4, mate=3)  # mate en 3 a favor
-    despues = _pos(11, cp=500, mejor=D4)  # deja de haber mate, aunque sigue ganando mucho
-    clasificacion, _, _ = classify_move(antes, despues, played=E4)
-    assert clasificacion == "missed_win"
+def test_losing_a_forced_mate_is_missed_win_even_when_still_winning() -> None:
+    before = _pos(10, cp=0, best_move=D4, mate=3)  # mate en 3 a favor
+    after = _pos(11, cp=500, best_move=D4)  # deja de haber mate, aunque sigue ganando mucho
+    classification, _, _ = classify_move(before, after, played=E4)
+    assert classification == "missed_win"
 
 
-def test_mantener_el_mate_forzado_no_es_missed_win() -> None:
-    antes = _pos(10, cp=0, mejor=E4, mate=3)
-    despues = _pos(11, cp=0, mejor=D4, mate=2)  # sigue habiendo mate, más cerca incluso
-    clasificacion, _, _ = classify_move(antes, despues, played=E4)
-    assert clasificacion == "best"  # jugó la mejor jugada del motor
+def test_keeping_the_forced_mate_is_not_missed_win() -> None:
+    before = _pos(10, cp=0, best_move=E4, mate=3)
+    after = _pos(11, cp=0, best_move=D4, mate=2)  # sigue habiendo mate, más cerca incluso
+    classification, _, _ = classify_move(before, after, played=E4)
+    assert classification == "best"  # jugó la mejor jugada del motor

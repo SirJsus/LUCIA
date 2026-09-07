@@ -57,10 +57,10 @@ Cliente `httpx` asíncrono para la API pública de chess.com (`https://api.chess
 - Vite + React 19 + TypeScript. Rutas con **TanStack Router** en modo código (pocas rutas, sin plugin ni árbol generado): `/` (partidas), `/games/$gameId` (visor), `/engines` (motores).
 - **`lib/api.ts`**: cliente tipado con los tipos generados desde el OpenAPI real (`make types`), así un cambio de endpoint rompe la compilación en vez de fallar en producción.
 - **`features/games/`**: lista con filtros (jugador, color, control, puntuadas), paginación y disparo de sincronización.
-- **`features/viewer/`**: `Chessboard` (envoltorio de **chessground**, API imperativa manejada con `useRef`), `MoveList` (jugadas clasificadas), `EvalChart` (**Recharts**, eje Y en probabilidad de victoria, no centipawns), `useAnalysisProgress` (WebSocket con respaldo HTTP). Navegación con teclado.
+- **`features/viewer/`**: el visor de partidas y, además, las piezas de tablero que comparten las dos pantallas de ajedrez (las importa `features/board`): `Chessboard` (envoltorio de **chessground**, API imperativa manejada con `useRef`), `boardConfig` (configuración de chessground y traducción de líneas del motor a flechas: la mejor destacada, hasta tres, cada una etiquetada con su evaluación — RF-5.2), `EvalBar` (barra de evaluación en probabilidad de victoria, orientada como el tablero). Propios del visor: `MoveList` (jugadas clasificadas), `EvalChart` (**Recharts**, eje Y en probabilidad de victoria, no centipawns), `EngineComparison` (RF-2.6) y `useAnalysisProgress` (WebSocket con respaldo HTTP; el callback de fin va en una ref para no reabrir el socket en cada render). Navegación con teclado. Compartir estas piezas es lo que sostiene RNF-11: misma lectura en las dos pantallas.
 - **`features/engines/`**: configuración editable de los motores (RF-5.4).
 - **`features/dashboard/`**: estadísticas (RF-3.1 a 3.3): marcador y rating por control, partidas por mes, rendimiento por apertura y pérdida de ventaja por fase.
-- **`features/board/`**: tablero de análisis (RF-6). `tree.ts` tiene el árbol de variantes (añadir, promover, borrar, exportar a PGN) y es donde vive la validación de jugadas con chess.js; el servidor guarda ese árbol como JSON opaco.
+- **`features/board/`**: tablero de análisis (RF-6). `tree.ts` tiene el árbol de variantes (añadir, promover, borrar, exportar a PGN) y es donde vive la validación de jugadas con chess.js; el servidor guarda ese árbol como JSON opaco. `EngineLines` enseña el MultiPV en vivo y, al señalar una jugada de una línea, previsualiza esa continuación sobre el tablero (RF-6.2). El tablero, la barra de evaluación y las flechas se reutilizan de `features/viewer/`.
 - Estado de servidor con **TanStack Query**; el estado local del visor es `useState` — Zustand no hizo falta todavía.
 - Tailwind CSS con tema claro/oscuro (preferencia del sistema + conmutador recordado en `localStorage`).
 
@@ -115,12 +115,13 @@ puzzles (id, source_move_id, fen, solution_uci, theme, srs_due_at, srs_ease)
 
 1. **Sync** (implementado): `POST /sync` → `lucia_chesscom.ChessComClient` trae perfil, stats y archivos → `months_to_sync` decide qué meses faltan (RF-1.3) → por cada mes, secuencial, descarga partidas y hace upsert por `uuid` en `games` (idempotente) → actualiza `sync_state` → responde un resumen (meses sincronizados, partidas insertadas/actualizadas). Ver `lucia_api/services/chesscom_sync.py`.
 2. **Análisis** (implementado): `POST /analysis {game_ids, engine, depth, multipv}` → crea una fila `Analysis` por partida (estado `queued`) → `AnalysisWorker.enqueue` (una cola `asyncio.Queue` en proceso, un consumidor) → el worker llama a `run_analysis`, que usa `lucia_core.analyze_game` con un `CachedEngineBridge` (consulta `position_cache` antes de preguntarle al motor real) → guarda `analyzed_moves` y las precisiones → publica progreso a quien esté conectado por `WS /ws/analysis/{id}` → al terminar, deja el estado en `done` o `error`. `GET /analysis/{id}` es el respaldo si no hubo WebSocket o se perdió algún evento. Ver `lucia_api/worker/` y `lucia_api/services/analysis.py`.
-3. **Insight**: `GET /stats/...` agrega sobre `analyzed_moves` + `games` (consultas SQL, cacheadas).
-4. **Puzzles**: job periódico toma blunders con solución única (MultiPV: 1ª línea ≫ 2ª) → crea `puzzles`.
+3. **Análisis en vivo de una posición** (implementado, RF-5.2 / RF-6.2): el tablero de análisis manda `POST /analysis/position {fen, engine, multipv}` (con espera de ~400 ms para no disparar una petición por jugada de una secuencia rápida) → `analyse_position` responde las N mejores líneas **en centipawns o mate**, sin derivados → el cliente las dibuja como flechas y traduce la evaluación a probabilidad de victoria para la barra, replicando el modelo de Lichess del backend ([ADR-0006](adr/0006-probabilidad-de-victoria-en-el-cliente.md)). A diferencia del flujo 2, no hay fila `Analysis` ni worker: la petición es síncrona y se apoya en `position_cache`.
+4. **Insight**: `GET /stats/...` agrega sobre `analyzed_moves` + `games` (consultas SQL, cacheadas).
+5. **Puzzles**: job periódico toma blunders con solución única (MultiPV: 1ª línea ≫ 2ª) → crea `puzzles`.
 
 ## Decisiones clave
 
-Ver [ADRs](adr/): monorepo, motores como sub-módulos compilados, Python orquesta / C++ solo en motores, GPL-3.0, SQLite local-first.
+Ver [ADRs](adr/): monorepo, motores como sub-módulos compilados, Python orquesta / C++ solo en motores, GPL-3.0, SQLite local-first, probabilidad de victoria calculada también en el cliente.
 
 ## Ver también
 

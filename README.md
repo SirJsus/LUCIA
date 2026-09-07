@@ -6,7 +6,7 @@ Plataforma personal de entrenamiento de ajedrez. Usa **Stockfish** y **Lc0 (Leel
 
 ## Estructura del monorepo
 
-```
+``` text
 LUCIA/
 ├── apps/
 │   ├── api/            # Backend FastAPI (Python): orquesta motores, expone análisis
@@ -15,8 +15,8 @@ LUCIA/
 │   ├── core/           # Python: puente UCI con Stockfish/Lc0, clasificación de jugadas, métricas
 │   ├── chesscom/       # Python: cliente de la API pública de chess.com (perfil, archivos PGN)
 │   └── shared-types/   # TypeScript: tipos compartidos API <-> web (generados desde OpenAPI)
-├── engines/            # Submódulos git: stockfish/ y lc0/ (fuente C++, compilado a engines/bin/)
-├── infra/docker/       # docker-compose y Dockerfiles
+├── engines/            # Sub-módulos git: stockfish/ y lc0/ (fuente C++, compilado a engines/bin/)
+├── infra/docker/       # docker-compose y Docker-files
 ├── scripts/            # setup-engines.sh, utilidades
 └── docs/               # Visión, requerimientos, arquitectura, stack, roadmap, ADRs
 ```
@@ -31,6 +31,7 @@ LUCIA/
 | [04-stack-tecnologico.md](docs/04-stack-tecnologico.md) | Tecnologías elegidas y por qué |
 | [05-roadmap.md](docs/05-roadmap.md) | Fases de entrega |
 | [06-mapa-del-proyecto.md](docs/06-mapa-del-proyecto.md) | Mapa vivo en diagramas Mermaid: flujo general, módulos, secuencias y qué RF vive en qué archivo |
+| [07-coherencia-ui.md](docs/07-coherencia-ui.md) | Criterios de coherencia de la interfaz e inventario de incumplimientos abiertos |
 | [docs/adr/](docs/adr/) | Decisiones de arquitectura (ADR) |
 | [CHANGELOG.md](CHANGELOG.md) | Historial de versiones (Keep a Changelog + SemVer), a partir del alcance v1.0 congelado en requerimientos |
 
@@ -40,7 +41,7 @@ El flujo de desarrollo es nativo, sin Docker, pero con la comodidad de `docker c
 
 ```bash
 make doctor    # qué tienes, qué falta y cómo instalarlo
-make engines   # clona submódulos, compila Stockfish y Lc0, descarga red (una sola vez)
+make engines   # clona sub-módulos, compila Stockfish y Lc0, descarga red (una sola vez)
 make up        # crea .env si falta, instala dependencias si faltan, levanta api + web
 make up S=api  # solo un servicio (api | web)
 make types     # regenera los tipos TS del front desde el OpenAPI de la API

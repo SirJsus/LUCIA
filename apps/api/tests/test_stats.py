@@ -31,13 +31,13 @@ async def _add_game(
     eco: str | None = None,
     year: int = 2024,
     month: int = 1,
-    dias_atras: int = 0,
+    days_ago: int = 0,
 ) -> Game:
-    jugador = Player(platform="chesscom", username=f"dummy-{platform_id}")
-    session.add(jugador)
+    player = Player(platform="chesscom", username=f"dummy-{platform_id}")
+    session.add(player)
     await session.flush()
-    partida = Game(
-        player_id=jugador.id,
+    game = Game(
+        player_id=player.id,
         platform="chesscom",
         platform_id=platform_id,
         pgn=PGN,
@@ -52,16 +52,16 @@ async def _add_game(
         rules="chess",
         rated=True,
         eco=eco,
-        played_at=dt.datetime.now(dt.UTC) - dt.timedelta(days=dias_atras),
+        played_at=dt.datetime.now(dt.UTC) - dt.timedelta(days=days_ago),
         year=year,
         month=month,
     )
-    session.add(partida)
+    session.add(game)
     await session.commit()
-    return partida
+    return game
 
 
-async def test_resultado_depende_del_color_del_jugador(db_session: AsyncSession) -> None:
+async def test_outcome_depends_on_the_player_color(db_session: AsyncSession) -> None:
     # Una sola partida: victoria de las blancas (ana) sobre beto.
     await _add_game(
         db_session,
@@ -72,14 +72,14 @@ async def test_resultado_depende_del_color_del_jugador(db_session: AsyncSession)
         black_result="checkmated",
     )
 
-    de_ana = await get_player_stats(db_session, "ana")
-    de_beto = await get_player_stats(db_session, "beto")
+    ana_stats = await get_player_stats(db_session, "ana")
+    beto_stats = await get_player_stats(db_session, "beto")
 
-    assert (de_ana.overall.wins, de_ana.overall.losses) == (1, 0)
-    assert (de_beto.overall.wins, de_beto.overall.losses) == (0, 1)
+    assert (ana_stats.overall.wins, ana_stats.overall.losses) == (1, 0)
+    assert (beto_stats.overall.wins, beto_stats.overall.losses) == (0, 1)
 
 
-async def test_encuentra_al_jugador_sin_importar_mayusculas(db_session: AsyncSession) -> None:
+async def test_finds_the_player_regardless_of_case(db_session: AsyncSession) -> None:
     """chess.com da el perfil en minúsculas ("sirjsus") pero dentro del PGN el
     nombre va como lo escribió el jugador ("SirJsus"). Buscar por el nombre del
     perfil tiene que encontrar sus partidas igualmente."""
@@ -98,7 +98,7 @@ async def test_encuentra_al_jugador_sin_importar_mayusculas(db_session: AsyncSes
     assert stats.overall.wins == 1
 
 
-async def test_cuenta_tablas_por_separado(db_session: AsyncSession) -> None:
+async def test_counts_draws_separately(db_session: AsyncSession) -> None:
     await _add_game(
         db_session,
         platform_id="g1",
@@ -123,7 +123,7 @@ async def test_cuenta_tablas_por_separado(db_session: AsyncSession) -> None:
     assert stats.overall.score_percent == 50.0
 
 
-async def test_agrupa_por_control_de_tiempo_con_el_rating_mas_reciente(
+async def test_groups_by_time_class_with_the_most_recent_rating(
     db_session: AsyncSession,
 ) -> None:
     await _add_game(
@@ -135,7 +135,7 @@ async def test_agrupa_por_control_de_tiempo_con_el_rating_mas_reciente(
         black_result="resigned",
         time_class="bullet",
         white_rating=1400,
-        dias_atras=10,
+        days_ago=10,
     )
     await _add_game(
         db_session,
@@ -146,7 +146,7 @@ async def test_agrupa_por_control_de_tiempo_con_el_rating_mas_reciente(
         black_result="resigned",
         time_class="bullet",
         white_rating=1450,
-        dias_atras=1,  # más reciente: este rating es el que debe reportarse
+        days_ago=1,  # más reciente: este rating es el que debe reportarse
     )
     await _add_game(
         db_session,
@@ -160,15 +160,15 @@ async def test_agrupa_por_control_de_tiempo_con_el_rating_mas_reciente(
     )
 
     stats = await get_player_stats(db_session, "ana")
-    por_control = {item.time_class: item for item in stats.by_time_class}
+    by_time_class = {item.time_class: item for item in stats.by_time_class}
 
-    assert por_control["bullet"].record.wins == 2
-    assert por_control["bullet"].current_rating == 1450
-    assert por_control["rapid"].record.losses == 1
-    assert por_control["rapid"].current_rating == 1600
+    assert by_time_class["bullet"].record.wins == 2
+    assert by_time_class["bullet"].current_rating == 1450
+    assert by_time_class["rapid"].record.losses == 1
+    assert by_time_class["rapid"].current_rating == 1600
 
 
-async def test_agrupa_partidas_por_mes(db_session: AsyncSession) -> None:
+async def test_groups_games_by_month(db_session: AsyncSession) -> None:
     await _add_game(
         db_session,
         platform_id="g1",
@@ -208,8 +208,8 @@ async def test_agrupa_partidas_por_mes(db_session: AsyncSession) -> None:
     ]
 
 
-async def test_rendimiento_por_apertura_separa_colores(db_session: AsyncSession) -> None:
-    italiana = "https://www.chess.com/openings/Italian-Game"
+async def test_opening_performance_separates_colors(db_session: AsyncSession) -> None:
+    italian_game_url = "https://www.chess.com/openings/Italian-Game"
     await _add_game(
         db_session,
         platform_id="g1",
@@ -217,7 +217,7 @@ async def test_rendimiento_por_apertura_separa_colores(db_session: AsyncSession)
         black="beto",
         white_result="win",
         black_result="resigned",
-        eco=italiana,
+        eco=italian_game_url,
     )
     await _add_game(
         db_session,
@@ -226,21 +226,21 @@ async def test_rendimiento_por_apertura_separa_colores(db_session: AsyncSession)
         black="ana",
         white_result="win",
         black_result="resigned",
-        eco=italiana,
+        eco=italian_game_url,
     )
 
     stats = await get_player_stats(db_session, "ana")
-    por_color = {item.color: item for item in stats.by_opening}
+    by_color = {item.color: item for item in stats.by_opening}
 
-    assert por_color["white"].opening == "Italian Game"  # nombre legible, no la URL
-    assert por_color["white"].record.wins == 1
-    assert por_color["black"].record.losses == 1
+    assert by_color["white"].opening == "Italian Game"  # nombre legible, no la URL
+    assert by_color["white"].record.wins == 1
+    assert by_color["black"].record.losses == 1
 
 
-async def test_estadisticas_por_fase_solo_cuentan_jugadas_propias(
+async def test_phase_stats_only_count_own_moves(
     db_session: AsyncSession,
 ) -> None:
-    partida = await _add_game(
+    game = await _add_game(
         db_session,
         platform_id="g1",
         white="ana",
@@ -248,8 +248,8 @@ async def test_estadisticas_por_fase_solo_cuentan_jugadas_propias(
         white_result="win",
         black_result="resigned",
     )
-    analisis = Analysis(
-        game_id=partida.id,
+    analysis = Analysis(
+        game_id=game.id,
         engine="stockfish",
         depth=10,
         multipv=1,
@@ -257,14 +257,14 @@ async def test_estadisticas_por_fase_solo_cuentan_jugadas_propias(
         white_accuracy=90.0,
         black_accuracy=70.0,
     )
-    db_session.add(analisis)
+    db_session.add(analysis)
     await db_session.flush()
 
     # Una jugada de cada color en apertura; la de las negras es un blunder.
     db_session.add_all(
         [
             AnalyzedMove(
-                analysis_id=analisis.id,
+                analysis_id=analysis.id,
                 ply=0,
                 color="white",
                 san="e4",
@@ -277,7 +277,7 @@ async def test_estadisticas_por_fase_solo_cuentan_jugadas_propias(
                 win_percent_after=52.0,
             ),
             AnalyzedMove(
-                analysis_id=analisis.id,
+                analysis_id=analysis.id,
                 ply=1,
                 color="black",
                 san="g5",
@@ -293,27 +293,27 @@ async def test_estadisticas_por_fase_solo_cuentan_jugadas_propias(
     )
     await db_session.commit()
 
-    de_ana = await get_player_stats(db_session, "ana")
-    de_beto = await get_player_stats(db_session, "beto")
+    ana_stats = await get_player_stats(db_session, "ana")
+    beto_stats = await get_player_stats(db_session, "beto")
 
-    apertura_ana = next(p for p in de_ana.by_phase if p.phase == "opening")
-    apertura_beto = next(p for p in de_beto.by_phase if p.phase == "opening")
+    ana_opening_phase = next(p for p in ana_stats.by_phase if p.phase == "opening")
+    beto_opening_phase = next(p for p in beto_stats.by_phase if p.phase == "opening")
 
-    assert apertura_ana.moves == 1
-    assert apertura_ana.blunders == 0
-    assert apertura_ana.average_accuracy == 99.0
+    assert ana_opening_phase.moves == 1
+    assert ana_opening_phase.blunders == 0
+    assert ana_opening_phase.average_accuracy == 99.0
 
-    assert apertura_beto.moves == 1
-    assert apertura_beto.blunders == 1
-    assert apertura_beto.average_win_percent_lost == 40.0
+    assert beto_opening_phase.moves == 1
+    assert beto_opening_phase.blunders == 1
+    assert beto_opening_phase.average_win_percent_lost == 40.0
 
     # La precisión global también sale del bando correcto.
-    assert de_ana.average_accuracy == 90.0
-    assert de_beto.average_accuracy == 70.0
-    assert de_ana.analyzed_games == 1
+    assert ana_stats.average_accuracy == 90.0
+    assert beto_stats.average_accuracy == 70.0
+    assert ana_stats.analyzed_games == 1
 
 
-async def test_endpoint_stats_devuelve_el_resumen(db_session: AsyncSession) -> None:
+async def test_stats_endpoint_returns_the_summary(db_session: AsyncSession) -> None:
     await _add_game(
         db_session,
         platform_id="g1",
@@ -329,18 +329,18 @@ async def test_endpoint_stats_devuelve_el_resumen(db_session: AsyncSession) -> N
     app.dependency_overrides[get_session] = _session
     try:
         with TestClient(app) as http:
-            respuesta = http.get("/stats", params={"username": "ana"})
+            response = http.get("/stats", params={"username": "ana"})
     finally:
         app.dependency_overrides.clear()
 
-    assert respuesta.status_code == 200
-    body = respuesta.json()
+    assert response.status_code == 200
+    body = response.json()
     assert body["username"] == "ana"
     assert body["overall"]["wins"] == 1
     assert body["overall"]["total"] == 1
 
 
-async def test_endpoint_stats_sin_username_ni_configuracion_da_422(
+async def test_stats_endpoint_without_username_or_config_returns_422(
     db_session: AsyncSession, monkeypatch
 ) -> None:
     monkeypatch.setattr("lucia_api.routers.stats.settings.chesscom_username", "")
@@ -351,8 +351,8 @@ async def test_endpoint_stats_sin_username_ni_configuracion_da_422(
     app.dependency_overrides[get_session] = _session
     try:
         with TestClient(app) as http:
-            respuesta = http.get("/stats")
+            response = http.get("/stats")
     finally:
         app.dependency_overrides.clear()
 
-    assert respuesta.status_code == 422
+    assert response.status_code == 422

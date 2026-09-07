@@ -64,11 +64,11 @@ class ChessComClient:
         """Meses disponibles como tuplas `(año, mes)`, a partir de las URLs
         que devuelve `/games/archives` (formato `.../games/{YYYY}/{MM}`)."""
         data = await self._get_json(f"/player/{username}/games/archives")
-        meses: list[tuple[int, int]] = []
+        months: list[tuple[int, int]] = []
         for url in data.get("archives", []):
             year_str, month_str = url.rstrip("/").rsplit("/", 2)[-2:]
-            meses.append((int(year_str), int(month_str)))
-        return meses
+            months.append((int(year_str), int(month_str)))
+        return months
 
     async def get_month_games(self, username: str, year: int, month: int) -> list[ChessComGame]:
         try:
@@ -87,12 +87,12 @@ class ChessComClient:
         await self.aclose()
 
     async def _get_json(self, path: str) -> dict:
-        for intento in range(_MAX_RETRIES):
+        for attempt in range(_MAX_RETRIES):
             response = await self._http.get(path)
             if response.status_code == 404:
                 raise ChessComNotFoundError(path)
             if response.status_code == 429:
-                await asyncio.sleep(_retry_delay_seconds(response, intento))
+                await asyncio.sleep(_retry_delay_seconds(response, attempt))
                 continue
             response.raise_for_status()
             return response.json()
@@ -100,11 +100,11 @@ class ChessComClient:
         return response.json()
 
 
-def _retry_delay_seconds(response: httpx.Response, intento: int) -> float:
+def _retry_delay_seconds(response: httpx.Response, attempt: int) -> float:
     retry_after = response.headers.get("Retry-After")
     if retry_after is not None:
         try:
             return float(retry_after)
         except ValueError:
             pass
-    return _BACKOFF_BASE_SECONDS * (2**intento)
+    return _BACKOFF_BASE_SECONDS * (2**attempt)

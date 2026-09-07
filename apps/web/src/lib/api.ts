@@ -109,7 +109,7 @@ export const api = {
 
   getAnalysis: (analysisId: number) => request<AnalysisDetail>(`/analysis/${analysisId}`),
 
-  analysePosition: (body: {
+  analyzePosition: (body: {
     fen: string;
     engine?: "stockfish" | "lc0";
     depth?: number | null;

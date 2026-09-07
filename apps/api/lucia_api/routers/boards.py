@@ -58,7 +58,7 @@ class BoardUpdate(BaseModel):
     is_own_game: bool | None = None
 
 
-def _validar_fen(fen: str) -> None:
+def _validate_fen(fen: str) -> None:
     try:
         chess.Board(fen)
     except ValueError as error:
@@ -71,37 +71,37 @@ async def list_boards(
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[BoardSummary]:
-    resultado = await session.execute(
+    result = await session.execute(
         select(Board).order_by(Board.updated_at.desc()).limit(limit).offset(offset)
     )
-    return [BoardSummary.model_validate(b) for b in resultado.scalars().all()]
+    return [BoardSummary.model_validate(board) for board in result.scalars().all()]
 
 
 @router.post("/boards", response_model=BoardDetail, status_code=201)
 async def create_board(
     body: BoardCreate, session: Annotated[AsyncSession, Depends(get_session)]
 ) -> BoardDetail:
-    _validar_fen(body.root_fen)
-    tablero = Board(
+    _validate_fen(body.root_fen)
+    board = Board(
         title=body.title,
         root_fen=body.root_fen,
         tree_json=body.tree_json,
         tags_json=body.tags_json,
         is_own_game=body.is_own_game,
     )
-    session.add(tablero)
+    session.add(board)
     await session.commit()
-    return BoardDetail.model_validate(tablero)
+    return BoardDetail.model_validate(board)
 
 
 @router.get("/boards/{board_id}", response_model=BoardDetail)
 async def get_board(
     board_id: int, session: Annotated[AsyncSession, Depends(get_session)]
 ) -> BoardDetail:
-    tablero = await session.get(Board, board_id)
-    if tablero is None:
+    board = await session.get(Board, board_id)
+    if board is None:
         raise HTTPException(status_code=404, detail="no existe ese tablero")
-    return BoardDetail.model_validate(tablero)
+    return BoardDetail.model_validate(board)
 
 
 @router.put("/boards/{board_id}", response_model=BoardDetail)
@@ -110,30 +110,30 @@ async def update_board(
     body: BoardUpdate,
     session: Annotated[AsyncSession, Depends(get_session)],
 ) -> BoardDetail:
-    tablero = await session.get(Board, board_id)
-    if tablero is None:
+    board = await session.get(Board, board_id)
+    if board is None:
         raise HTTPException(status_code=404, detail="no existe ese tablero")
 
     if body.title is not None:
-        tablero.title = body.title
+        board.title = body.title
     if body.tree_json is not None:
-        tablero.tree_json = body.tree_json
+        board.tree_json = body.tree_json
     if body.tags_json is not None:
-        tablero.tags_json = body.tags_json
+        board.tags_json = body.tags_json
     if body.is_own_game is not None:
-        tablero.is_own_game = body.is_own_game
-    tablero.updated_at = dt.datetime.now(dt.UTC)
+        board.is_own_game = body.is_own_game
+    board.updated_at = dt.datetime.now(dt.UTC)
 
     await session.commit()
-    return BoardDetail.model_validate(tablero)
+    return BoardDetail.model_validate(board)
 
 
 @router.delete("/boards/{board_id}", status_code=204)
 async def delete_board(
     board_id: int, session: Annotated[AsyncSession, Depends(get_session)]
 ) -> None:
-    tablero = await session.get(Board, board_id)
-    if tablero is None:
+    board = await session.get(Board, board_id)
+    if board is None:
         raise HTTPException(status_code=404, detail="no existe ese tablero")
-    await session.delete(tablero)
+    await session.delete(board)
     await session.commit()

@@ -13,6 +13,19 @@ export function formatAccuracy(accuracy: number | null | undefined): string {
   return accuracy == null ? "—" : accuracy.toFixed(1);
 }
 
+/** Segundos transcurridos como "m:ss", o "h:mm:ss" si pasa de una hora.
+ * Para relojes en marcha: cuánto lleva corriendo un análisis. */
+export function formatDuration(totalSeconds: number): string {
+  const seconds = Math.max(0, Math.floor(totalSeconds));
+  const padTwoDigits = (value: number) => String(value).padStart(2, "0");
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor(seconds / 60);
+  // La primera cifra va sin rellenar: "1:02:05", no "01:02:05".
+  return hours > 0
+    ? `${hours}:${padTwoDigits(minutes % 60)}:${padTwoDigits(seconds % 60)}`
+    : `${minutes}:${padTwoDigits(seconds % 60)}`;
+}
+
 /** Resultados que chess.com reporta para AMBOS jugadores cuando es tablas;
  * cualquier otro valor distinto de "win" significa que ese bando perdió. */
 const DRAW_RESULTS = new Set([

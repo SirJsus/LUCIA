@@ -228,7 +228,7 @@ class PositionCache(Base):
     multipv: Mapped[int] = mapped_column(primary_key=True)
     lines_json: Mapped[list] = mapped_column(JSON)
     """Una entrada por línea de MultiPV, ver
-    `lucia_api.services.analysis._serializar_linea`."""
+    `lucia_api.services.analysis._serialize_line`."""
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
     )

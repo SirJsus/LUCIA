@@ -11,7 +11,7 @@ GameFactory = Callable[..., ChessComGame]
 ClientFactory = Callable[..., object]
 
 
-async def test_post_sync_devuelve_resumen(
+async def test_post_sync_returns_the_summary(
     db_session: AsyncSession, game_factory: GameFactory, fake_chesscom_client: ClientFactory
 ) -> None:
     client = fake_chesscom_client(
@@ -40,7 +40,7 @@ async def test_post_sync_devuelve_resumen(
     assert body["games_upserted"] == 1
 
 
-async def test_post_sync_sin_body_usa_username_de_settings(
+async def test_post_sync_without_body_uses_the_username_from_settings(
     db_session: AsyncSession,
     game_factory: GameFactory,
     fake_chesscom_client: ClientFactory,
