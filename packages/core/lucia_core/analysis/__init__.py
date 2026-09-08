@@ -147,7 +147,14 @@ async def analyze_game(
     thresholds: ClassificationThresholds | None = None,
     on_position: OnPosition | None = None,
 ) -> AnalyzedGame:
-    """Evalúa, clasifica y calcula la precisión de una partida completa."""
+    """Evalúa, clasifica y calcula la precisión de una partida completa.
+
+    `board` es la posición de partida y `moves` la línea principal jugada
+    desde ella: quien llama debe pasar la posición real de la partida (en
+    `apps/api`, `pgn_game.board()`), no un `chess.Board()` recién creado, o
+    las jugadas de una partida con `[SetUp "1"]` + `[FEN ...]` se replicarán
+    sobre un tablero que no es el suyo.
+    """
     position_evals = await evaluate_positions(engine, board, moves, on_position)
 
     # Las fases se calculan sobre los tableros, no sobre las evaluaciones: no

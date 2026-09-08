@@ -21,13 +21,17 @@ D4 = chess.Move.from_uci("d2d4")
 
 
 def _pos(
-    ply: int, cp: int, best_move: chess.Move | None, mate: int | None = None
+    ply: int,
+    cp: int,
+    best_move: chess.Move | None,
+    mate: int | None = None,
+    turn: chess.Color = chess.WHITE,
 ) -> FakeEvaluatedPosition:
     score = chess.engine.Mate(mate) if mate is not None else chess.engine.Cp(cp)
     return FakeEvaluatedPosition(
         ply=ply,
-        turn=chess.WHITE,
-        score=chess.engine.PovScore(score, chess.WHITE),
+        turn=turn,
+        score=chess.engine.PovScore(score, turn),
         best_move=best_move,
     )
 
@@ -74,3 +78,14 @@ def test_keeping_the_forced_mate_is_not_missed_win() -> None:
     after = _pos(11, cp=0, best_move=D4, mate=2)  # sigue habiendo mate, más cerca incluso
     classification, _, _ = classify_move(before, after, played=E4)
     assert classification == "best"  # jugó la mejor jugada del motor
+
+
+def test_delivering_the_mate_is_not_missed_win() -> None:
+    """La jugada que da mate cierra la partida: la posición resultante vale
+    `#+0` para quien lo dio, y eso es el mate cumplido, no un mate perdido."""
+    before = _pos(10, cp=0, best_move=E4, mate=2)  # mate en 2 a favor de las blancas
+    # Así evalúa `evaluate_positions` una posición terminal: `#-0` para quien
+    # tiene el turno, que tras el mate es el bando mateado.
+    after = _pos(11, cp=0, best_move=None, mate=0, turn=chess.BLACK)
+    classification, _, _ = classify_move(before, after, played=E4)
+    assert classification == "best"

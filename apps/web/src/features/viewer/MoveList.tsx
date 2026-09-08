@@ -1,6 +1,7 @@
 /** Lista de jugadas con su clasificación (RF-5.1), emparejadas por turno. */
 import type { AnalyzedMoveOut } from "@lucia/shared-types";
 import { classificationStyle } from "../../lib/classification";
+import { formatAccuracy } from "../../lib/format";
 
 interface MoveListProps {
   moves: AnalyzedMoveOut[];
@@ -44,7 +45,7 @@ function MoveButton({
     <button
       type="button"
       onClick={() => onSelect(move.ply)}
-      title={`${style.label} · precisión ${move.move_accuracy.toFixed(1)}`}
+      title={`${style.label} · precisión ${formatAccuracy(move.move_accuracy)}`}
       className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 text-left hover:bg-slate-100 dark:hover:bg-slate-800 ${
         isCurrent ? "bg-indigo-100 font-medium dark:bg-indigo-900/60" : ""
       }`}

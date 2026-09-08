@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { formatAccuracy, formatDuration, formatTimeControl, gameResult } from "../format";
+import {
+  formatAccuracy,
+  formatDuration,
+  formatEngineName,
+  formatPercent,
+  formatTimeClass,
+  formatTimeControl,
+  gameResult,
+} from "../format";
 
 describe("gameResult", () => {
   it("traduce la victoria de las blancas", () => {
@@ -41,8 +49,8 @@ describe("formatAccuracy", () => {
     expect(formatAccuracy(undefined)).toBe("—");
   });
 
-  it("redondea a un decimal", () => {
-    expect(formatAccuracy(93.4567)).toBe("93.5");
+  it("redondea a un decimal y lleva la unidad, que es un porcentaje", () => {
+    expect(formatAccuracy(93.4567)).toBe("93.5 %");
   });
 });
 
@@ -62,5 +70,38 @@ describe("formatDuration", () => {
   it("no rompe con entradas fraccionarias ni negativas", () => {
     expect(formatDuration(12.7)).toBe("0:12");
     expect(formatDuration(-5)).toBe("0:00");
+  });
+});
+
+describe("formatPercent", () => {
+  it("pone la unidad, con el espacio que pide la ortografía española", () => {
+    expect(formatPercent(54.28)).toBe("54 %");
+    expect(formatPercent(54.28, 1)).toBe("54.3 %");
+  });
+});
+
+describe("formatEngineName", () => {
+  it("enseña los motores conocidos como se escriben de verdad", () => {
+    expect(formatEngineName("stockfish")).toBe("Stockfish");
+    expect(formatEngineName("lc0")).toBe("Lc0");
+  });
+
+  it("un motor que no conoce se capitaliza, no se rompe (RNF-9)", () => {
+    expect(formatEngineName("komodo")).toBe("Komodo");
+  });
+});
+
+describe("formatTimeClass", () => {
+  it("presenta los controles de chess.com igual en todas las pantallas", () => {
+    // En inglés a propósito: son los términos del dominio y los que el
+    // usuario ya ve en chess.com. Ver el comentario de la función.
+    expect(formatTimeClass("bullet")).toBe("Bullet");
+    expect(formatTimeClass("blitz")).toBe("Blitz");
+    expect(formatTimeClass("rapid")).toBe("Rapid");
+    expect(formatTimeClass("daily")).toBe("Daily");
+  });
+
+  it("uno desconocido se capitaliza en vez de desaparecer", () => {
+    expect(formatTimeClass("classical")).toBe("Classical");
   });
 });

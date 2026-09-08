@@ -4,7 +4,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Chess } from "chess.js";
 import { useState } from "react";
+import { Button } from "../../components/Button";
 import { EmptyState, ErrorBox, Spinner } from "../../components/Feedback";
+import { FIELD_CLASSES, PANEL_CLASSES } from "../../components/styles";
 import { api } from "../../lib/api";
 import { formatDate } from "../../lib/format";
 import { addMove, createRoot, type TreeNode } from "./tree";
@@ -59,7 +61,7 @@ export function BoardsPage() {
 
       <form
         onSubmit={handleCreate}
-        className="space-y-3 rounded border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+        className={`space-y-3 p-4 ${PANEL_CLASSES}`}
       >
         <div className="flex flex-wrap gap-3">
           <label className="text-sm">
@@ -68,7 +70,7 @@ export function BoardsPage() {
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Mi partida del club"
-              className="w-64 rounded border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-950"
+              className={`w-64 ${FIELD_CLASSES}`}
             />
           </label>
         </div>
@@ -82,20 +84,19 @@ export function BoardsPage() {
             onChange={(event) => setSource(event.target.value)}
             rows={3}
             placeholder="rnbqkbnr/pppppppp/... o 1. e4 e5 2. Nf3"
-            className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 font-mono text-xs dark:border-slate-700 dark:bg-slate-950"
+            className={`w-full font-mono text-xs ${FIELD_CLASSES}`}
           />
         </label>
 
-        {error && <p className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+        {/* El error de validación usa el mismo recuadro que el de la API:
+            antes uno era un párrafo rojo suelto y el otro un `ErrorBox`, a dos
+            líneas de distancia dentro del mismo formulario. */}
+        {error && <ErrorBox error={new Error(error)} />}
         {createMutation.isError && <ErrorBox error={createMutation.error} />}
 
-        <button
-          type="submit"
-          disabled={createMutation.isPending}
-          className="rounded bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
-        >
+        <Button type="submit" variant="primary" disabled={createMutation.isPending}>
           {createMutation.isPending ? "Creando…" : "Crear tablero"}
-        </button>
+        </Button>
       </form>
 
       {boardsQuery.isPending && <Spinner />}
@@ -110,7 +111,7 @@ export function BoardsPage() {
           {boardsQuery.data.map((board) => (
             <li
               key={board.id}
-              className="flex items-center justify-between gap-3 rounded border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900"
+              className={`flex items-center justify-between gap-3 px-3 py-2 ${PANEL_CLASSES}`}
             >
               <Link
                 to="/boards/$boardId"
@@ -127,13 +128,13 @@ export function BoardsPage() {
                   actualizado {formatDate(board.updated_at)}
                 </span>
               </Link>
-              <button
-                type="button"
+              <Button
+                variant="danger"
+                size="sm"
                 onClick={() => deleteMutation.mutate(board.id)}
-                className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-red-50 dark:border-slate-700 dark:hover:bg-red-950/50"
               >
                 Eliminar
-              </button>
+              </Button>
             </li>
           ))}
         </ul>

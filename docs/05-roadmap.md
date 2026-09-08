@@ -169,18 +169,21 @@
       por FEN (RF-2.7) y puede ahorrar el trabajo o parte de él.
 - [ ] Coherencia de la interfaz entre pantallas (RF-5.1 y RNF-6 sin
       terminar; criterios e inventario en
-      [docs/07-coherencia-ui.md](07-coherencia-ui.md), filas 1 a 25 y 36 a 42
-      del inventario). El tablero de análisis
-      se navega solo con el teclado y su pantalla es siempre la misma, mientras
-      que el visor tiene controles visibles y cambia según lo que hace el
-      motor: quien no sabe ya de análisis lee el tablero como una herramienta
-      tosca. Entra: controles de navegación en pantalla y los mismos atajos que
-      el visor (`Home`/`End` incluidos), estados del motor visibles (en cola /
-      analizando con progreso / listo / vacío / error), etiquetas y selector de
-      motor iguales en ambas pantallas, y un componente compartido de "el motor
-      está trabajando" que hoy solo existe a mano en el visor (`Feedback.tsx`
-      no tiene nada con progreso). El `EmptyState` compartido en el panel
-      lateral del tablero ya está hecho. Cuenta para 1.0.0 porque son
+      [docs/07-coherencia-ui.md](07-coherencia-ui.md), filas 1 a 27 del
+      inventario, tabla A). El tablero de análisis se navega solo con el
+      teclado y su pantalla es siempre la misma, mientras que el visor tiene
+      controles visibles y cambia según lo que hace el motor: quien no sabe ya
+      de análisis lee el tablero como una herramienta tosca. Entra: controles
+      de navegación en pantalla y los mismos atajos que el visor (`Home`/`End`
+      incluidos), estados del motor visibles (en cola / analizando con progreso
+      / listo / vacío / error), etiquetas y selector de motor iguales en ambas
+      pantallas. Los cimientos compartidos ya están puestos (2026-09-07):
+      `Feedback.tsx` tiene `ProgressBox`, `SuccessBox` y `WarningBox`; los
+      controles de navegación y el bloque de tablero con barra de evaluación
+      viven en `components/board/`; y las recetas de botón, panel y campo, en
+      `components/Button.tsx`, `components/Panel.tsx` y
+      `components/styles.ts`. Lo que queda es adoptarlos en el tablero de
+      análisis. Cuenta para 1.0.0 porque son
       incumplimientos de RF-5.1 y RNF-6 (progreso y errores del motor
       visibles), ya congelados; lo visual de RF-6.2 ("las mismas capacidades
       visuales que RF-5.2") lo cerró el ítem de legibilidad de más arriba y ya
@@ -273,3 +276,17 @@ en el código.
 - [ ] Almacén único de preferencias del usuario, que absorba el tema
       claro/oscuro (hoy suelto en `localStorage`) y la persistencia del
       sub-modo de ocupación (RF-7.8).
+
+### Fase 6 · Partidas con ventaja (RF-11)
+
+Bloque planteado el **2026-09-07**, después del corte de alcance, así que no
+cuenta para el progreso hacia 1.0.0. Depende de dos cosas que sí son alcance de
+1.0 y hay que tener antes: el editor de posición pieza a pieza (RF-6.1, fase 2)
+y el sparring contra motor con fuerza calibrada (RF-4.3, fase 3).
+
+- [ ] Jugar contra el motor desde una posición inicial personalizada, eligiendo
+      color y bando con ventaja (RF-11.1).
+- [ ] Dificultad en dos perillas: fuerza del motor y ventaja material, cada una
+      con su control y su explicación (RF-11.2).
+- [ ] Guardar la partida jugada con su PGN (`SetUp`/`FEN`), analizable con RF-2
+      y visible en el visor, pero fuera de estadísticas (RF-11.3).

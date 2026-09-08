@@ -13,10 +13,17 @@ autoguardado.
 | `VariationTree.tsx` | Navegación visual de ese árbol (RF-6.3) |
 | `EngineLines.tsx` | Panel de líneas del motor (RF-6.2), con previsualización de la continuación al señalarlas |
 
-Lo visual del tablero no vive aquí: `Chessboard`, `EvalBar` y `boardConfig`
-son de [`features/viewer`](../viewer/README.md) y se comparten con el visor de
-partidas para que las dos pantallas se vean y se lean igual (RNF-11).
+Lo visual del tablero no vive aquí: `Chessboard`, `EvalBar`,
+`BoardWithEvalBar`, `MoveNavigator` y `boardConfig` están en
+`components/board/` y se comparten con el visor de partidas para que las dos
+pantallas se vean y se lean igual (RNF-11).
 
 El servidor guarda el árbol como JSON opaco (`boards.tree_json`), así que las
 reglas de ajedrez solo se aplican aquí; si el JSON llega con una forma
 inesperada, `BoardPage` reconstruye desde el FEN raíz en vez de romper.
+
+Un tablero no tiene por qué arrancar en la posición estándar (se crea desde
+un FEN o desde un PGN con `[SetUp "1"]`), así que la numeración de las
+jugadas se deriva de la posición raíz con `plyFromFen` (`tree.ts`), y la usan
+tanto `VariationTree` en pantalla como `toPgn` al exportar, para que la misma
+jugada no salga con dos números distintos.

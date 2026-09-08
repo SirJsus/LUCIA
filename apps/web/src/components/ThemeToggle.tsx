@@ -5,6 +5,7 @@
  * poner o quitar la clase en `<html>`.
  */
 import { useEffect, useState } from "react";
+import { Button } from "./Button";
 
 const STORAGE_KEY = "lucia:theme";
 
@@ -25,14 +26,14 @@ export function ThemeToggle() {
   }, [theme]);
 
   return (
-    <button
-      type="button"
+    <Button
+      size="sm"
       onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-      className="rounded border border-slate-300 px-2 py-1 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
       title={theme === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
       aria-label={theme === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
+      className="text-sm"
     >
       {theme === "dark" ? "☀" : "☾"}
-    </button>
+    </Button>
   );
 }

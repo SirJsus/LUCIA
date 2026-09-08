@@ -22,12 +22,26 @@ de `/games` (RF-5.3), tendencias (RF-3.7), extras del tablero de análisis
 Después, las fases 3 y 4.
 
 Fuera de ese camino, en Post 1.0: **RF-8 · Personalización de interfaz**
-(Fase 5), **RF-9 · Comparación de evaluaciones entre motores** (ampliación de
-RF-2.6, sin fase propia) y **RNF-11 · Coherencia de interfaz**, criterio
-permanente cuyos incumplimientos concretos sí se arreglan dentro de 1.0
-—inventario en [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md)—.
+(Fase 5), **RF-11 · Partidas con ventaja (odds) contra el motor** (Fase 6,
+planteado el 2026-09-07: necesita antes el editor de posición de RF-6.1 y el
+sparring calibrado de RF-4.3, ambos alcance de 1.0), **RF-9 · Comparación de
+evaluaciones entre motores** (ampliación de RF-2.6, sin fase propia) y
+**RNF-11 · Coherencia de interfaz**, criterio permanente cuyos incumplimientos
+concretos sí se arreglan dentro de 1.0 —inventario en
+[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md)—.
 
 ### Cambiado
+
+- Cimientos compartidos de la interfaz, primera parte del ítem de coherencia
+  entre pantallas de la fase 2 (RNF-11, inventario en
+  [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md)): componentes `Button`,
+  `Panel`, `BoardWithEvalBar` y `MoveNavigator`; `Feedback` gana `SuccessBox`,
+  `WarningBox` y `ProgressBox`; `styles.ts` recoge las recetas de clases que no
+  pueden ser un componente; y `lib/format.ts` gana `formatPercent`,
+  `formatEngineName` y `formatTimeClass`. Las piezas de tablero (`Chessboard`,
+  `EvalBar`, `boardConfig`) se mudan de `features/viewer/` a
+  `components/board/`, que es donde deben estar si las comparten dos pantallas.
+  Cierra once filas del inventario, que baja de 42 a 34.
 
 - Identificadores traducidos al inglés en todo el repositorio, cumpliendo la
   regla de `CLAUDE.md` que ya lo pedía. Se midió antes de decidir: de los 3.151
@@ -52,6 +66,26 @@ permanente cuyos incumplimientos concretos sí se arreglan dentro de 1.0
   (`analysis_progress`). Eso cambia su `operationId` en el OpenAPI y en los
   tipos generados, ya regenerados con `make types`. La ruta, los esquemas y los
   campos no cambian, y el front no usa los `operationId`.
+
+### Corregido
+
+- El análisis de una partida se replicaba siempre sobre la posición inicial
+  estándar (RF-2.1, RF-2.2, RF-2.3). Las partidas con `[SetUp "1"]` +
+  `[FEN ...]` —odds chess, Chess960, "partidas desde posición", que chess.com
+  ofrece y LUCIA ya importaba— acababan sobre tableros imposibles, con jugadas
+  ilegales y evaluaciones sin sentido. `run_analysis` parte ahora de
+  `pgn_game.board()`, que además marca `chess960` cuando toca. Afecta a 62 de
+  las 324 partidas importadas: sus análisis anteriores son basura y hay que
+  volver a lanzarlos.
+- La jugada que daba mate se clasificaba como *perdió el mate* (RF-2.2). El
+  mate ya dado es `#+0` (`MateGiven`) y el recibido `#-0`, ambos con
+  `mate() == 0`, así que la comprobación `mate() > 0` descartaba el remate.
+  Ahora se usa el orden de `Score`, que sí distingue un mate a favor de uno en
+  contra.
+- El visor sacaba la posición previa a la primera jugada de una constante con
+  el FEN estándar en vez del PGN (RF-5.1), así que en esas mismas partidas
+  enseñaba un tablero que no era el de la partida. Ahora sale del historial
+  parseado.
 
 ## [0.2.1] - 2026-09-06
 

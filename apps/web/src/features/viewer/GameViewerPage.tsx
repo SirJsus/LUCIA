@@ -2,15 +2,25 @@
  * evaluación y disparo del análisis con progreso en vivo. */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
-import { Chess } from "chess.js";
+import { Chess, DEFAULT_POSITION } from "chess.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { EmptyState, ErrorBox, Spinner } from "../../components/Feedback";
+import { Button } from "../../components/Button";
+import { BoardWithEvalBar } from "../../components/board/BoardWithEvalBar";
+import { MoveNavigator } from "../../components/board/MoveNavigator";
+import { EmptyState, ErrorBox, ProgressBox, Spinner } from "../../components/Feedback";
+import { Panel } from "../../components/Panel";
+import { FIELD_CLASSES } from "../../components/styles";
 import { api } from "../../lib/api";
 import { classificationStyle } from "../../lib/classification";
-import { formatAccuracy, formatDate, formatDuration, gameResult } from "../../lib/format";
+import {
+  formatAccuracy,
+  formatDate,
+  formatDuration,
+  formatEngineName,
+  formatTimeClass,
+  gameResult,
+} from "../../lib/format";
 import { whiteWinPercentAfterMove } from "../../lib/score";
-import { Chessboard } from "./Chessboard";
-import { EvalBar } from "./EvalBar";
 import { EngineComparison } from "./EngineComparison";
 import { EvalChart } from "./EvalChart";
 import { MoveList } from "./MoveList";
@@ -24,7 +34,11 @@ interface ParsedPosition {
   san: string;
 }
 
-const STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
+interface ParsedGame {
+  /** Posición de partida: la del PGN, que no siempre es la estándar. */
+  startingFen: string;
+  positions: ParsedPosition[];
+}
 
 export function GameViewerPage() {
   const { gameId } = useParams({ from: "/games/$gameId" });
@@ -88,7 +102,10 @@ export function GameViewerPage() {
     enabled: canCompareEngines,
   });
 
-  const positions = useMemo(() => parsePgn(gameQuery.data?.pgn), [gameQuery.data?.pgn]);
+  const { startingFen, positions } = useMemo(
+    () => parsePgn(gameQuery.data?.pgn),
+    [gameQuery.data?.pgn],
+  );
 
   const goTo = useCallback(
     (ply: number) => setCurrentPly(Math.max(-1, Math.min(ply, positions.length - 1))),
@@ -138,7 +155,7 @@ export function GameViewerPage() {
   if (gameQuery.isError) return <ErrorBox error={gameQuery.error} onRetry={gameQuery.refetch} />;
 
   const game = gameQuery.data;
-  const currentFen = currentPly < 0 ? STARTING_FEN : positions[currentPly].fen;
+  const currentFen = currentPly < 0 ? startingFen : positions[currentPly].fen;
   const lastMoveUci = currentPly < 0 ? null : positions[currentPly].lan;
 
   return (
@@ -154,39 +171,35 @@ export function GameViewerPage() {
             <span className="opacity-60">({game.black_rating})</span>
           </h1>
           <p className="text-sm opacity-60">
-            {formatDate(game.played_at)} · {game.time_class} · {game.rated ? "puntuada" : "amistosa"}
+            {formatDate(game.played_at)} · {formatTimeClass(game.time_class)} ·{" "}
+            {game.rated ? "puntuada" : "amistosa"}
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setOrientation(orientation === "white" ? "black" : "white")}
-            className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-          >
+          <Button onClick={() => setOrientation(orientation === "white" ? "black" : "white")}>
             Girar tablero
-          </button>
+          </Button>
           <select
             value={engine}
             onChange={(event) => setEngine(event.target.value as "stockfish" | "lc0")}
             title="Motor con el que analizar"
-            className="rounded border border-slate-300 bg-white px-2 py-1.5 text-sm dark:border-slate-700 dark:bg-slate-900"
+            className={`text-sm ${FIELD_CLASSES}`}
           >
             <option value="stockfish">Stockfish</option>
             <option value="lc0">Lc0</option>
           </select>
-          <button
-            type="button"
+          <Button
+            variant="primary"
             onClick={() => analyzeMutation.mutate()}
             disabled={analyzeMutation.isPending || isRunning}
-            className="rounded bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
           >
             {isRunning || analyzeMutation.isPending
               ? "Analizando…"
               : doneAnalysisByEngine.has(engine)
-                ? `Reanalizar con ${engine}`
-                : `Analizar con ${engine}`}
-          </button>
+                ? `Reanalizar con ${formatEngineName(engine)}`
+                : `Analizar con ${formatEngineName(engine)}`}
+          </Button>
         </div>
       </div>
 
@@ -196,68 +209,36 @@ export function GameViewerPage() {
       )}
 
       {isRunning && (
-        <div className="rounded border border-indigo-300 bg-indigo-50 px-3 py-2 text-sm dark:border-indigo-800 dark:bg-indigo-950/50">
-          <div className="flex justify-between">
-            <span>Analizando con el motor…</span>
-            <span className="tabular-nums opacity-70">
-              {progress ? `posición ${progress.ply} de ${progress.total}` : "en cola"} ·{" "}
-              {formatDuration(elapsedSeconds)}
-            </span>
-          </div>
-          <div className="mt-1.5 h-1.5 overflow-hidden rounded bg-indigo-200 dark:bg-indigo-900">
-            <div
-              className="h-full bg-indigo-600 transition-all dark:bg-indigo-400"
-              style={{ width: progress ? `${(progress.ply / progress.total) * 100}%` : "0%" }}
-            />
-          </div>
-        </div>
+        <ProgressBox
+          label="Analizando con el motor…"
+          detail={`${
+            progress ? `posición ${progress.ply} de ${progress.total}` : "en cola"
+          } · ${formatDuration(elapsedSeconds)}`}
+          // Sin evento de progreso todavía, el trabajo está encolado: la barra
+          // se muestra indeterminada en vez de fingir un 0 %.
+          progress={progress ? (progress.ply / progress.total) * 100 : null}
+        />
       )}
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="space-y-3">
-          <div className="mx-auto flex w-full max-w-[36rem] gap-3">
-            {analysis?.status === "done" && (
-              <EvalBar whiteWinPercent={whiteWinPercent} orientation={orientation} />
-            )}
-            <div className="min-w-0 flex-1">
-              <Chessboard
-                fen={currentFen}
-                orientation={orientation}
-                lastMoveUci={lastMoveUci}
-                engineArrows={engineArrows}
-              />
-            </div>
-          </div>
+          <BoardWithEvalBar
+            fen={currentFen}
+            orientation={orientation}
+            lastMoveUci={lastMoveUci}
+            engineArrows={engineArrows}
+            whiteWinPercent={whiteWinPercent}
+          />
 
-          <div className="flex items-center justify-center gap-2 text-sm">
-            <NavButton
-              onClick={() => goTo(-1)}
-              disabled={currentPly === -1}
-              symbol="⏮"
-              accessibleName="Ir a la posición inicial"
-            />
-            <NavButton
-              onClick={() => goTo(currentPly - 1)}
-              disabled={currentPly === -1}
-              symbol="◀"
-              accessibleName="Jugada anterior"
-            />
-            <span className="w-24 text-center tabular-nums opacity-70">
-              {currentPly + 1} / {positions.length}
-            </span>
-            <NavButton
-              onClick={() => goTo(currentPly + 1)}
-              disabled={currentPly >= positions.length - 1}
-              symbol="▶"
-              accessibleName="Jugada siguiente"
-            />
-            <NavButton
-              onClick={() => goTo(positions.length - 1)}
-              disabled={currentPly >= positions.length - 1}
-              symbol="⏭"
-              accessibleName="Ir a la última jugada"
-            />
-          </div>
+          <MoveNavigator
+            onFirst={() => goTo(-1)}
+            onPrevious={() => goTo(currentPly - 1)}
+            onNext={() => goTo(currentPly + 1)}
+            onLast={() => goTo(positions.length - 1)}
+            canGoBack={currentPly > -1}
+            canGoForward={currentPly < positions.length - 1}
+            position={`${currentPly + 1} / ${positions.length}`}
+          />
 
           {analysis?.status === "done" && analysis.moves.length > 0 && (
             <EvalChart moves={analysis.moves} currentPly={currentPly} onSelectPly={goTo} />
@@ -266,8 +247,7 @@ export function GameViewerPage() {
 
         <aside className="space-y-3">
           {analysis?.status === "done" && (
-            <div className="rounded border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-              <p className="mb-2 font-medium">Precisión</p>
+            <Panel title="Precisión" bodyClassName="p-3 text-sm">
               <div className="flex justify-between">
                 <span>{game.white_username}</span>
                 <span className="tabular-nums">{formatAccuracy(analysis.white_accuracy)}</span>
@@ -277,18 +257,19 @@ export function GameViewerPage() {
                 <span className="tabular-nums">{formatAccuracy(analysis.black_accuracy)}</span>
               </div>
               <p className="mt-2 text-xs opacity-60">
-                {analysis.engine} · profundidad {analysis.depth} · MultiPV {analysis.multipv}
+                {formatEngineName(analysis.engine)} · profundidad {analysis.depth} · MultiPV{" "}
+                {analysis.multipv}
               </p>
-            </div>
+            </Panel>
           )}
 
-          <div className="rounded border border-slate-200 bg-white p-2 dark:border-slate-800 dark:bg-slate-900">
+          <Panel bodyClassName="p-2">
             {analysis?.status === "done" ? (
               <MoveList moves={analysis.moves} currentPly={currentPly} onSelectPly={goTo} />
             ) : (
               <PlainMoveList positions={positions} currentPly={currentPly} onSelectPly={goTo} />
             )}
-          </div>
+          </Panel>
 
           {!analysis && !existingQuery.isPending && (
             <EmptyState title="Sin analizar">
@@ -346,34 +327,6 @@ function useElapsedSeconds(isRunning: boolean): number {
   return elapsedSeconds;
 }
 
-/** Botón de navegación del visor. `symbol` es lo que se ve y `accessibleName`
- * lo que se lee: un botón cuyo contenido es solo un símbolo no tiene nombre
- * accesible propio (C-7 de docs/07-coherencia-ui.md). */
-function NavButton({
-  onClick,
-  disabled,
-  symbol,
-  accessibleName,
-}: {
-  onClick: () => void;
-  disabled: boolean;
-  symbol: string;
-  accessibleName: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      aria-label={accessibleName}
-      title={accessibleName}
-      className="rounded border border-slate-300 px-2.5 py-1 disabled:opacity-40 dark:border-slate-700"
-    >
-      {symbol}
-    </button>
-  );
-}
-
 /** Lista de jugadas cuando todavía no hay análisis: solo la notación. */
 function PlainMoveList({
   positions,
@@ -408,8 +361,7 @@ function ClassificationSummary({ counts }: { counts: Map<string, number> }) {
   if (entries.length === 0) return null;
 
   return (
-    <div className="rounded border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-      <p className="mb-2 font-medium">Resumen de jugadas</p>
+    <Panel title="Resumen de jugadas" bodyClassName="p-3 text-sm">
       <ul className="space-y-1">
         {entries.map(([classification, count]) => {
           const style = classificationStyle(classification);
@@ -426,7 +378,7 @@ function ClassificationSummary({ counts }: { counts: Map<string, number> }) {
           );
         })}
       </ul>
-    </div>
+    </Panel>
   );
 }
 
@@ -440,19 +392,28 @@ function countClassifications(classifications: string[]): Map<string, number> {
 
 /** Reconstruye la secuencia de posiciones desde el PGN, para poder navegar la
  * partida aunque todavía no se haya analizado. */
-function parsePgn(pgn: string | undefined): ParsedPosition[] {
-  if (!pgn) return [];
+function parsePgn(pgn: string | undefined): ParsedGame {
+  const emptyParsedGame: ParsedGame = { startingFen: DEFAULT_POSITION, positions: [] };
+  if (!pgn) return emptyParsedGame;
   try {
     const chess = new Chess();
     chess.loadPgn(pgn);
-    return chess.history({ verbose: true }).map((move) => ({
-      fen: move.after,
-      lan: move.lan,
-      san: move.san,
-    }));
+    const history = chess.history({ verbose: true });
+    return {
+      // `before` de la primera jugada es la posición inicial real: un PGN con
+      // `[SetUp "1"]` + `[FEN ...]` (odds chess, Chess960, partidas desde
+      // posición) no empieza en la posición estándar. Sin jugadas no hay
+      // `before`, pero entonces la posición actual del tablero es la inicial.
+      startingFen: history[0]?.before ?? chess.fen(),
+      positions: history.map((move) => ({
+        fen: move.after,
+        lan: move.lan,
+        san: move.san,
+      })),
+    };
   } catch {
     // Un PGN que chess.js no acepta no debe tumbar la página: el resto
     // (cabecera, botón de analizar) sigue siendo útil.
-    return [];
+    return emptyParsedGame;
   }
 }

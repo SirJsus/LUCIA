@@ -17,9 +17,12 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { Button } from "../../components/Button";
+import { Panel } from "../../components/Panel";
 import { EmptyState, ErrorBox, Spinner } from "../../components/Feedback";
+import { FIELD_CLASSES } from "../../components/styles";
 import { api } from "../../lib/api";
-import { formatAccuracy } from "../../lib/format";
+import { formatAccuracy, formatPercent, formatTimeClass } from "../../lib/format";
 
 const PHASE_LABELS: Record<string, string> = {
   opening: "Apertura",
@@ -53,15 +56,12 @@ export function DashboardPage() {
               value={username}
               onChange={(event) => setUsername(event.target.value)}
               placeholder="el de .env"
-              className="w-52 rounded border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900"
+              className={`w-52 ${FIELD_CLASSES}`}
             />
           </label>
-          <button
-            type="submit"
-            className="rounded bg-slate-900 px-3 py-1.5 text-sm text-white dark:bg-slate-100 dark:text-slate-900"
-          >
+          <Button type="submit" variant="primary">
             Ver
-          </button>
+          </Button>
         </form>
       </div>
 
@@ -86,7 +86,7 @@ function StatsContent({ stats }: { stats: PlayerStats }) {
     <div className="space-y-6">
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard label="Partidas" value={String(stats.total_games)} />
-        <StatCard label="Puntuación" value={`${stats.overall.score_percent.toFixed(1)}%`} />
+        <StatCard label="Puntuación" value={formatPercent(stats.overall.score_percent, 1)} />
         <StatCard label="Analizadas" value={String(stats.analyzed_games)} />
         <StatCard label="Precisión media" value={formatAccuracy(stats.average_accuracy)} />
       </section>
@@ -107,13 +107,13 @@ function StatsContent({ stats }: { stats: PlayerStats }) {
             <tbody>
               {stats.by_time_class.map((item) => (
                 <tr key={item.time_class} className="border-t border-slate-200 dark:border-slate-800">
-                  <td className="px-3 py-2 capitalize">{item.time_class}</td>
+                  <td className="px-3 py-2">{formatTimeClass(item.time_class)}</td>
                   <td className="px-3 py-2 tabular-nums">{item.current_rating ?? "—"}</td>
                   <td className="px-3 py-2">
                     <RecordBadges record={item.record} />
                   </td>
                   <td className="px-3 py-2 tabular-nums">
-                    {item.record.score_percent.toFixed(1)}%
+                    {formatPercent(item.record.score_percent, 1)}
                   </td>
                   <td className="px-3 py-2 tabular-nums opacity-70">{item.record.total}</td>
                 </tr>
@@ -186,7 +186,7 @@ function StatsContent({ stats }: { stats: PlayerStats }) {
                       <RecordBadges record={item.record} />
                     </td>
                     <td className="px-3 py-2 tabular-nums">
-                      {item.record.score_percent.toFixed(1)}%
+                      {formatPercent(item.record.score_percent, 1)}
                     </td>
                     <td className="px-3 py-2 tabular-nums opacity-70">
                       {formatAccuracy(item.average_accuracy)}
@@ -223,7 +223,10 @@ function PhaseSection({ phases }: { phases: PhaseStats[] }) {
             <YAxis tick={{ fontSize: 11 }} width={36} />
             <Tooltip
               contentStyle={{ fontSize: 12 }}
-              formatter={(value: number) => [`${value}%`, "Prob. de victoria perdida por jugada"]}
+              formatter={(value: number) => [
+                formatPercent(value, 2),
+                "Prob. de victoria perdida por jugada",
+              ]}
             />
             <Bar dataKey="lost" isAnimationActive={false}>
               {data.map((entry) => (
@@ -242,10 +245,11 @@ function PhaseSection({ phases }: { phases: PhaseStats[] }) {
           >
             <div className="flex justify-between font-medium">
               <span>{phase.label}</span>
-              <span className="tabular-nums">{phase.accuracy.toFixed(1)}</span>
+              <span className="tabular-nums">{formatAccuracy(phase.accuracy)}</span>
             </div>
             <p className="mt-0.5 text-xs opacity-60">
-              {phase.moves} jugadas · {phase.blunders} blunders · pierde {phase.lost}% por jugada
+              {phase.moves} jugadas · {phase.blunders} blunders · pierde {formatPercent(phase.lost, 2)} por
+              jugada
             </p>
           </li>
         ))}
@@ -256,10 +260,10 @@ function PhaseSection({ phases }: { phases: PhaseStats[] }) {
 
 function StatCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+    <Panel>
       <p className="text-xs uppercase tracking-wide opacity-60">{label}</p>
       <p className="mt-1 text-2xl font-semibold tabular-nums">{value}</p>
-    </div>
+    </Panel>
   );
 }
 

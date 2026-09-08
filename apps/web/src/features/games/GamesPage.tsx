@@ -3,9 +3,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
-import { EmptyState, ErrorBox, Spinner } from "../../components/Feedback";
+import { Button } from "../../components/Button";
+import { EmptyState, ErrorBox, Spinner, SuccessBox } from "../../components/Feedback";
+import { buttonClasses, FIELD_CLASSES, PANEL_CLASSES } from "../../components/styles";
 import { api, type GameFilters } from "../../lib/api";
-import { formatDate, formatTimeControl, gameResult } from "../../lib/format";
+import { formatDate, formatTimeClass, formatTimeControl, gameResult } from "../../lib/format";
 
 const TIME_CLASSES = ["bullet", "blitz", "rapid", "daily"] as const;
 const PAGE_SIZE = 25;
@@ -51,35 +53,31 @@ export function GamesPage() {
               value={syncUsername}
               onChange={(event) => setSyncUsername(event.target.value)}
               placeholder="usuario (o el de .env)"
-              className="w-56 rounded border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-900"
+              className={`w-56 ${FIELD_CLASSES}`}
             />
           </label>
-          <button
-            type="submit"
-            disabled={syncMutation.isPending}
-            className="rounded bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
-          >
+          <Button type="submit" variant="primary" disabled={syncMutation.isPending}>
             {syncMutation.isPending ? "Sincronizando…" : "Sincronizar"}
-          </button>
+          </Button>
         </form>
       </div>
 
       {syncMutation.isError && <ErrorBox error={syncMutation.error} />}
       {syncMutation.isSuccess && (
-        <p className="rounded border border-emerald-300 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200">
+        <SuccessBox>
           {syncMutation.data.games_upserted} partidas importadas en{" "}
           {syncMutation.data.months_synced.length} mes(es).
-        </p>
+        </SuccessBox>
       )}
 
-      <div className="flex flex-wrap gap-3 rounded border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
+      <div className={`flex flex-wrap gap-3 p-3 text-sm ${PANEL_CLASSES}`}>
         <label className="flex flex-col gap-1">
           <span className="opacity-70">Jugador</span>
           <input
             value={filters.username ?? ""}
             onChange={(event) => updateFilter({ username: event.target.value || undefined })}
             placeholder="cualquiera"
-            className="w-44 rounded border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-950"
+            className={`w-44 ${FIELD_CLASSES}`}
           />
         </label>
 
@@ -92,7 +90,7 @@ export function GamesPage() {
             }
             disabled={!filters.username}
             title={filters.username ? undefined : "Elige un jugador primero"}
-            className="w-32 rounded border border-slate-300 bg-white px-2 py-1 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-950"
+            className={`w-32 disabled:opacity-50 ${FIELD_CLASSES}`}
           >
             <option value="">Ambos</option>
             <option value="white">Blancas</option>
@@ -105,12 +103,12 @@ export function GamesPage() {
           <select
             value={filters.time_class ?? ""}
             onChange={(event) => updateFilter({ time_class: event.target.value || undefined })}
-            className="w-32 rounded border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-950"
+            className={`w-32 ${FIELD_CLASSES}`}
           >
             <option value="">Todos</option>
             {TIME_CLASSES.map((timeClass) => (
               <option key={timeClass} value={timeClass}>
-                {timeClass}
+                {formatTimeClass(timeClass)}
               </option>
             ))}
           </select>
@@ -125,7 +123,7 @@ export function GamesPage() {
                 rated: event.target.value === "" ? undefined : event.target.value === "true",
               })
             }
-            className="w-32 rounded border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-950"
+            className={`w-32 ${FIELD_CLASSES}`}
           >
             <option value="">Todas</option>
             <option value="true">Sí</option>
@@ -177,13 +175,13 @@ export function GamesPage() {
                     <td className="px-3 py-2 font-mono">{gameResult(game)}</td>
                     <td className="whitespace-nowrap px-3 py-2 opacity-70">
                       {formatTimeControl(game.time_control)}{" "}
-                      <span className="opacity-70">{game.time_class}</span>
+                      <span className="opacity-70">{formatTimeClass(game.time_class)}</span>
                     </td>
                     <td className="px-3 py-2 text-right">
                       <Link
                         to="/games/$gameId"
                         params={{ gameId: String(game.id) }}
-                        className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
+                        className={buttonClasses("secondary", "sm")}
                       >
                         Analizar
                       </Link>
@@ -195,8 +193,8 @@ export function GamesPage() {
           </div>
 
           <div className="flex items-center gap-3 text-sm">
-            <button
-              type="button"
+            <Button
+              size="sm"
               disabled={(filters.offset ?? 0) === 0}
               onClick={() =>
                 setFilters((current) => ({
@@ -204,13 +202,12 @@ export function GamesPage() {
                   offset: Math.max(0, (current.offset ?? 0) - PAGE_SIZE),
                 }))
               }
-              className="rounded border border-slate-300 px-2 py-1 disabled:opacity-40 dark:border-slate-700"
             >
               ← Anterior
-            </button>
+            </Button>
             <span className="opacity-70">Página {page}</span>
-            <button
-              type="button"
+            <Button
+              size="sm"
               disabled={gamesQuery.data.length < PAGE_SIZE}
               onClick={() =>
                 setFilters((current) => ({
@@ -218,10 +215,9 @@ export function GamesPage() {
                   offset: (current.offset ?? 0) + PAGE_SIZE,
                 }))
               }
-              className="rounded border border-slate-300 px-2 py-1 disabled:opacity-40 dark:border-slate-700"
             >
               Siguiente →
-            </button>
+            </Button>
           </div>
         </>
       )}

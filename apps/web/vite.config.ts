@@ -1,6 +1,11 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
+// El puerto de la API se puede cambiar para convivir con otros proyectos en la
+// misma máquina (`API_PORT=8001 make up`); `scripts/dev.sh` exporta la misma
+// variable, así que el proxy y la API no se pueden desincronizar.
+const API_PORT = process.env.API_PORT ?? "8000";
+
 export default defineConfig({
   plugins: [react()],
   build: {
@@ -21,8 +26,11 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      "/api": { target: "http://localhost:8000", rewrite: (p) => p.replace(/^\/api/, "") },
-      "/ws": { target: "ws://localhost:8000", ws: true },
+      "/api": {
+        target: `http://localhost:${API_PORT}`,
+        rewrite: (p) => p.replace(/^\/api/, ""),
+      },
+      "/ws": { target: `ws://localhost:${API_PORT}`, ws: true },
     },
   },
 });

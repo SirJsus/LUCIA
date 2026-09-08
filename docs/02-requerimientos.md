@@ -17,6 +17,12 @@
 > tras el corte (RF-8, RF-9 y RNF-11) sigue fuera, porque es interfaz sobre
 > datos que ya existen y no cuesta más hacerlo después.
 >
+> **Ampliación del 2026-09-07.** RF-11 (partidas con ventaja contra el motor)
+> se plantea después del corte y se queda fuera del alcance de v1.0: necesita
+> antes el editor de posición pieza a pieza (RF-6.1, fase 2) y el sparring
+> contra motor con fuerza calibrada (RF-4.3, fase 3), que sí son alcance de
+> 1.0, y no cambia el esquema de la base ni obliga a re-analizar nada.
+>
 > Ese mismo día se **reescribieron los textos de RF-5.2 y RF-6.2**, que estaban
 > resumidos en una línea ("análisis en vivo, flechas de mejores jugadas"), para
 > decir qué se ve exactamente sobre el tablero: MultiPV, flechas etiquetadas,
@@ -219,6 +225,38 @@ nuevo. `GET /analysis/{id}` devuelve todas las jugadas de un análisis con su
 se puede construir en el cliente pidiendo los dos análisis, que la pantalla ya
 sabe identificar. `GET /analysis/compare` sigue sirviendo para el resumen de
 discrepancias, que es otra vista del mismo material.
+
+### RF-11 · Partidas con ventaja (odds) contra el motor
+
+Jugar contra el motor desde una posición inicial elegida por el usuario, con
+ventaja material para uno de los dos bandos. Nace de las propias partidas
+importadas: chess.com ofrece *odds chess* y LUCIA ya las trae, así que el
+formato es familiar y ya se sabe analizar. La idea es usar la ventaja como
+segunda perilla de dificultad, independiente de la fuerza del motor: un jugador
+de 1000 contra un motor calibrado a 700 pero con una torre de más para el
+motor es un rival ajustado que ningún Elo por sí solo consigue.
+
+**No reinventa lo que ya está en v1.0.** El editor de posición pieza a pieza es
+RF-6.1 (fase 2) y el sparring contra motor con fuerza calibrada es RF-4.3
+(fase 3); RF-11 es lo que falta para juntarlos: la ventaja material como parte
+de la dificultad, y una partida jugada que se guarda y se analiza.
+
+| ID | Requerimiento | Prioridad |
+| ---- | --------------- | ----------- |
+| RF-11.1 | Jugar una partida completa contra el motor desde una posición inicial personalizada —la del editor de RF-6.1 o un FEN— eligiendo color y bando con ventaja antes de empezar. | P1 |
+| RF-11.2 | Dificultad en dos perillas independientes y combinables: fuerza del motor (RF-4.3: `UCI_Elo`/`UCI_LimitStrength` en Stockfish, red tipo Maia en Lc0) y ventaja material de la posición inicial. La pantalla deja claro cuál es cada una: no es lo mismo un motor débil que un motor fuerte con piezas de menos. | P1 |
+| RF-11.3 | La partida jugada se guarda con su PGN (`[SetUp "1"]` + `[FEN ...]`), se puede analizar con RF-2 y recorrer en el visor (RF-5.1), pero **no cuenta** en estadísticas ni en detección de patrones (RF-3), igual que los tableros de análisis en RF-6.5: una partida contra un motor mutilado no dice nada del rendimiento real. | P1 |
+
+Notas técnicas, para cuando se retome:
+
+- **El análisis ya sabe partir de una posición no estándar.** Hasta el
+  2026-09-07 `run_analysis` replicaba las jugadas sobre el tablero inicial de
+  siempre, así que las partidas con `[SetUp "1"]` daban posiciones imposibles;
+  ahora arranca de `pgn_game.board()`, que además marca Chess960 cuando toca.
+  Una partida con ventaja se analiza hoy sin tocar nada más.
+- **Lo que falta de verdad es jugar.** No hay ningún flujo en el que el motor
+  responda a una jugada del usuario: `EngineBridge` solo analiza. RF-4.3 y
+  RF-4.4 comparten esa carencia, y conviene resolverla una vez para los tres.
 
 ### Requerimientos no funcionales (Post 1.0)
 

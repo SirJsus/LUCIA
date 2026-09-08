@@ -5,7 +5,9 @@
  * concreto y la valoración posicional apuntan a cosas distintas.
  */
 import type { AnalysisComparison } from "@lucia/shared-types";
+import { Panel } from "../../components/Panel";
 import { classificationStyle } from "../../lib/classification";
+import { formatEngineName, formatPercent } from "../../lib/format";
 
 export function EngineComparison({
   comparison,
@@ -15,13 +17,13 @@ export function EngineComparison({
   onSelectPly: (ply: number) => void;
 }) {
   return (
-    <div className="rounded border border-slate-200 bg-white p-3 text-sm dark:border-slate-800 dark:bg-slate-900">
-      <p className="font-medium">
-        {comparison.engine_a} vs {comparison.engine_b}
-      </p>
-      <p className="mt-1 text-xs opacity-70">
+    <Panel
+      title={`${formatEngineName(comparison.engine_a)} vs ${formatEngineName(comparison.engine_b)}`}
+      bodyClassName="p-3 text-sm"
+    >
+      <p className="text-xs opacity-70">
         Coinciden en la mejor jugada en {comparison.agreed_best_moves} de{" "}
-        {comparison.total_moves} ({comparison.best_move_agreement_percent.toFixed(0)}%).
+        {comparison.total_moves} ({formatPercent(comparison.best_move_agreement_percent)}).
       </p>
 
       {comparison.disagreements.length === 0 ? (
@@ -66,7 +68,7 @@ export function EngineComparison({
           ))}
         </ul>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -84,11 +86,11 @@ function EngineOpinion({
   const style = classificationStyle(classification);
   return (
     <span className="flex items-center gap-1">
-      <span className="opacity-60">{engine}:</span>
+      <span className="opacity-60">{formatEngineName(engine)}:</span>
       <span className={`rounded px-1 text-[10px] leading-4 ${style.className}`}>
         {style.symbol}
       </span>
-      <span className="tabular-nums opacity-70">{winPercent.toFixed(0)}%</span>
+      <span className="tabular-nums opacity-70">{formatPercent(winPercent)}</span>
       {bestMove && <span className="font-mono opacity-60">({bestMove})</span>}
     </span>
   );

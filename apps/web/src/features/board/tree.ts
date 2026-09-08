@@ -166,13 +166,17 @@ export function mainLine(root: TreeNode): TreeNode[] {
 
 /** Exporta el árbol a PGN con variantes entre paréntesis (RF-6.7). */
 export function toPgn(root: TreeNode): string {
-  const movetext = renderVariation(root, plyOf(root.fen));
+  const movetext = renderVariation(root, plyFromFen(root.fen));
   const setup =
     root.fen === new Chess().fen() ? "" : `[SetUp "1"]\n[FEN "${root.fen}"]\n\n`;
   return `${setup}${movetext.trim()} *\n`;
 }
 
-function plyOf(fen: string): number {
+/** Ply inicial de una posición: lo que hay que sumar para numerar las jugadas
+ * como el PGN, en un tablero que no arranca de la posición estándar. Lo usan
+ * tanto la exportación (`toPgn`) como el árbol en pantalla (`VariationTree`),
+ * para que el mismo movimiento no salga con dos números distintos. */
+export function plyFromFen(fen: string): number {
   // Del FEN salen el número de jugada y el turno, que dan el ply inicial.
   const fenFields = fen.split(" ");
   const fullmove = Number(fenFields[5] ?? 1);

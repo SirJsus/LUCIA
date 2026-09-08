@@ -1,7 +1,7 @@
 /** Árbol de variantes navegable (RF-6.3): la línea principal en línea, las
  * variantes indentadas, con acciones de promover y borrar. */
 import { EmptyState } from "../../components/Feedback";
-import type { TreeNode } from "./tree";
+import { plyFromFen, type TreeNode } from "./tree";
 
 interface VariationTreeProps {
   root: TreeNode;
@@ -32,7 +32,10 @@ export function VariationTree({
     <div className="max-h-[26rem] overflow-y-auto p-2 text-sm">
       <Variation
         node={root}
-        ply={0}
+        // El tablero puede arrancar de un FEN o de un PGN con `[SetUp "1"]`:
+        // la numeración sale de la posición raíz, no de un 1. fijo, para que
+        // coincida con la del PGN que exporta "Copiar PGN" (`toPgn`).
+        ply={plyFromFen(root.fen)}
         currentId={currentId}
         onSelect={onSelect}
         onPromote={onPromote}

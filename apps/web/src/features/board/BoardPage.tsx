@@ -2,20 +2,21 @@
  * ver lo que dice el motor en vivo y autoguardar.
  *
  * El tablero, la barra de evaluación y las flechas se comparten con el visor
- * de partidas: viven en `features/viewer/` (`Chessboard`, `EvalBar`,
- * `boardConfig`) para que las dos pantallas enseñen lo mismo de la misma
- * forma. Lo propio de aquí es el árbol de variantes (`tree.ts`,
- * `VariationTree`) y el panel del motor (`EngineLines`). */
+ * de partidas: viven en `components/board/` (`Chessboard`, `EvalBar`,
+ * `BoardWithEvalBar`, `boardConfig`) para que las dos pantallas enseñen lo
+ * mismo de la misma forma. Lo propio de aquí es el árbol de variantes
+ * (`tree.ts`, `VariationTree`) y el panel del motor (`EngineLines`). */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { Chess } from "chess.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "../../components/Button";
+import { BoardWithEvalBar } from "../../components/board/BoardWithEvalBar";
+import { arrowsFromEngineLines, arrowsFromPreviewLine } from "../../components/board/boardConfig";
 import { ErrorBox, Spinner } from "../../components/Feedback";
+import { Panel } from "../../components/Panel";
 import { api } from "../../lib/api";
 import { whiteWinPercentFromScore } from "../../lib/score";
-import { arrowsFromEngineLines, arrowsFromPreviewLine } from "../viewer/boardConfig";
-import { Chessboard } from "../viewer/Chessboard";
-import { EvalBar } from "../viewer/EvalBar";
 import { EngineLines } from "./EngineLines";
 import { VariationTree } from "./VariationTree";
 import {
@@ -215,28 +216,20 @@ export function BoardPage() {
             />
             Partida propia
           </label>
-          <button
-            type="button"
-            onClick={() => setEngineOn(!engineOn)}
-            className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-          >
+          <Button onClick={() => setEngineOn(!engineOn)}>
             {engineOn ? "Apagar motor" : "Encender motor"}
-          </button>
-          <button
-            type="button"
-            onClick={() => setOrientation(orientation === "white" ? "black" : "white")}
-            className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
-          >
-            Girar
-          </button>
-          <button
-            type="button"
+          </Button>
+          {/* Mismo nombre que en el visor: era "Girar" aquí y "Girar tablero"
+              allí para la misma acción. */}
+          <Button onClick={() => setOrientation(orientation === "white" ? "black" : "white")}>
+            Girar tablero
+          </Button>
+          <Button
             onClick={() => navigator.clipboard.writeText(toPgn(tree))}
             title="Copia el árbol completo, con variantes, al portapapeles"
-            className="rounded border border-slate-300 px-3 py-1.5 text-sm hover:bg-slate-100 dark:border-slate-700 dark:hover:bg-slate-800"
           >
             Copiar PGN
-          </button>
+          </Button>
         </div>
       </div>
 
@@ -244,25 +237,18 @@ export function BoardPage() {
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="space-y-3">
-          <div className="mx-auto flex w-full max-w-[36rem] gap-3">
-            {engineOn && (
-              <EvalBar
-                whiteWinPercent={bestLine ? whiteWinPercentFromScore(bestLine) : null}
-                orientation={orientation}
-              />
-            )}
-            <div className="min-w-0 flex-1">
-              <Chessboard
-                fen={currentFen}
-                orientation={orientation}
-                engineArrows={engineArrows}
-                lastMoveUci={lastMoveUci}
-                legalMoves={legalMoves}
-                turnColor={turnColor}
-                onMove={handleBoardMove}
-              />
-            </div>
-          </div>
+          <BoardWithEvalBar
+            fen={currentFen}
+            orientation={orientation}
+            engineArrows={engineArrows}
+            lastMoveUci={lastMoveUci}
+            legalMoves={legalMoves}
+            turnColor={turnColor}
+            onMove={handleBoardMove}
+            whiteWinPercent={
+              engineOn && bestLine ? whiteWinPercentFromScore(bestLine) : null
+            }
+          />
           <p className="text-center text-xs opacity-60">
             Arrastra una pieza para añadir la jugada. ← y → recorren la línea actual.
           </p>
@@ -278,10 +264,7 @@ export function BoardPage() {
             />
           )}
 
-          <div className="rounded border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-            <p className="border-b border-slate-200 px-3 py-2 text-sm font-medium dark:border-slate-800">
-              Variantes
-            </p>
+          <Panel title="Variantes" bodyClassName="">
             <VariationTree
               root={tree}
               currentId={currentId}
@@ -291,7 +274,7 @@ export function BoardPage() {
                 mutateTree((current) => deleteNode(current, nodeId), tree.id)
               }
             />
-          </div>
+          </Panel>
         </aside>
       </div>
     </div>

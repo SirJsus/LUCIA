@@ -16,6 +16,7 @@ import {
   YAxis,
 } from "recharts";
 import { classificationStyle } from "../../lib/classification";
+import { formatPercent } from "../../lib/format";
 import { whiteWinPercentAfterMove } from "../../lib/score";
 
 interface EvalChartProps {
@@ -52,7 +53,7 @@ export function EvalChart({ moves, currentPly, onSelectPly }: EvalChartProps) {
             contentStyle={{ fontSize: 12 }}
             labelFormatter={(ply) => `Jugada ${Number(ply) + 1}`}
             formatter={(value: number, _name, entry) => [
-              `${value.toFixed(1)}% blancas · ${entry.payload.san} (${classificationStyle(entry.payload.classification).label})`,
+              `${formatPercent(value, 1)} blancas · ${entry.payload.san} (${classificationStyle(entry.payload.classification).label})`,
               "Prob. de victoria",
             ]}
           />

@@ -1,4 +1,10 @@
-/** Estados compartidos de carga, error y vacío, para no repetirlos en cada página. */
+/** Estados compartidos de la interfaz: carga, trabajo en curso, error, éxito,
+ * aviso y vacío. Están aquí para no repetirlos —ni reinventarlos— en cada
+ * pantalla (criterios C-3 y C-4 de docs/07-coherencia-ui.md).
+ *
+ * Los cuatro recuadros de color comparten forma y solo cambian de paleta, para
+ * que se reconozcan como la misma familia a simple vista.
+ */
 import type { ReactNode } from "react";
 
 export function Spinner({ label = "Cargando…" }: { label?: string }) {
@@ -10,11 +16,44 @@ export function Spinner({ label = "Cargando…" }: { label?: string }) {
   );
 }
 
+type NoticeTone = "error" | "success" | "warning" | "progress";
+
+const TONE_CLASSES: Record<NoticeTone, string> = {
+  error:
+    "border-red-300 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200",
+  success:
+    "border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-200",
+  warning:
+    "border-amber-300 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200",
+  progress:
+    "border-indigo-300 bg-indigo-50 text-indigo-900 dark:border-indigo-800 dark:bg-indigo-950/50 dark:text-indigo-100",
+};
+
+function Notice({
+  tone,
+  children,
+  className = "",
+}: {
+  tone: NoticeTone;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded border px-3 py-2 text-sm ${TONE_CLASSES[tone]} ${className}`}>
+      {children}
+    </div>
+  );
+}
+
 export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
   const message = error instanceof Error ? error.message : String(error);
   return (
-    <div className="rounded border border-red-300 bg-red-50 p-4 text-sm text-red-800 dark:border-red-800 dark:bg-red-950/50 dark:text-red-200">
-      <p className="font-medium">Algo falló</p>
+    <Notice tone="error" className="py-3">
+      {/* `role="alert"` para que un lector de pantalla lo anuncie al aparecer:
+          los errores suelen surgir lejos de donde está el foco. */}
+      <p className="font-medium" role="alert">
+        Algo falló
+      </p>
       <p className="mt-1 opacity-90">{message}</p>
       {onRetry && (
         <button
@@ -25,7 +64,63 @@ export function ErrorBox({ error, onRetry }: { error: unknown; onRetry?: () => v
           Reintentar
         </button>
       )}
-    </div>
+    </Notice>
+  );
+}
+
+/** Confirmación de que algo salió bien. Antes había tres formas distintas de
+ * decirlo —recuadro verde, texto verde suelto y texto gris— y ninguna
+ * compartida. */
+export function SuccessBox({ children }: { children: ReactNode }) {
+  return (
+    <Notice tone="success">
+      <span role="status">{children}</span>
+    </Notice>
+  );
+}
+
+/** Advertencia: algo funciona, pero con una limitación que conviene saber. */
+export function WarningBox({ children }: { children: ReactNode }) {
+  return <Notice tone="warning">{children}</Notice>;
+}
+
+/** "Estoy trabajando, y esto es lo que llevo".
+ *
+ * `progress` va de 0 a 100, o `null` cuando el trabajo está encolado o no se
+ * sabe cuánto queda: entonces la barra se muestra indeterminada en vez de
+ * fingir un 0 %. `detail` es el texto de la derecha (posición actual, tiempo
+ * transcurrido). */
+export function ProgressBox({
+  label,
+  detail,
+  progress,
+}: {
+  label: string;
+  detail?: ReactNode;
+  progress: number | null;
+}) {
+  return (
+    <Notice tone="progress">
+      <div className="flex justify-between gap-3">
+        <span role="status">{label}</span>
+        {detail && <span className="tabular-nums opacity-70">{detail}</span>}
+      </div>
+      <div
+        className="mt-1.5 h-1.5 overflow-hidden rounded bg-indigo-200 dark:bg-indigo-900"
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={progress ?? undefined}
+        aria-label={label}
+      >
+        <div
+          className={`h-full bg-indigo-600 dark:bg-indigo-400 ${
+            progress === null ? "w-1/3 animate-pulse" : "transition-all"
+          }`}
+          style={progress === null ? undefined : { width: `${progress}%` }}
+        />
+      </div>
+    </Notice>
   );
 }
 

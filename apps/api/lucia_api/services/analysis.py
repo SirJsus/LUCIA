@@ -192,6 +192,13 @@ async def run_analysis(
         pgn_game = chess.pgn.read_game(io.StringIO(game.pgn))
         if pgn_game is None:
             raise ValueError(f"PGN inválido en la partida {game.id}")
+        # La posición inicial sale del PGN, no de `chess.Board()`: chess.com
+        # marca con `[SetUp "1"]` + `[FEN ...]` las partidas que no empiezan en
+        # la posición estándar (odds chess, Chess960, "partidas desde
+        # posición"), y replicarlas sobre el tablero de siempre daba jugadas
+        # ilegales. `pgn_game.board()` además marca `chess960` cuando toca, y
+        # con eso `python-chess` negocia solo el `UCI_Chess960` con el motor.
+        pgn_starting_board = pgn_game.board()
         moves = list(pgn_game.mainline_moves())
 
         # `depth` y `multipv` salen de la fila `Analysis` (quedaron fijados al
@@ -216,7 +223,7 @@ async def run_analysis(
         async with EngineBridge(config) as real_engine:
             cached_engine = CachedEngineBridge(session, real_engine, analysis.engine)
             analysis_result = await analyze_game(
-                cached_engine, chess.Board(), moves, on_position=on_progress
+                cached_engine, pgn_starting_board, moves, on_position=on_progress
             )
 
         for analyzed_move in analysis_result.moves:

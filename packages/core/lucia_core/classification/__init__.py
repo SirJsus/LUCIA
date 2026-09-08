@@ -91,8 +91,19 @@ def _missed_forced_mate(
     posición siga siendo ganadora en centipawns: los umbrales de win% no
     distinguen bien entre "mate en 3" y "ganando por una torre" porque ambos
     saturan cerca del 100%, así que se comprueba aparte."""
-    score_before = before.score.pov(mover_color)
-    score_after = after.score.pov(mover_color)
-    had_forced_mate = score_before.is_mate() and (score_before.mate() or 0) > 0
-    still_has_forced_mate = score_after.is_mate() and (score_after.mate() or 0) > 0
+    had_forced_mate = _has_forced_mate(before.score.pov(mover_color))
+    still_has_forced_mate = _has_forced_mate(after.score.pov(mover_color))
     return had_forced_mate and not still_has_forced_mate
+
+
+def _has_forced_mate(score: chess.engine.Score) -> bool:
+    """Si la puntuación es un mate **a favor** de quien la mira.
+
+    No sirve mirar `mate() > 0`: el mate ya dado vale `#+0` (`MateGiven`), con
+    `mate() == 0`, igual que el mate recibido (`#-0`), así que por ahí la
+    jugada que remata la partida contaba como mate perdido. Esa puntuación
+    terminal no la da el motor: la pone `_terminal_score` de
+    `lucia_core.analysis` al llegar a una posición sin jugadas legales. El
+    orden de `Score` sí los distingue: todo mate a favor está por encima de
+    cualquier evaluación en centipeones, y todo mate en contra, por debajo."""
+    return score.is_mate() and score > chess.engine.Cp(0)

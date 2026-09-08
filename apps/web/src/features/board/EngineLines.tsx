@@ -8,6 +8,7 @@
  */
 import type { EngineLine } from "@lucia/shared-types";
 import { EmptyState } from "../../components/Feedback";
+import { Panel } from "../../components/Panel";
 import { formatScore } from "../../lib/score";
 
 export function EngineLines({
@@ -23,12 +24,11 @@ export function EngineLines({
   onPreviewLine: (pvUci: string[] | null) => void;
 }) {
   return (
-    <div className="rounded border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2 text-sm font-medium dark:border-slate-800">
-        <span>Motor</span>
-        {isLoading && <span className="text-xs font-normal opacity-60">analizando…</span>}
-      </div>
-
+    <Panel
+      title="Motor"
+      aside={isLoading && <span className="text-xs font-normal opacity-60">analizando…</span>}
+      bodyClassName=""
+    >
       {!lines?.length && !isLoading && (
         <div className="p-3">
           <EmptyState title="Sin líneas para esta posición">
@@ -75,6 +75,6 @@ export function EngineLines({
           </li>
         ))}
       </ul>
-    </div>
+    </Panel>
   );
 }

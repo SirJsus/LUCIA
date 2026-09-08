@@ -22,6 +22,8 @@
  * evaluación en vivo con `whiteWinPercentFromScore` (ADR-0006). Ambos en
  * `lib/score.ts`.
  */
+import { formatPercent } from "../../lib/format";
+
 export interface EvalBarProps {
   /** Probabilidad de victoria de las blancas (0-100), o `null` si todavía no
    * hay evaluación (motor apagado, análisis sin terminar). */
@@ -35,7 +37,7 @@ export function EvalBar({ whiteWinPercent, orientation = "white" }: EvalBarProps
   const shownWhiteWinPercent = whiteWinPercent ?? 50;
   const bottomShare =
     orientation === "white" ? shownWhiteWinPercent : 100 - shownWhiteWinPercent;
-  const whiteWinPercentText = `${Math.round(shownWhiteWinPercent)} %`;
+  const whiteWinPercentText = formatPercent(shownWhiteWinPercent);
 
   return (
     <div className="flex w-10 shrink-0 flex-col items-center gap-1">
@@ -48,7 +50,7 @@ export function EvalBar({ whiteWinPercent, orientation = "white" }: EvalBarProps
         }
         title={
           hasEval
-            ? `${whiteWinPercentText} para las blancas · ${Math.round(100 - shownWhiteWinPercent)} % para las negras`
+            ? `${whiteWinPercentText} para las blancas · ${formatPercent(100 - shownWhiteWinPercent)} para las negras`
             : "Sin datos del motor"
         }
         className={`relative w-3 flex-1 overflow-hidden rounded border border-slate-300 bg-slate-700 dark:border-slate-700 dark:bg-slate-950 ${
