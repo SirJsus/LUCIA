@@ -13,12 +13,11 @@ SemVer para la serie `0.x`).
 
 Camino a v1.0.0 — ver progreso en [docs/05-roadmap.md](docs/05-roadmap.md) y
 alcance congelado en [docs/02-requerimientos.md](docs/02-requerimientos.md).
-De la **fase 2** quedan once ítems: alternativas por jugada en el análisis
-guardado (RF-10), coherencia de la interfaz entre pantallas, extractores de
-patrones (RF-2.8, RF-3.2), tabla ECO y categoría "book" (RF-2.2), repertorio
-contra Lichess Explorer (RF-3.6), importación de PGN manual (RF-1.5), filtros
-de `/games` (RF-5.3), tendencias (RF-3.7), extras del tablero de análisis
-(RF-6.6 a 6.9), capa de ocupación (RF-7.1 a 7.7) y exportación de PGN anotado.
+De la **fase 2** quedan nueve ítems: extractores de patrones (RF-2.8, RF-3.2),
+tabla ECO y categoría "book" (RF-2.2), repertorio contra Lichess Explorer
+(RF-3.6), importación de PGN manual (RF-1.5), filtros de `/games` (RF-5.3),
+tendencias (RF-3.7), extras del tablero de análisis (RF-6.6 a 6.9), capa de
+ocupación (RF-7.1 a 7.7) y exportación de PGN anotado.
 Después, las fases 3 y 4.
 
 Fuera de ese camino, en Post 1.0: **RF-8 · Personalización de interfaz**
@@ -27,10 +26,79 @@ planteado el 2026-09-07: necesita antes el editor de posición de RF-6.1 y el
 sparring calibrado de RF-4.3, ambos alcance de 1.0), **RF-9 · Comparación de
 evaluaciones entre motores** (ampliación de RF-2.6, sin fase propia) y
 **RNF-11 · Coherencia de interfaz**, criterio permanente cuyos incumplimientos
-concretos sí se arreglan dentro de 1.0 —inventario en
-[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md)—.
+concretos se arreglaron dentro de 1.0: su inventario en
+[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) quedó vacío el
+2026-09-08.
+
+### Añadido
+
+- **Alternativas por jugada en el análisis guardado** (RF-10.1 y RF-10.2). El
+  análisis persiste ahora las N mejores líneas de cada posición, no solo
+  `best_move_uci`, y el visor las usa: las mismas flechas múltiples que el
+  tablero de análisis, y un panel "podías haber jugado, en vez de …" al pararse
+  en una jugada, con su evaluación y su continuación. Señalar o pulsar una
+  jugada de una línea la dibuja sobre el tablero.
+  - En la base: columna `analyzed_moves.alternatives_json` (migración
+    `7a1c4e9d2b30`), con el mismo formato serializado que
+    `position_cache.lines_json`. La notación SAN no se guarda: se deriva de
+    `fen_before` al servir.
+  - En la API: `AnalyzedMoveOut.alternatives`, con la misma forma
+    (`EngineLineOut`) que devuelve el análisis en vivo de una posición.
+  - **Los análisis que ya existían no hay que repetirlos**, que era el motivo
+    de meter RF-10 en el alcance de 1.0: sus posiciones siguen en
+    `position_cache` con todas sus líneas (RF-2.7), y `GET /analysis/{id}` las
+    recupera de ahí cuando la clave coincide exactamente (misma posición,
+    motor, red, límite y MultiPV). Comprobado sobre la base del autor: un
+    análisis de 56 jugadas recuperó las tres alternativas de todas ellas sin
+    gastar motor.
 
 ### Cambiado
+
+- **La interfaz es coherente entre pantallas** (RF-5.1, RF-5.2, RF-6.2,
+  RNF-6/RNF-11): el inventario de
+  [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) queda **vacío**, con las
+  51 filas que llegó a tener cerradas: las 38 que lo motivaron, las nueve que
+  destapó después el barrido de comprobación de las seis pantallas contra los
+  siete criterios, y las cuatro de revisar las alternativas por jugada del
+  visor. Cierra el ítem de coherencia de la fase 2. Lo más visible:
+  - El **tablero de análisis** tiene controles de navegación en pantalla y los
+    mismos cuatro atajos que el visor (`Home` y `End` incluidos), dice qué
+    motor firma la evaluación y con cuál analizar, y distingue los cinco
+    estados del motor —apagado, buscando, con error, sin líneas y con líneas—
+    en vez de un "analizando…" en letra pequeña. Pulsar cualquier jugada de una
+    línea del motor lleva el tablero hasta ahí; antes solo la primera hacía
+    algo, con el mismo aspecto que las demás. Y mientras el motor todavía no ha
+    contestado a la posición nueva, el panel y la barra dicen que lo que se ve
+    es de la anterior, en vez de contradecir al tablero en silencio.
+  - **La numeración de jugadas sale de la partida**, no del índice interno
+    (`lib/moves.ts`): una partida que empieza en la jugada 12 se numera desde
+    12 en la lista, en el gráfico y en la comparación de motores. El gráfico de
+    evaluación dejaba de contar medias jugadas llamándolas "Jugada 41".
+  - **Nada se transmite ya solo con color** (C-7): la clasificación de jugada
+    viaja con su nombre, victorias/tablas/derrotas llevan su letra, la fase que
+    más ventaja cuesta se dice con palabras, y la barra de evaluación gira sus
+    colores con el tablero — con el tablero de negras afirmaba lo contrario que
+    el motor. Los tres gráficos tienen paleta propia en tema oscuro
+    (`lib/chartTheme.ts`), donde el tooltip conservaba su fondo blanco.
+  - **Se avisa de las partidas que no empiezan en la posición estándar**, en el
+    visor y en el listado. `GET /games` y `GET /games/{id}` traen para ello un
+    campo nuevo, `starts_from_custom_position`, que la API deduce del PGN sin
+    columna nueva ni migración.
+  - **Las dos pantallas de listado se abren igual**: un enlace con aspecto de
+    botón al final de la fila —"Ver partida", "Ver tablero"—, separado de
+    eliminar. En Tableros era el título entero, que no se veía pulsable. Y la
+    navegación superior marca la sección también en las pantallas de detalle:
+    en el visor de una partida no se iluminaba nada.
+  - Piezas que dejan de estar copiadas y pasan a `components/`: la insignia
+    (`Badge` y sus dos usos con significado), la tabla de datos (`DataTable`),
+    el selector de motor (`EngineSelect`), el botón de jugada (`MoveButton`) y
+    los atajos de navegación (`useMoveNavigationKeys`).
+  - Detalles que se arrastraban: guardar o borrar un tablero dice qué está
+    pasando, "Copiar PGN" y "Partida propia" dicen si salieron bien, eliminar
+    pregunta antes y se llama igual en los dos sitios, filtrar por jugador se
+    aplica al teclear y está en el mismo sitio en las dos pantallas que lo
+    tienen, y el enlace del listado de partidas dice "Ver partida", que es lo
+    que hace.
 
 - Cimientos compartidos de la interfaz, primera parte del ítem de coherencia
   entre pantallas de la fase 2 (RNF-11, inventario en
@@ -41,7 +109,7 @@ concretos sí se arreglan dentro de 1.0 —inventario en
   `formatEngineName` y `formatTimeClass`. Las piezas de tablero (`Chessboard`,
   `EvalBar`, `boardConfig`) se mudan de `features/viewer/` a
   `components/board/`, que es donde deben estar si las comparten dos pantallas.
-  Cierra once filas del inventario, que baja de 42 a 34.
+  Cerró once filas del inventario.
 
 - Identificadores traducidos al inglés en todo el repositorio, cumpliendo la
   regla de `CLAUDE.md` que ya lo pedía. Se midió antes de decidir: de los 3.151

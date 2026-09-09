@@ -7,7 +7,9 @@ RF-2 (análisis con motores): `Analysis`, `AnalyzedMove`, `PositionCache`.
 from __future__ import annotations
 
 import datetime as dt
+import re
 
+import chess
 from sqlalchemy import JSON, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -82,6 +84,22 @@ class Game(Base):
         back_populates="game", cascade="all, delete-orphan"
     )
 
+    @property
+    def starts_from_custom_position(self) -> bool:
+        """Si la partida no arranca en la posición estándar.
+
+        chess.com marca esas partidas con `[SetUp "1"]` + `[FEN ...]` en el
+        PGN: odds chess, Chess960 y "partidas desde posición". Se mira con una
+        expresión regular sobre la cabecera y no con `chess.pgn.read_game`
+        porque el listado devuelve decenas de partidas por petición y aquí
+        solo hace falta el FEN inicial, no el árbol de jugadas.
+
+        La interfaz lo usa para avisar de que el tablero que se ve es el de la
+        partida y no un fallo (criterio C-6 de docs/07-coherencia-ui.md).
+        """
+        starting_fen = re.search(r'\[FEN "([^"]+)"\]', self.pgn)
+        return starting_fen is not None and starting_fen.group(1) != chess.STARTING_FEN
+
 
 class SyncState(Base):
     """Progreso de sincronización incremental por jugador (RF-1.3)."""
@@ -151,6 +169,20 @@ class AnalyzedMove(Base):
     win_percent_before: Mapped[float]
     win_percent_after: Mapped[float]
     best_move_uci: Mapped[str | None] = mapped_column(default=None)
+    alternatives_json: Mapped[list | None] = mapped_column(JSON, default=None)
+    """Las N mejores líneas de la posición **anterior** a esta jugada (RF-10.1),
+    de mejor a peor: `[{rank, score_cp, score_mate, pv_uci}]`, con la puntuación
+    desde el punto de vista de las blancas, como todo lo que se guarda.
+
+    Es lo que permite al visor enseñar las alternativas de cada jugada, no solo
+    `best_move_uci`. `None` en los análisis anteriores a RF-10; para esos, el
+    router las recupera de `position_cache` cuando puede (ver
+    `services/analysis.py::alternatives_from_cache`).
+
+    La notación SAN no se guarda: depende de la posición y se deriva de
+    `fen_before` al servir, para no almacenar dos veces la misma jugada.
+
+    Por qué JSON aquí y no una tabla de líneas: ADR-0007."""
 
     analysis: Mapped[Analysis] = relationship(back_populates="moves")
 

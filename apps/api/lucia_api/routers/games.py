@@ -32,6 +32,10 @@ class GameSummary(BaseModel):
     rated: bool
     eco: str | None
     played_at: dt.datetime
+    starts_from_custom_position: bool
+    """La partida no empieza en la posición estándar (odds chess, Chess960,
+    partidas desde posición). Sale del PGN, no de una columna: ver
+    `Game.starts_from_custom_position`."""
 
 
 class GameDetail(GameSummary):

@@ -130,12 +130,12 @@ Capa de visualización activable con una tecla sobre **cualquier tablero** (viso
 ### RF-10 · Alternativas por jugada en el análisis guardado
 
 Añadido al alcance de v1.0 el 2026-09-06 (ver la nota de alcance al inicio del
-documento). Las flechas múltiples de RF-5.2 hoy solo existen en el tablero de
-análisis, porque ahí el motor responde en vivo sobre la posición actual. En el
-visor de una partida analizada solo hay una flecha, y no por decisión de
-interfaz: el análisis guardado no tiene las alternativas. `analyzed_moves`
-guarda una única `best_move_uci` por jugada, aunque el análisis se haya corrido
-con MultiPV.
+documento) y **entregado el 2026-09-08** en sus dos puntos P1. Nació de esto:
+las flechas múltiples de RF-5.2 solo existían en el tablero de análisis, porque
+ahí el motor responde en vivo sobre la posición actual, mientras que en el
+visor de una partida analizada había una sola flecha —y no por decisión de
+interfaz, sino porque `analyzed_moves` guardaba una única `best_move_uci` por
+jugada aunque el análisis se hubiera corrido con MultiPV.
 
 | ID | Requerimiento | Prioridad |
 | ---- | --------------- | ----------- |
@@ -143,18 +143,25 @@ con MultiPV.
 | RF-10.2 | Usar esas alternativas en el visor: flechas múltiples por jugada y "lo que podrías haber jugado en su lugar" al pararse en un error. | P1 |
 | RF-10.3 | Usar esas alternativas en entrenamiento: un puzzle generado desde un error propio (RF-4.1) necesita saber qué jugadas eran buenas, no solo cuál era la mejor, para aceptar respuestas equivalentes en vez de exigir la única del motor. | P2 |
 
-Notas técnicas, para cuando se implemente (fase 2 del roadmap):
+Cómo quedó (2026-09-08), y lo que sigue abierto — la forma de guardarlo está
+razonada en [ADR-0007](adr/0007-alternativas-por-jugada-json-y-cache.md):
 
-- **El dato puede estar ya en la base.** `position_cache.lines_json` guarda
-  **todas** las líneas del MultiPV por FEN (RF-2.7), así que para las partidas
-  analizadas recientemente las alternativas se pueden recuperar sin volver a
-  gastar motor. Lo que falta es una vía para leerlas y la garantía de que no se
-  hayan quedado obsoletas por un cambio de configuración, porque la clave de la
-  caché incluye motor, red, profundidad y MultiPV.
+- **Dónde vive el dato.** `analyzed_moves.alternatives_json` guarda las líneas
+  de la posición anterior a cada jugada, en el mismo formato serializado que
+  `position_cache.lines_json`. La notación SAN no se guarda: depende de la
+  posición y se deriva de `fen_before` al servir.
+- **El dato ya estaba en la base, y se aprovecha.** `position_cache` guarda
+  **todas** las líneas del MultiPV por FEN (RF-2.7), así que los análisis
+  anteriores a este requerimiento no hay que repetirlos: `GET /analysis/{id}`
+  recupera de ahí sus alternativas cuando la clave coincide exactamente —misma
+  posición, motor, red, límite y MultiPV—. Si no coincide, no se sirve nada:
+  una línea calculada con otra configuración no es la que produjo esa
+  clasificación.
+- **RF-10.3 sigue pendiente**, con RF-4.1: los puzzles no existen todavía.
 - **Se solapa con RF-2.8** ("momentos críticos, con MultiPV real en la
   clasificación", pendiente en la fase 2): distinguir una jugada única de una
-  con tres alternativas igual de buenas necesita exactamente el mismo material.
-  Conviene resolverlos juntos y no dos veces.
+  con tres alternativas igual de buenas necesita exactamente este material, que
+  ahora ya está guardado. Ese ítem se apoya en esto en vez de repetirlo.
 
 ## Requerimientos no funcionales
 
@@ -217,14 +224,18 @@ distintos.
 | RF-9.1 | Tabla comparativa jugada a jugada con la evaluación de cada motor en columnas separadas. No necesita ser exhaustiva en su primera versión: basta con ver ambos resultados a la vez. | P2 |
 | RF-9.2 | Detalle ampliado de una jugada de esa tabla: mejor línea de cada motor, diferencia de probabilidad de victoria y clasificación que le da cada uno. **Dónde vive está sin decidir** — pantalla aparte, modal sobre el visor o panel desplegable; se elige al implementarlo, no antes. | P2 |
 | RF-9.3 | **Flechas de los dos motores sobre el mismo tablero.** Donde ambos recomiendan la misma jugada, una sola flecha en el color de acuerdo (hoy el verde y sus tonos, que es lo que ya hace RF-5.2 con un motor). Donde discrepan, una flecha por motor, cada una con su color propio. El tope de tres flechas con que se implementó RF-5.2 (una constante, no parte del requerimiento) se relaja en ese caso: una discrepancia son dos flechas, y verla es justo el objetivo. Los colores son configurables por RF-8.3. | P2 |
-| RF-9.4 | **Cada línea dice qué motor la firma.** El panel del motor identifica de quién es cada evaluación —"Stockfish dice…", "Lc0 dice…"— y deja elegir motor donde hoy no se puede. Con un solo motor activo es un problema de coherencia ya abierto (fila 29 del inventario de [docs/07-coherencia-ui.md](07-coherencia-ui.md): el tablero de análisis evalúa sin decir con qué motor); con dos es imprescindible, porque sin ello dos flechas de colores distintos no significan nada. | P2 |
+| RF-9.4 | **Cada línea dice qué motor la firma.** El panel del motor identifica de quién es cada evaluación —"Stockfish dice…", "Lc0 dice…"— y deja elegir motor donde hoy no se puede. Con un solo motor activo era un problema de coherencia, ya resuelto el 2026-09-08 (el tablero de análisis dice con qué motor evalúa y deja elegirlo, como el visor); con dos motores a la vez es imprescindible, porque sin ello dos flechas de colores distintos no significan nada. | P2 |
 
 Nota técnica, para cuando se retome: el dato ya existe y no hace falta endpoint
 nuevo. `GET /analysis/{id}` devuelve todas las jugadas de un análisis con su
-`win_percent_after`, su `classification` y su `best_move_uci`, así que la tabla
-se puede construir en el cliente pidiendo los dos análisis, que la pantalla ya
-sabe identificar. `GET /analysis/compare` sigue sirviendo para el resumen de
-discrepancias, que es otra vista del mismo material.
+`win_percent_after`, su `classification`, su `best_move_uci` y —desde RF-10.1—
+sus `alternatives`, así que la tabla se puede construir en el cliente pidiendo
+los dos análisis, que la pantalla ya sabe identificar. Con las alternativas,
+RF-9.2 tiene la línea entera de cada motor y no solo su primera jugada, y
+RF-9.3 puede pintar las flechas de ambos con `arrowsFromEngineLines`, que es lo
+que ya usan las dos pantallas con tablero. `GET /analysis/compare` sigue
+sirviendo para el resumen de discrepancias, que es otra vista del mismo
+material.
 
 ### RF-11 · Partidas con ventaja (odds) contra el motor
 
@@ -262,4 +273,4 @@ Notas técnicas, para cuando se retome:
 
 | ID | Requerimiento |
 | ---- | --------------- |
-| RNF-11 | La interfaz se comporta igual en todas las pantallas: paridad entre lo que se puede hacer con el teclado y lo que hay como control visible, mismo nombre y misma posición para la misma acción, estados explícitos de lo que está haciendo el sistema (en cola, trabajando con progreso, listo, vacío, error), estados de carga/error/vacío compartidos, un solo formato por dato, y ningún número del motor sin etiqueta o representación visual que lo explique. Los criterios verificables y el inventario de incumplimientos actuales están en [docs/07-coherencia-ui.md](07-coherencia-ui.md). |
+| RNF-11 | La interfaz se comporta igual en todas las pantallas: paridad entre lo que se puede hacer con el teclado y lo que hay como control visible, mismo nombre y misma posición para la misma acción, estados explícitos de lo que está haciendo el sistema (en cola, trabajando con progreso, listo, vacío, error), estados de carga/error/vacío compartidos, un solo formato por dato, y ningún número del motor sin etiqueta o representación visual que lo explique. Los criterios verificables están en [docs/07-coherencia-ui.md](07-coherencia-ui.md), donde también se lleva el inventario de incumplimientos: vacío desde el 2026-09-08. |

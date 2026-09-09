@@ -14,13 +14,14 @@
  * Aquí también se decide cómo se ven las flechas del motor (RF-5.2 / RF-6.2):
  * qué pincel le toca a cada línea y qué texto lleva encima.
  *
- * Quién usa qué: `Chessboard` llama a `buildBoardConfig` y nadie más;
- * `BoardPage` arma sus flechas con `arrowsFromEngineLines` (MultiPV en vivo) y
- * `arrowsFromPreviewLine` (la continuación que se está señalando en el panel
- * del motor). `GameViewerPage` no usa ninguna de las dos: el análisis guardado
- * solo persiste la mejor jugada de cada posición, así que construye su única
- * flecha a mano. Cuando RF-10 guarde las N mejores líneas, pasará a usar
- * `arrowsFromEngineLines` como el tablero de análisis.
+ * Quién usa qué: `Chessboard` llama a `buildBoardConfig` y nadie más. Las dos
+ * pantallas con tablero arman sus flechas igual, con `arrowsFromEngineLines`
+ * (las mejores líneas de la posición) y `arrowsFromPreviewLine` (la
+ * continuación que se está señalando en el panel de líneas): en vivo el
+ * tablero de análisis, y desde el análisis guardado el visor, que desde RF-10.2
+ * tiene las alternativas de cada jugada. Al visor le queda un caso propio: un
+ * análisis anterior a RF-10 cuyas posiciones ya no estén en la caché solo tiene
+ * `best_move_uci`, y entonces dibuja esa flecha suelta.
  */
 import type { EngineLine } from "@lucia/shared-types";
 import type { Config } from "chessground/config";

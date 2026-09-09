@@ -6,6 +6,7 @@ import {
   formatPercent,
   formatTimeClass,
   formatTimeControl,
+  formatYearMonth,
   gameResult,
 } from "../format";
 
@@ -103,5 +104,12 @@ describe("formatTimeClass", () => {
 
   it("uno desconocido se capitaliza en vez de desaparecer", () => {
     expect(formatTimeClass("classical")).toBe("Classical");
+  });
+});
+
+describe("formatYearMonth", () => {
+  it("rellena el mes a dos cifras para que los meses se ordenen a la vista", () => {
+    expect(formatYearMonth(2026, 9)).toBe("2026-09");
+    expect(formatYearMonth(2026, 12)).toBe("2026-12");
   });
 });

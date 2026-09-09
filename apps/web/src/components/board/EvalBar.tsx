@@ -7,7 +7,9 @@
  * cada bando.
  *
  * Se orienta como el tablero: el bando que el usuario tiene abajo crece desde
- * abajo. Así la barra y las piezas cuentan la misma historia.
+ * abajo, **y con su color**. Girar solo el reparto y dejar los colores fijos
+ * era peor que no girar nada: con el tablero de negras, un dominio negro del
+ * 80 % se pintaba de blanco y la barra decía lo contrario que el motor.
  *
  * La etiqueta es el porcentaje en las dos pantallas que usan la barra. Si en
  * una dijera `+3.10` y en la otra `62 %`, el mismo dato tendría dos formas
@@ -31,12 +33,16 @@ export interface EvalBarProps {
   orientation?: "white" | "black";
 }
 
+/** Blanco y negro de la barra, con contraste suficiente en los dos temas. */
+const WHITE_SIDE_CLASSES = "bg-slate-50 dark:bg-slate-200";
+const BLACK_SIDE_CLASSES = "bg-slate-700 dark:bg-slate-950";
+
 export function EvalBar({ whiteWinPercent, orientation = "white" }: EvalBarProps) {
   const hasEval = whiteWinPercent !== null;
   // Sin evaluación, la barra se queda a la mitad.
   const shownWhiteWinPercent = whiteWinPercent ?? 50;
-  const bottomShare =
-    orientation === "white" ? shownWhiteWinPercent : 100 - shownWhiteWinPercent;
+  const whiteIsAtTheBottom = orientation === "white";
+  const bottomShare = whiteIsAtTheBottom ? shownWhiteWinPercent : 100 - shownWhiteWinPercent;
   const whiteWinPercentText = formatPercent(shownWhiteWinPercent);
 
   return (
@@ -53,20 +59,29 @@ export function EvalBar({ whiteWinPercent, orientation = "white" }: EvalBarProps
             ? `${whiteWinPercentText} para las blancas · ${formatPercent(100 - shownWhiteWinPercent)} para las negras`
             : "Sin datos del motor"
         }
-        className={`relative w-3 flex-1 overflow-hidden rounded border border-slate-300 bg-slate-700 dark:border-slate-700 dark:bg-slate-950 ${
-          hasEval ? "" : "opacity-40"
-        }`}
+        // El fondo es el bando de arriba y el relleno el de abajo, así que
+        // los dos se intercambian al girar el tablero.
+        className={`relative w-3 flex-1 overflow-hidden rounded border border-slate-300 dark:border-slate-700 ${
+          whiteIsAtTheBottom ? BLACK_SIDE_CLASSES : WHITE_SIDE_CLASSES
+        } ${hasEval ? "" : "opacity-40"}`}
       >
         <div
-          className="absolute inset-x-0 bottom-0 bg-slate-50 transition-[height] duration-300 dark:bg-slate-200"
+          className={`absolute inset-x-0 bottom-0 transition-[height] duration-300 ${
+            whiteIsAtTheBottom ? WHITE_SIDE_CLASSES : BLACK_SIDE_CLASSES
+          }`}
           style={{ height: `${bottomShare}%` }}
         />
         {/* La mitad marca el equilibrio: sin ella, un 55 % y un 45 % se ven
             iguales. */}
         <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-slate-400 opacity-60" />
       </div>
-      <span className="w-full text-center font-mono text-xs tabular-nums opacity-70">
-        {hasEval ? whiteWinPercentText : "—"}
+      <span className="w-full text-center text-xs leading-tight opacity-70">
+        <span className="block font-mono tabular-nums">
+          {hasEval ? whiteWinPercentText : "—"}
+        </span>
+        {/* El punto de vista es siempre el de las blancas (criterio C-5), y
+            girar el tablero no lo cambia: sin esta palabra hay que deducirlo. */}
+        <span className="block">blancas</span>
       </span>
     </div>
   );

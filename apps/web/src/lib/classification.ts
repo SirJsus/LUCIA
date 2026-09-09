@@ -77,10 +77,14 @@ export function classificationStyle(classification: string): ClassificationStyle
   return STYLES[classification as MoveClassification] ?? FALLBACK;
 }
 
-/** Categorías que cuentan como "algo salió mal", para resúmenes y filtros. */
-export const MISTAKE_CLASSIFICATIONS: MoveClassification[] = [
+/** Categorías que cuentan como "algo salió mal", para resúmenes y filtros.
+ *
+ * El tipo es `string[]` y no `MoveClassification[]` porque se compara contra
+ * la clasificación que llega de la API, que es una cadena cualquiera; el
+ * `satisfies` mantiene la comprobación de que los cuatro valores existen. */
+export const MISTAKE_CLASSIFICATIONS: string[] = [
   "inaccuracy",
   "mistake",
   "blunder",
   "missed_win",
-];
+] satisfies MoveClassification[];

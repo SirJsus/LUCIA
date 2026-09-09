@@ -5,13 +5,24 @@ import { Link, useParams } from "@tanstack/react-router";
 import { Chess, DEFAULT_POSITION } from "chess.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "../../components/Button";
+import { EngineSelect } from "../../components/EngineSelect";
+import { ClassificationBadge } from "../../components/ClassificationBadge";
+import { CustomPositionBadge } from "../../components/CustomPositionBadge";
 import { BoardWithEvalBar } from "../../components/board/BoardWithEvalBar";
+import { EngineLineList } from "../../components/board/EngineLineList";
+import { arrowsFromEngineLines, arrowsFromPreviewLine } from "../../components/board/boardConfig";
+import { MoveButton } from "../../components/board/MoveButton";
 import { MoveNavigator } from "../../components/board/MoveNavigator";
+import { useMoveNavigationKeys } from "../../components/board/useMoveNavigationKeys";
 import { EmptyState, ErrorBox, ProgressBox, Spinner } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
-import { FIELD_CLASSES } from "../../components/styles";
+import {
+  BOARD_HINT_CLASSES,
+  BOARD_SIDEBAR_GRID_CLASS,
+  MOVE_LIST_HEIGHT_CLASS,
+} from "../../components/styles";
 import { api } from "../../lib/api";
-import { classificationStyle } from "../../lib/classification";
+import { classificationStyle, MISTAKE_CLASSIFICATIONS } from "../../lib/classification";
 import {
   formatAccuracy,
   formatDate,
@@ -19,7 +30,9 @@ import {
   formatEngineName,
   formatTimeClass,
   gameResult,
+  type EngineId,
 } from "../../lib/format";
+import { moveNumberLabel, plyFromFen } from "../../lib/moves";
 import { whiteWinPercentAfterMove } from "../../lib/score";
 import { EngineComparison } from "./EngineComparison";
 import { EvalChart } from "./EvalChart";
@@ -47,7 +60,8 @@ export function GameViewerPage() {
   const [currentPly, setCurrentPly] = useState(-1); // -1 = posición inicial
   const [analysisId, setAnalysisId] = useState<number | null>(null);
   const [orientation, setOrientation] = useState<"white" | "black">("white");
-  const [engine, setEngine] = useState<"stockfish" | "lc0">("stockfish");
+  const [engine, setEngine] = useState<EngineId>("stockfish");
+  const [previewPvUci, setPreviewPvUci] = useState<string[] | null>(null);
 
   const gameQuery = useQuery({ queryKey: ["game", id], queryFn: () => api.getGame(id) });
 
@@ -107,44 +121,66 @@ export function GameViewerPage() {
     [gameQuery.data?.pgn],
   );
 
+  // Una partida que empieza en la jugada 12 (odds chess, Chess960, partidas
+  // desde posición) tiene que numerarse desde ahí en todas partes: lista,
+  // gráfico y comparación de motores (criterio C-5).
+  const startingPly = useMemo(() => plyFromFen(startingFen), [startingFen]);
+
   const goTo = useCallback(
     (ply: number) => setCurrentPly(Math.max(-1, Math.min(ply, positions.length - 1))),
     [positions.length],
   );
 
-  // Navegación con teclado (RF-5.1).
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.target instanceof HTMLInputElement) return;
-      const actions: Record<string, () => void> = {
-        ArrowLeft: () => goTo(currentPly - 1),
-        ArrowRight: () => goTo(currentPly + 1),
-        Home: () => goTo(-1),
-        End: () => goTo(positions.length - 1),
-      };
-      const action = actions[event.key];
-      if (action) {
-        event.preventDefault();
-        action();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [currentPly, goTo, positions.length]);
+  // Los cuatro saltos por la partida (RF-5.1), que comparten los botones y el
+  // teclado, aquí y en el tablero de análisis.
+  const goToStart = useCallback(() => goTo(-1), [goTo]);
+  const goToPrevious = useCallback(() => goTo(currentPly - 1), [goTo, currentPly]);
+  const goToNext = useCallback(() => goTo(currentPly + 1), [goTo, currentPly]);
+  const goToEnd = useCallback(() => goTo(positions.length - 1), [goTo, positions.length]);
+  useMoveNavigationKeys({
+    onFirst: goToStart,
+    onPrevious: goToPrevious,
+    onNext: goToNext,
+    onLast: goToEnd,
+  });
 
-  // El análisis guardado solo tiene la mejor jugada de cada posición, no el
-  // MultiPV completo (eso vive en el tablero de análisis, que consulta al
-  // motor en vivo), así que aquí la flecha es una sola. RF-10 es justamente
-  // persistir las alternativas; hasta entonces no hay más que dibujar.
-  const bestMoveUci = analysis?.moves[currentPly + 1]?.best_move_uci ?? null;
-  const engineArrows = useMemo(
-    () => (bestMoveUci ? [{ uci: bestMoveUci, brush: "green" as const }] : []),
-    [bestMoveUci],
-  );
+  // Lo que el motor proponía en la posición que se está viendo: son las
+  // alternativas guardadas con la jugada **siguiente**, porque están tomadas
+  // desde la posición anterior a ella (RF-10.1).
+  const nextAnalyzedMove = analysis?.moves[currentPly + 1];
+
+  // Las mismas flechas que el tablero de análisis (RF-10.2), con la línea que
+  // se esté señalando por encima de ellas. Un análisis anterior a RF-10 cuyas
+  // posiciones ya no estén en la caché no tiene alternativas: entonces se
+  // dibuja la única flecha que sí se guardó.
+  const engineArrows = useMemo(() => {
+    if (previewPvUci) return arrowsFromPreviewLine(previewPvUci);
+    const alternativeArrows = arrowsFromEngineLines(nextAnalyzedMove?.alternatives);
+    if (alternativeArrows.length > 0) return alternativeArrows;
+    const bestMoveUci = nextAnalyzedMove?.best_move_uci;
+    return bestMoveUci ? [{ uci: bestMoveUci, brush: "green" as const }] : [];
+  }, [previewPvUci, nextAnalyzedMove]);
+
+  // Al cambiar de jugada, la línea señalada era continuación de otra posición.
+  useEffect(() => setPreviewPvUci(null), [currentPly]);
 
   // En la posición inicial nadie ha movido todavía: 50-50 mientras haya
   // análisis, y sin barra si no lo hay.
   const currentAnalyzedMove = currentPly >= 0 ? analysis?.moves[currentPly] : undefined;
+
+  // Las alternativas del panel son las de la posición que se está viendo, las
+  // mismas que dibujan las flechas: si fueran las de la jugada anterior —que
+  // es donde se guardan las de "en su lugar"— señalar una línea dibujaría una
+  // continuación media jugada por detrás, sobre piezas que ya se movieron.
+  //
+  // Con eso, "lo que podías haber jugado en su lugar" (RF-10.2) es esta misma
+  // lista mirada desde aquí: `nextAnalyzedMove` es la jugada que se hizo desde
+  // esta posición, así que cuando salió mal el panel lo dice y marca en la
+  // lista cuál fue.
+  const positionAlternatives = nextAnalyzedMove?.alternatives ?? [];
+  const wasNextMoveAMistake =
+    nextAnalyzedMove !== undefined &&
+    MISTAKE_CLASSIFICATIONS.includes(nextAnalyzedMove.classification);
   const whiteWinPercent = currentAnalyzedMove
     ? whiteWinPercentAfterMove(currentAnalyzedMove)
     : analysis?.status === "done"
@@ -165,14 +201,19 @@ export function GameViewerPage() {
           <Link to="/" className="text-sm opacity-70 hover:underline">
             ← Volver a partidas
           </Link>
-          <h1 className="mt-1 text-xl font-bold">
+          <h1 className="mt-1 text-2xl font-bold">
             {game.white_username} <span className="opacity-60">({game.white_rating})</span>{" "}
             <span className="font-mono">{gameResult(game)}</span> {game.black_username}{" "}
             <span className="opacity-60">({game.black_rating})</span>
           </h1>
-          <p className="text-sm opacity-60">
-            {formatDate(game.played_at)} · {formatTimeClass(game.time_class)} ·{" "}
-            {game.rated ? "puntuada" : "amistosa"}
+          <p className="flex flex-wrap items-center gap-2 text-sm opacity-60">
+            <span>
+              {formatDate(game.played_at)} · {formatTimeClass(game.time_class)} ·{" "}
+              {game.rated ? "puntuada" : "amistosa"}
+            </span>
+            {/* Sin esto, un tablero al que le faltan piezas se lee como un
+                fallo de la aplicación y no como la partida que es. */}
+            {game.starts_from_custom_position && <CustomPositionBadge />}
           </p>
         </div>
 
@@ -180,15 +221,7 @@ export function GameViewerPage() {
           <Button onClick={() => setOrientation(orientation === "white" ? "black" : "white")}>
             Girar tablero
           </Button>
-          <select
-            value={engine}
-            onChange={(event) => setEngine(event.target.value as "stockfish" | "lc0")}
-            title="Motor con el que analizar"
-            className={`text-sm ${FIELD_CLASSES}`}
-          >
-            <option value="stockfish">Stockfish</option>
-            <option value="lc0">Lc0</option>
-          </select>
+          <EngineSelect value={engine} onChange={setEngine} />
           <Button
             variant="primary"
             onClick={() => analyzeMutation.mutate()}
@@ -204,6 +237,9 @@ export function GameViewerPage() {
       </div>
 
       {analyzeMutation.isError && <ErrorBox error={analyzeMutation.error} />}
+      {existingQuery.isError && (
+        <ErrorBox error={existingQuery.error} onRetry={existingQuery.refetch} />
+      )}
       {analysis?.status === "error" && (
         <ErrorBox error={new Error(analysis.error ?? "el análisis falló")} />
       )}
@@ -220,7 +256,7 @@ export function GameViewerPage() {
         />
       )}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_22rem]">
+      <div className={BOARD_SIDEBAR_GRID_CLASS}>
         <div className="space-y-3">
           <BoardWithEvalBar
             fen={currentFen}
@@ -231,17 +267,28 @@ export function GameViewerPage() {
           />
 
           <MoveNavigator
-            onFirst={() => goTo(-1)}
-            onPrevious={() => goTo(currentPly - 1)}
-            onNext={() => goTo(currentPly + 1)}
-            onLast={() => goTo(positions.length - 1)}
+            onFirst={goToStart}
+            onPrevious={goToPrevious}
+            onNext={goToNext}
+            onLast={goToEnd}
             canGoBack={currentPly > -1}
             canGoForward={currentPly < positions.length - 1}
             position={`${currentPly + 1} / ${positions.length}`}
           />
 
+          <p className={BOARD_HINT_CLASSES}>
+            ← → recorren la partida, Inicio y Fin van a sus extremos. Pulsa una jugada de la lista
+            o del gráfico para saltar a esa posición. Señala una jugada de las alternativas para
+            verla sobre el tablero.
+          </p>
+
           {analysis?.status === "done" && analysis.moves.length > 0 && (
-            <EvalChart moves={analysis.moves} currentPly={currentPly} onSelectPly={goTo} />
+            <EvalChart
+              moves={analysis.moves}
+              currentPly={currentPly}
+              startingPly={startingPly}
+              onSelectPly={goTo}
+            />
           )}
         </div>
 
@@ -257,34 +304,77 @@ export function GameViewerPage() {
                 <span className="tabular-nums">{formatAccuracy(analysis.black_accuracy)}</span>
               </div>
               <p className="mt-2 text-xs opacity-60">
-                {formatEngineName(analysis.engine)} · profundidad {analysis.depth} · MultiPV{" "}
-                {analysis.multipv}
+                {formatEngineName(analysis.engine)} · profundidad {analysis.depth} ·{" "}
+                {analysis.multipv} líneas por posición (MultiPV)
               </p>
+            </Panel>
+          )}
+
+          {analysis?.status === "done" && nextAnalyzedMove !== undefined && (
+            <Panel
+              title={
+                wasNextMoveAMistake
+                  ? `Podías haber jugado, en vez de ${nextAnalyzedMove.san}`
+                  : "Lo que propone el motor aquí"
+              }
+              bodyClassName=""
+            >
+              {positionAlternatives.length > 0 ? (
+                <EngineLineList
+                  lines={positionAlternatives}
+                  playedUci={nextAnalyzedMove.uci}
+                  onPreviewLine={setPreviewPvUci}
+                />
+              ) : (
+                /* Un análisis anterior a RF-10.1 cuyas posiciones ya no estén
+                   en la caché no guardó las líneas: se dice, en vez de dejar el
+                   hueco donde en las demás posiciones hay una lista (C-3). */
+                <div className="p-3">
+                  <EmptyState title="Sin alternativas guardadas">
+                    Este análisis solo guardó la mejor jugada, y sus posiciones ya no están en la
+                    caché del motor. Reanaliza la partida para ver las alternativas.
+                  </EmptyState>
+                </div>
+              )}
             </Panel>
           )}
 
           <Panel bodyClassName="p-2">
             {analysis?.status === "done" ? (
-              <MoveList moves={analysis.moves} currentPly={currentPly} onSelectPly={goTo} />
+              <MoveList
+                moves={analysis.moves}
+                currentPly={currentPly}
+                startingPly={startingPly}
+                onSelectPly={goTo}
+              />
             ) : (
-              <PlainMoveList positions={positions} currentPly={currentPly} onSelectPly={goTo} />
+              <PlainMoveList
+                positions={positions}
+                currentPly={currentPly}
+                startingPly={startingPly}
+                onSelectPly={goTo}
+              />
             )}
           </Panel>
 
-          {!analysis && !existingQuery.isPending && (
+          {!analysis && !existingQuery.isPending && !existingQuery.isError && (
             <EmptyState title="Sin analizar">
               Pulsa <strong>Analizar</strong> para que el motor evalúe cada jugada.
             </EmptyState>
           )}
 
           {comparisonQuery.data && (
-            <EngineComparison comparison={comparisonQuery.data} onSelectPly={goTo} />
+            <EngineComparison
+              comparison={comparisonQuery.data}
+              startingPly={startingPly}
+              onSelectPly={goTo}
+            />
           )}
 
           {!canCompareEngines && analysis?.status === "done" && (
-            <p className="rounded border border-dashed border-slate-300 px-3 py-2 text-xs opacity-70 dark:border-slate-700">
+            <EmptyState title="Sin comparación de motores">
               Analiza también con el otro motor para ver dónde discrepan.
-            </p>
+            </EmptyState>
           )}
 
           {analysis?.status === "done" && (
@@ -331,26 +421,23 @@ function useElapsedSeconds(isRunning: boolean): number {
 function PlainMoveList({
   positions,
   currentPly,
+  startingPly,
   onSelectPly,
 }: {
   positions: ParsedPosition[];
   currentPly: number;
+  startingPly: number;
   onSelectPly: (ply: number) => void;
 }) {
   return (
-    <div className="flex max-h-[28rem] flex-wrap gap-1 overflow-y-auto p-1 text-sm">
+    <div className={`flex ${MOVE_LIST_HEIGHT_CLASS} flex-wrap gap-1 overflow-y-auto p-1 text-sm`}>
       {positions.map((position, ply) => (
-        <button
-          key={ply}
-          type="button"
-          onClick={() => onSelectPly(ply)}
-          className={`rounded px-1.5 py-0.5 font-mono hover:bg-slate-100 dark:hover:bg-slate-800 ${
-            ply === currentPly ? "bg-indigo-100 font-medium dark:bg-indigo-900/60" : ""
-          }`}
-        >
-          {ply % 2 === 0 && <span className="mr-1 opacity-50">{ply / 2 + 1}.</span>}
+        <MoveButton key={ply} isCurrent={ply === currentPly} onClick={() => onSelectPly(ply)}>
+          {(ply + startingPly) % 2 === 0 && (
+            <span className="opacity-50">{moveNumberLabel(ply + startingPly)}</span>
+          )}
           {position.san}
-        </button>
+        </MoveButton>
       ))}
     </div>
   );
@@ -368,9 +455,7 @@ function ClassificationSummary({ counts }: { counts: Map<string, number> }) {
           return (
             <li key={classification} className="flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <span className={`rounded px-1 text-[10px] leading-4 ${style.className}`}>
-                  {style.symbol}
-                </span>
+                <ClassificationBadge classification={classification} />
                 {style.label}
               </span>
               <span className="tabular-nums opacity-70">{count}</span>

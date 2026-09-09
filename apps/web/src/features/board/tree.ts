@@ -8,6 +8,7 @@
  * primer hijo, así que promover una variante es moverla a la posición 0.
  */
 import { Chess } from "chess.js";
+import { moveNumberLabel, plyFromFen } from "../../lib/moves";
 
 export interface TreeNode {
   id: string;
@@ -172,27 +173,15 @@ export function toPgn(root: TreeNode): string {
   return `${setup}${movetext.trim()} *\n`;
 }
 
-/** Ply inicial de una posición: lo que hay que sumar para numerar las jugadas
- * como el PGN, en un tablero que no arranca de la posición estándar. Lo usan
- * tanto la exportación (`toPgn`) como el árbol en pantalla (`VariationTree`),
- * para que el mismo movimiento no salga con dos números distintos. */
-export function plyFromFen(fen: string): number {
-  // Del FEN salen el número de jugada y el turno, que dan el ply inicial.
-  const fenFields = fen.split(" ");
-  const fullmove = Number(fenFields[5] ?? 1);
-  const sideToMove = fenFields[1] ?? "w";
-  return (fullmove - 1) * 2 + (sideToMove === "b" ? 1 : 0);
-}
-
 function renderVariation(node: TreeNode, ply: number): string {
   if (node.children.length === 0) return "";
 
   const [mainChild, ...variations] = node.children;
-  let movetext = `${moveNumber(ply)}${mainChild.san}`;
+  let movetext = `${moveNumberLabel(ply)} ${mainChild.san}`;
   if (mainChild.comment) movetext += ` {${mainChild.comment}}`;
 
   for (const variation of variations) {
-    let sub = `${moveNumber(ply)}${variation.san}`;
+    let sub = `${moveNumberLabel(ply)} ${variation.san}`;
     if (variation.comment) sub += ` {${variation.comment}}`;
     const variationContinuation = renderVariation(variation, ply + 1);
     movetext += ` (${sub}${variationContinuation ? ` ${variationContinuation}` : ""})`;
@@ -200,9 +189,4 @@ function renderVariation(node: TreeNode, ply: number): string {
 
   const mainContinuation = renderVariation(mainChild, ply + 1);
   return mainContinuation ? `${movetext} ${mainContinuation}` : movetext;
-}
-
-function moveNumber(ply: number): string {
-  const fullmoveNumber = Math.floor(ply / 2) + 1;
-  return ply % 2 === 0 ? `${fullmoveNumber}. ` : `${fullmoveNumber}... `;
 }

@@ -7,6 +7,7 @@
 import type { EngineConfigOut, EngineConfigUpdate } from "@lucia/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
+import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { ErrorBox, Spinner, SuccessBox, WarningBox } from "../../components/Feedback";
 import { FIELD_CLASSES, PANEL_CLASSES } from "../../components/styles";
@@ -64,6 +65,14 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["engines"] }),
   });
 
+  /** Cambiar un campo borra el resultado del guardado anterior: si no, el
+   * recuadro seguía diciendo "Configuración guardada" al lado de valores que
+   * ya no eran los guardados (criterio C-3). */
+  function updateForm(patch: Partial<EngineConfigUpdate>) {
+    saveMutation.reset();
+    setForm((current) => ({ ...current, ...patch }));
+  }
+
   return (
     <form
       onSubmit={(event) => {
@@ -117,7 +126,7 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
           value={form.depth}
           min={1}
           max={40}
-          onChange={(depth) => setForm({ ...form, depth })}
+          onChange={(depth) => updateForm({ depth })}
         />
         <NumberField
           label="MultiPV"
@@ -125,7 +134,7 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
           value={form.multipv}
           min={1}
           max={10}
-          onChange={(multipv) => setForm({ ...form, multipv })}
+          onChange={(multipv) => updateForm({ multipv })}
         />
         <NumberField
           label="Hilos"
@@ -133,7 +142,7 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
           value={form.threads}
           min={1}
           max={64}
-          onChange={(threads) => setForm({ ...form, threads })}
+          onChange={(threads) => updateForm({ threads })}
         />
         <NumberField
           label="Hash (MB)"
@@ -142,7 +151,7 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
           min={16}
           max={8192}
           step={16}
-          onChange={(hash_mb) => setForm({ ...form, hash_mb })}
+          onChange={(hash_mb) => updateForm({ hash_mb })}
         />
       </div>
 
@@ -160,15 +169,9 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
 
 function AvailabilityBadge({ available }: { available: boolean }) {
   return (
-    <span
-      className={`whitespace-nowrap rounded px-2 py-0.5 text-xs ${
-        available
-          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200"
-          : "bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-200"
-      }`}
-    >
+    <Badge tone={available ? "success" : "danger"}>
       {available ? "disponible" : "no encontrado"}
-    </span>
+    </Badge>
   );
 }
 
@@ -191,7 +194,10 @@ function NumberField({
 }) {
   return (
     <label className="text-sm">
-      <span className="block">{label}</span>
+      {/* Mismo tono que las etiquetas de campo del resto de pantallas: aquí
+          iban a opacidad plena y el nombre del campo pesaba más que su valor
+          (criterio C-2). */}
+      <span className="block opacity-70">{label}</span>
       <input
         type="number"
         value={value}
@@ -201,7 +207,10 @@ function NumberField({
         onChange={(event) => onChange(Number(event.target.value))}
         className={`mt-1 w-full ${FIELD_CLASSES}`}
       />
-      <span className="mt-0.5 block text-xs opacity-50">{hint}</span>
+      {/* El texto de ayuda va en `opacity-60`, como el de las dos pantallas de
+          tablero y el del gráfico; `opacity-50` está reservado al número de
+          jugada. */}
+      <span className="mt-0.5 block text-xs opacity-60">{hint}</span>
     </label>
   );
 }

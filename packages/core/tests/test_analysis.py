@@ -97,3 +97,41 @@ async def test_terminal_draws_score_zero() -> None:
 
     assert board.is_stalemate()
     assert position_evals[0].score.pov(chess.WHITE).score() == 0
+
+
+@requires_stockfish
+async def test_evaluate_positions_keeps_every_multipv_line() -> None:
+    """Con MultiPV > 1 se guardan todas las líneas, no solo la mejor: son las
+    alternativas de cada jugada (RF-10.1)."""
+    board = chess.Board()
+    moves = [chess.Move.from_uci(uci) for uci in FOOLS_MATE_UCI_MOVES]
+
+    async with EngineBridge(_config(multipv=3)) as engine:
+        position_evals = await evaluate_positions(engine, board, moves)
+
+    opening = position_evals[0]
+    assert len(opening.lines) == 3
+    # Ordenadas de mejor a peor, y la primera es la que ya devolvían
+    # `best_move` y `pv`.
+    assert opening.best_move == opening.lines[0].move
+    assert opening.pv == opening.lines[0].pv
+    assert opening.score == opening.lines[0].score
+    # Cada línea propone una jugada distinta: son alternativas de verdad.
+    assert len({line.move for line in opening.lines}) == 3
+
+
+@requires_stockfish
+async def test_analyzed_move_carries_the_alternatives_of_the_previous_position() -> None:
+    board = chess.Board()
+    moves = [chess.Move.from_uci(uci) for uci in FOOLS_MATE_UCI_MOVES]
+
+    async with EngineBridge(_config(multipv=3)) as engine:
+        analyzed_game = await analyze_game(engine, board, moves)
+
+    blunder = analyzed_game.moves[2]  # g2g4
+    assert blunder.uci == "g2g4"
+    # Las alternativas son las de la posición desde la que se jugó, así que la
+    # primera es la jugada que el motor recomendaba en su lugar.
+    assert blunder.alternatives[0].move is not None
+    assert blunder.alternatives[0].move.uci() == blunder.best_move_uci
+    assert len(blunder.alternatives) == 3

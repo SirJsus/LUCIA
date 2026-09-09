@@ -4,14 +4,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Chess } from "chess.js";
 import { useState } from "react";
+import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
+import { CustomPositionBadge } from "../../components/CustomPositionBadge";
 import { EmptyState, ErrorBox, Spinner } from "../../components/Feedback";
-import { FIELD_CLASSES, PANEL_CLASSES } from "../../components/styles";
+import { buttonClasses, FIELD_CLASSES, PANEL_CLASSES } from "../../components/styles";
 import { api } from "../../lib/api";
 import { formatDate } from "../../lib/format";
 import { addMove, createRoot, type TreeNode } from "./tree";
 
-const STARTING_FEN = new Chess().fen();
+const STANDARD_STARTING_FEN = new Chess().fen();
 
 export function BoardsPage() {
   const queryClient = useQueryClient();
@@ -36,6 +38,13 @@ export function BoardsPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["boards"] }),
   });
 
+  /** Qué tablero se está borrando ahora mismo: la mutación es una sola para
+   * toda la lista, así que sin mirar sus `variables` se marcarían todas las
+   * filas a la vez. */
+  function isDeleting(boardId: number): boolean {
+    return deleteMutation.isPending && deleteMutation.variables === boardId;
+  }
+
   function handleCreate(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
@@ -53,11 +62,16 @@ export function BoardsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Tableros de análisis</h1>
-      <p className="-mt-4 text-sm opacity-70">
-        Para partidas presenciales, posiciones de libro o ideas sueltas. No cuentan en tus
-        estadísticas.
-      </p>
+      {/* Título y frase de entrada van juntos, como en Motores: sueltos,
+          había que anular el `space-y-6` de la pantalla con un margen
+          negativo para que la frase no pareciera de otra sección. */}
+      <div>
+        <h1 className="text-2xl font-bold">Tableros de análisis</h1>
+        <p className="mt-1 text-sm opacity-70">
+          Para partidas presenciales, posiciones de libro o ideas sueltas. No cuentan en tus
+          estadísticas.
+        </p>
+      </div>
 
       <form
         onSubmit={handleCreate}
@@ -99,6 +113,7 @@ export function BoardsPage() {
         </Button>
       </form>
 
+      {deleteMutation.isError && <ErrorBox error={deleteMutation.error} />}
       {boardsQuery.isPending && <Spinner />}
       {boardsQuery.isError && <ErrorBox error={boardsQuery.error} onRetry={boardsQuery.refetch} />}
 
@@ -113,27 +128,51 @@ export function BoardsPage() {
               key={board.id}
               className={`flex items-center justify-between gap-3 px-3 py-2 ${PANEL_CLASSES}`}
             >
-              <Link
-                to="/boards/$boardId"
-                params={{ boardId: String(board.id) }}
-                className="flex-1 hover:underline"
-              >
+              <div className="flex-1">
                 <span className="font-medium">{board.title}</span>
                 {board.is_own_game && (
-                  <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-xs text-sky-800 dark:bg-sky-900/60 dark:text-sky-200">
-                    partida propia
+                  <span className="ml-2">
+                    <Badge tone="info" title="Cuenta en tus estadísticas (RF-6.5)">
+                      partida propia
+                    </Badge>
+                  </span>
+                )}
+                {/* Un tablero se crea desde un FEN casi siempre: decir de qué
+                    posición arranca es más útil aquí que en ningún otro sitio. */}
+                {board.root_fen !== STANDARD_STARTING_FEN && (
+                  <span className="ml-2">
+                    <CustomPositionBadge />
                   </span>
                 )}
                 <span className="ml-2 text-xs opacity-60">
                   actualizado {formatDate(board.updated_at)}
                 </span>
+              </div>
+              {/* Abrir un elemento se hace igual que en Partidas: un enlace con
+                  aspecto de botón al final de la fila, separado de eliminar. */}
+              <Link
+                to="/boards/$boardId"
+                params={{ boardId: String(board.id) }}
+                className={buttonClasses("secondary", "sm")}
+              >
+                Ver tablero
               </Link>
+              {/* Destruir siempre pregunta, aquí y en el árbol de variantes:
+                  no hay deshacer para ninguna de las dos. Y mientras la
+                  petición viaja lo dice, como el resto de escrituras de la
+                  aplicación (criterio C-3): la fila se quedaba igual y daba la
+                  sensación de que el botón no había hecho nada. */}
               <Button
                 variant="danger"
                 size="sm"
-                onClick={() => deleteMutation.mutate(board.id)}
+                disabled={isDeleting(board.id)}
+                onClick={() => {
+                  if (window.confirm(`¿Eliminar el tablero "${board.title}"? No se puede deshacer.`)) {
+                    deleteMutation.mutate(board.id);
+                  }
+                }}
               >
-                Eliminar
+                {isDeleting(board.id) ? "Eliminando…" : "Eliminar"}
               </Button>
             </li>
           ))}
@@ -152,7 +191,9 @@ interface ParsedSource {
  * es más específico: un PGN nunca se confunde con un FEN válido. */
 function parseSource(source: string): ParsedSource | null {
   const trimmedSource = source.trim();
-  if (!trimmedSource) return { rootFen: STARTING_FEN, tree: createRoot(STARTING_FEN) };
+  if (!trimmedSource) {
+    return { rootFen: STANDARD_STARTING_FEN, tree: createRoot(STANDARD_STARTING_FEN) };
+  }
 
   try {
     const chess = new Chess(trimmedSource);

@@ -13,7 +13,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from lucia_api.db import get_session
 from lucia_api.db.models import Analysis, AnalyzedMove, Game
 from lucia_api.dependencies import get_worker
-from lucia_api.services.analysis import analyze_position
+from lucia_api.services.analysis import (
+    alternatives_from_cache,
+    analyze_position,
+    engine_lines_from_serialized,
+)
 from lucia_api.services.comparison import (
     DEFAULT_DISAGREEMENT_THRESHOLD,
     ComparisonError,
@@ -53,6 +57,20 @@ class AnalysisSummary(BaseModel):
     black_accuracy: float | None
 
 
+class EngineLineOut(BaseModel):
+    """Una línea del motor, igual la calcule en vivo `POST /analysis/position`
+    o venga guardada con una jugada analizada (RF-10.1): mismo formato en los
+    dos sitios, para que el front la dibuje igual."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    rank: int
+    score_cp: int | None
+    score_mate: int | None
+    pv_uci: list[str]
+    pv_san: list[str]
+
+
 class AnalyzedMoveOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -67,6 +85,10 @@ class AnalyzedMoveOut(BaseModel):
     win_percent_before: float
     win_percent_after: float
     best_move_uci: str | None
+    alternatives: list[EngineLineOut] = []
+    """Lo que el motor proponía en la posición anterior a esta jugada, de mejor
+    a peor (RF-10.1). Vacío en los análisis anteriores a RF-10 cuyas posiciones
+    ya no están en la caché."""
 
 
 class AnalysisDetail(AnalysisSummary):
@@ -116,14 +138,6 @@ class PositionAnalysisRequest(BaseModel):
     multipv: int | None = Field(default=None, ge=1, le=10)
 
 
-class EngineLineOut(BaseModel):
-    rank: int
-    score_cp: int | None
-    score_mate: int | None
-    pv_uci: list[str]
-    pv_san: list[str]
-
-
 @router.post("/analysis/position", response_model=list[EngineLineOut])
 async def position_analysis(
     body: PositionAnalysisRequest,
@@ -137,16 +151,7 @@ async def position_analysis(
         )
     except ValueError as error:
         raise HTTPException(status_code=422, detail=f"FEN inválido: {error}") from error
-    return [
-        EngineLineOut(
-            rank=line.rank,
-            score_cp=line.score_cp,
-            score_mate=line.score_mate,
-            pv_uci=line.pv_uci,
-            pv_san=line.pv_san,
-        )
-        for line in lines
-    ]
+    return [EngineLineOut.model_validate(line) for line in lines]
 
 
 @router.get("/analysis", response_model=list[AnalysisSummary])
@@ -244,10 +249,30 @@ async def get_analysis(
         .order_by(AnalyzedMove.ply)
     )
     moves = result.scalars().all()
-    return AnalysisDetail(
-        **AnalysisSummary.model_validate(analysis).model_dump(),
-        moves=[AnalyzedMoveOut.model_validate(move) for move in moves],
-    )
+
+    # Los análisis anteriores a RF-10.1 no guardaron alternativas, pero sus
+    # posiciones pueden seguir en la caché: se recuperan de ahí en vez de
+    # obligar a re-analizar la partida (ADR-0007).
+    cached_alternatives = await alternatives_from_cache(session, analysis, moves)
+
+    moves_out: list[AnalyzedMoveOut] = []
+    for move in moves:
+        serialized_alternatives = (
+            move.alternatives_json
+            if move.alternatives_json is not None
+            else cached_alternatives.get(move.ply, [])
+        )
+        move_out = AnalyzedMoveOut.model_validate(move)
+        # La SAN de cada línea se nombra desde `fen_before`, que es justo la
+        # posición de la que salieron las alternativas: se guardan con la
+        # jugada, pero son de antes de jugarla.
+        move_out.alternatives = [
+            EngineLineOut.model_validate(line)
+            for line in engine_lines_from_serialized(serialized_alternatives, move.fen_before)
+        ]
+        moves_out.append(move_out)
+
+    return AnalysisDetail(**AnalysisSummary.model_validate(analysis).model_dump(), moves=moves_out)
 
 
 @router.websocket("/ws/analysis/{analysis_id}")

@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import datetime as dt
 import io
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -14,6 +14,7 @@ import chess.engine
 import chess.pgn
 from lucia_core.analysis import analyze_game
 from lucia_core.engine import EngineBridge, EngineConfig
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db.models import Analysis, AnalyzedMove, Game, PositionCache
@@ -45,13 +46,7 @@ class CachedEngineBridge:
     def __init__(self, session: AsyncSession, engine: EngineBridge, engine_name: str) -> None:
         self._session = session
         self._engine = engine
-        # La clave de caché incluye la red neuronal, no solo el nombre del
-        # motor: el mismo Lc0 con otra red da evaluaciones distintas para la
-        # misma posición, y sin esto devolvería las de la red anterior.
-        weights_file = engine.config.extra_options.get("WeightsFile")
-        self._engine_name = (
-            f"{engine_name}/{Path(str(weights_file)).name}" if weights_file else engine_name
-        )
+        self._engine_name = _cache_engine_name(engine_name, engine.config.extra_options)
 
     async def analyze(self, board: chess.Board) -> list[chess.engine.InfoDict]:
         config = self._engine.config
@@ -72,18 +67,41 @@ class CachedEngineBridge:
 
         lines = await self._engine.analyze(board)
         self._session.add(
-            PositionCache(**cache_key, lines_json=[_serialize_line(line) for line in lines])
+            PositionCache(
+                **cache_key,
+                lines_json=[_serialize_line(line["score"], line.get("pv") or []) for line in lines],
+            )
         )
         await self._session.flush()
         return lines
 
 
-def _serialize_line(line: chess.engine.InfoDict) -> dict:
-    score = line["score"].white()
+def _cache_engine_name(engine_name: str, extra_options: Mapping[str, object]) -> str:
+    """El motor tal como aparece en la clave de `position_cache`.
+
+    Para Lc0 incluye el nombre de la red (`lc0/744706-conv.pb.gz`): el mismo
+    motor con otra red da evaluaciones distintas para la misma posición, y sin
+    esto la caché devolvería las de la red anterior.
+    """
+    weights_file = extra_options.get("WeightsFile")
+    return f"{engine_name}/{Path(str(weights_file)).name}" if weights_file else engine_name
+
+
+def _serialize_line(score: chess.engine.PovScore, pv: Sequence[chess.Move]) -> dict:
+    """Una línea del motor tal como se guarda en la base.
+
+    Mismo formato en `position_cache.lines_json` y en
+    `analyzed_moves.alternatives_json`: así una lista de líneas cacheada sirve
+    tal cual como alternativas de una jugada, sin traducción de por medio
+    (ADR-0007) — romper esa simetría rompe `alternatives_from_cache`. La
+    puntuación va siempre desde el punto de vista de las blancas, como todo lo
+    que se persiste.
+    """
+    white_score = score.white()
     return {
-        "score_cp": None if score.is_mate() else score.score(),
-        "score_mate": score.mate() if score.is_mate() else None,
-        "pv": [m.uci() for m in (line.get("pv") or [])],
+        "score_cp": None if white_score.is_mate() else white_score.score(),
+        "score_mate": white_score.mate() if white_score.is_mate() else None,
+        "pv": [move.uci() for move in pv],
     }
 
 
@@ -97,6 +115,45 @@ def _deserialize_line(serialized_line: dict) -> chess.engine.InfoDict:
         "score": chess.engine.PovScore(score, chess.WHITE),
         "pv": [chess.Move.from_uci(move_uci) for move_uci in serialized_line["pv"]],
     }
+
+
+async def alternatives_from_cache(
+    session: AsyncSession, analysis: Analysis, moves: Sequence[AnalyzedMove]
+) -> dict[int, list[dict]]:
+    """Alternativas recuperadas de `position_cache`, por ply, para las jugadas
+    que no las guardaron.
+
+    Sirve para los análisis hechos **antes** de RF-10.1, que guardaron solo
+    `best_move_uci`: sus posiciones sí quedaron en la caché con todas sus
+    líneas (RF-2.7), así que las alternativas se pueden devolver sin volver a
+    gastar motor, que es justamente por lo que RF-10 entró en el alcance de
+    v1.0.
+
+    Solo devuelve lo que encaja **exactamente** con la clave de la caché
+    —misma posición, mismo motor y red, mismo límite y mismo MultiPV—, porque
+    una línea calculada con otra configuración no es la que produjo esta
+    clasificación. Lo que no encaje, no sale: mejor una flecha sola que una
+    alternativa que el análisis nunca vio.
+
+    No escribe nada: es una lectura de conveniencia en el camino de servir un
+    análisis viejo, no una migración a medias.
+    """
+    fens_by_ply = {move.ply: move.fen_before for move in moves if move.alternatives_json is None}
+    if not fens_by_ply:
+        return {}
+
+    effective_config = await get_effective_config(session, analysis.engine)
+    engine_name = _cache_engine_name(analysis.engine, effective_config.uci_extra_options())
+    cached_positions = await session.execute(
+        select(PositionCache.fen, PositionCache.lines_json).where(
+            PositionCache.fen.in_(set(fens_by_ply.values())),
+            PositionCache.engine == engine_name,
+            PositionCache.depth == analysis.depth,
+            PositionCache.multipv == analysis.multipv,
+        )
+    )
+    lines_by_fen = dict(cached_positions.all())
+    return {ply: lines_by_fen[fen] for ply, fen in fens_by_ply.items() if fen in lines_by_fen}
 
 
 @dataclass(frozen=True)
@@ -146,6 +203,19 @@ async def analyze_position(
         raw_lines = await cached_engine.analyze(board)
     await session.commit()
 
+    return _engine_lines(raw_lines, fen)
+
+
+def engine_lines_from_serialized(serialized_lines: Sequence[dict], fen: str) -> list[EngineLine]:
+    """Convierte líneas guardadas (`alternatives_json`, `lines_json`) en las
+    mismas `EngineLine` que devuelve el análisis en vivo (RF-10.1)."""
+    return _engine_lines([_deserialize_line(line) for line in serialized_lines], fen)
+
+
+def _engine_lines(raw_lines: Sequence[chess.engine.InfoDict], fen: str) -> list[EngineLine]:
+    """Numera las líneas del motor y las nombra desde `fen`: la notación SAN
+    depende de la posición, así que no se guarda, se deriva al servir."""
+    board = chess.Board(fen)
     lines: list[EngineLine] = []
     for rank, raw_line in enumerate(raw_lines, start=1):
         score = raw_line["score"].white()
@@ -155,7 +225,7 @@ async def analyze_position(
                 rank=rank,
                 score_cp=None if score.is_mate() else score.score(),
                 score_mate=score.mate() if score.is_mate() else None,
-                pv_uci=[m.uci() for m in pv],
+                pv_uci=[move.uci() for move in pv],
                 pv_san=_pv_to_san(board, pv),
             )
         )
@@ -241,6 +311,11 @@ async def run_analysis(
                     win_percent_before=analyzed_move.win_percent_before,
                     win_percent_after=analyzed_move.win_percent_after,
                     best_move_uci=analyzed_move.best_move_uci,
+                    # RF-10.1: las N mejores líneas de la posición previa, no
+                    # solo la mejor. Con MultiPV 1 la lista tiene un elemento.
+                    alternatives_json=[
+                        _serialize_line(line.score, line.pv) for line in analyzed_move.alternatives
+                    ],
                 )
             )
         analysis.white_accuracy = analysis_result.white_accuracy

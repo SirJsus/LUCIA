@@ -31,7 +31,7 @@ LUCIA/
 | [04-stack-tecnologico.md](docs/04-stack-tecnologico.md) | Tecnologías elegidas y por qué |
 | [05-roadmap.md](docs/05-roadmap.md) | Fases de entrega |
 | [06-mapa-del-proyecto.md](docs/06-mapa-del-proyecto.md) | Mapa vivo en diagramas Mermaid: flujo general, módulos, secuencias y qué RF vive en qué archivo |
-| [07-coherencia-ui.md](docs/07-coherencia-ui.md) | Criterios de coherencia de la interfaz e inventario de incumplimientos abiertos |
+| [07-coherencia-ui.md](docs/07-coherencia-ui.md) | Criterios de coherencia de la interfaz (RNF-11), qué se arregló para cumplirlos y cómo se verifica antes de comitear en `apps/web` |
 | [docs/adr/](docs/adr/) | Decisiones de arquitectura (ADR) |
 | [CHANGELOG.md](CHANGELOG.md) | Historial de versiones (Keep a Changelog + SemVer), a partir del alcance v1.0 congelado en requerimientos |
 

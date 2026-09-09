@@ -7,9 +7,10 @@ from __future__ import annotations
 import datetime as dt
 from collections.abc import AsyncIterator
 
+import chess
 from fastapi.testclient import TestClient
 from lucia_api.db import get_session
-from lucia_api.db.models import Game, Player
+from lucia_api.db.models import Analysis, AnalyzedMove, Game, Player, PositionCache
 from lucia_api.main import app
 from lucia_api.worker import AnalysisWorker
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
@@ -159,3 +160,133 @@ async def test_get_analysis_with_unknown_id_returns_404(db_session: AsyncSession
         assert response.status_code == 404
     finally:
         app.dependency_overrides.clear()
+
+
+@requires_stockfish
+async def test_analysis_detail_serves_the_alternatives_of_each_move(
+    db_session: AsyncSession, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """RF-10.1: el análisis guarda las N mejores líneas de cada posición, y el
+    detalle las devuelve con su notación SAN, igual que el análisis en vivo."""
+    game_id = await _create_game(db_session)
+
+    async def _session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app.dependency_overrides[get_session] = _session
+    app.state.worker = AnalysisWorker(session_factory=db_session_factory)
+
+    try:
+        with TestClient(app) as http:
+            response = http.post(
+                "/analysis",
+                json={"game_ids": [game_id], "engine": "stockfish", "depth": 8, "multipv": 3},
+            )
+            analysis_id = response.json()[0]["id"]
+            with http.websocket_connect(f"/ws/analysis/{analysis_id}") as ws:
+                while ws.receive_json()["status"] not in ("done", "error"):
+                    pass
+
+            blunder = http.get(f"/analysis/{analysis_id}").json()["moves"][2]
+    finally:
+        app.dependency_overrides.clear()
+
+    assert blunder["uci"] == "g2g4"
+    alternatives = blunder["alternatives"]
+    assert len(alternatives) == 3
+    # Ordenadas de mejor a peor, y la primera es la que ya decía `best_move_uci`.
+    assert [line["rank"] for line in alternatives] == [1, 2, 3]
+    assert alternatives[0]["pv_uci"][0] == blunder["best_move_uci"]
+    # La SAN se deriva de `fen_before` al servir, no se guarda.
+    assert alternatives[0]["pv_san"][0]
+    # Son alternativas de verdad: jugadas distintas entre sí.
+    assert len({line["pv_uci"][0] for line in alternatives}) == 3
+
+
+async def _create_analysis_without_alternatives(
+    session: AsyncSession, *, cached_lines: list[dict], cache_depth: int = 8
+) -> int:
+    """Un análisis como los de antes de RF-10 —una jugada, sin
+    `alternatives_json`— cuya posición sí quedó en `position_cache` con
+    `cached_lines`. Devuelve su id."""
+    game_id = await _create_game(session)
+    analysis = Analysis(game_id=game_id, engine="stockfish", depth=8, multipv=2, status="done")
+    session.add(analysis)
+    await session.flush()
+    session.add(
+        AnalyzedMove(
+            analysis_id=analysis.id,
+            ply=0,
+            color="white",
+            san="f3",
+            uci="f2f3",
+            fen_before=chess.STARTING_FEN,
+            classification="mistake",
+            phase="opening",
+            move_accuracy=50.0,
+            win_percent_before=50.0,
+            win_percent_after=45.0,
+            best_move_uci="e2e4",
+            alternatives_json=None,
+        )
+    )
+    session.add(
+        PositionCache(
+            fen=chess.STARTING_FEN,
+            engine="stockfish",
+            depth=cache_depth,
+            multipv=2,
+            lines_json=cached_lines,
+        )
+    )
+    await session.commit()
+    return analysis.id
+
+
+async def _get_first_move(db_session: AsyncSession, analysis_id: int) -> dict:
+    async def _session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app.dependency_overrides[get_session] = _session
+    try:
+        with TestClient(app) as http:
+            return http.get(f"/analysis/{analysis_id}").json()["moves"][0]
+    finally:
+        app.dependency_overrides.clear()
+
+
+async def test_analysis_detail_recovers_alternatives_from_the_position_cache(
+    db_session: AsyncSession,
+) -> None:
+    """Un análisis anterior a RF-10 no guardó alternativas, pero sus posiciones
+    siguen en la caché: se recuperan de ahí en vez de re-analizar la partida."""
+    analysis_id = await _create_analysis_without_alternatives(
+        db_session,
+        cached_lines=[
+            {"score_cp": 30, "score_mate": None, "pv": ["e2e4", "e7e5"]},
+            {"score_cp": 25, "score_mate": None, "pv": ["d2d4", "d7d5"]},
+        ],
+    )
+
+    move = await _get_first_move(db_session, analysis_id)
+
+    assert [line["pv_uci"][0] for line in move["alternatives"]] == ["e2e4", "d2d4"]
+    assert [line["pv_san"][0] for line in move["alternatives"]] == ["e4", "d4"]
+    assert move["alternatives"][0]["score_cp"] == 30
+
+
+async def test_alternatives_are_not_recovered_from_a_different_configuration(
+    db_session: AsyncSession,
+) -> None:
+    """La clave de la caché incluye motor, límite y MultiPV: una línea calculada
+    con otra configuración no es la que produjo esta clasificación, así que no
+    se sirve como alternativa."""
+    analysis_id = await _create_analysis_without_alternatives(
+        db_session,
+        cached_lines=[{"score_cp": 30, "score_mate": None, "pv": ["e2e4"]}],
+        cache_depth=20,  # el análisis fue a profundidad 8
+    )
+
+    move = await _get_first_move(db_session, analysis_id)
+
+    assert move["alternatives"] == []

@@ -2,24 +2,36 @@
 
 Este documento existe porque la aplicación creció pantalla a pantalla y cada
 una resolvió a su manera cosas que deberían resolverse igual en todas. El
-síntoma que lo motivó: en el detalle de una partida se navega con botones en
-pantalla y la interfaz cambia según lo que esté haciendo el motor, mientras
-que en el tablero de análisis se navega solo con el teclado y la pantalla es
-siempre la misma. Quien ya sabe de análisis de partidas se adapta; quien no,
-lee el tablero de análisis como una herramienta tosca.
+síntoma que lo motivó: en el detalle de una partida se navegaba con botones en
+pantalla y la interfaz cambiaba según lo que estuviera haciendo el motor,
+mientras que en el tablero de análisis se navegaba solo con el teclado y la
+pantalla era siempre la misma. Quien ya sabe de análisis de partidas se adapta;
+quien no, leía el tablero de análisis como una herramienta tosca. Eso ya está
+corregido —las 38 filas que motivaron este inventario se cerraron el
+2026-09-08—, pero los criterios siguen vigentes: son la vara con la que se mide
+cada cambio nuevo de `apps/web`. El barrido completo que se hizo ese mismo día
+para comprobar que no quedaba nada destapó nueve incumplimientos más, las filas
+39 a 47, cerradas también ese día. La revisión de RF-10.2 —las alternativas por
+jugada del visor, ese mismo 2026-09-08— abrió otras cuatro, de la 48 a la 51,
+cerradas igualmente. El inventario está vacío, que es como debería encontrarse
+siempre que se lea este documento.
 
 **Qué es cada mitad de este documento.** Los criterios C-1 a C-7 son
 **RNF-11**, que vive en la sección Post 1.0 de
 [docs/02-requerimientos.md](02-requerimientos.md): son una práctica de trabajo
 vinculante desde hoy en cada commit de `apps/web`, no una prestación que se
 entregue en v1.0, y por eso no cuentan para el progreso hacia 1.0.0. El
-inventario de abajo es otra cosa: son incumplimientos de requerimientos **ya
-congelados** (RF-5.1, RF-5.2, RF-6.2, RNF-6), y por eso sí se arreglan dentro
-de v1.0, en la fase 2 de [docs/05-roadmap.md](05-roadmap.md).
+inventario es otra cosa: incumplimientos concretos, con archivo y línea. Las 38
+primeras filas lo eran de requerimientos **ya congelados** (RF-5.1, RF-5.2,
+RF-6.2, RNF-6), y por eso se arreglaron dentro de v1.0, en la fase 2 de
+[docs/05-roadmap.md](05-roadmap.md). Las nueve últimas (39 a 47) eran de dos
+clases, y la distinción sigue siendo útil para el próximo barrido: de la 39 a
+la 41 eran recetas de estilo copiadas a mano —no se veía nada raro en pantalla,
+pero una coherencia que sostiene el copiar y pegar se rompe en el primer
+cambio—, y de la 42 a la 47, cosas que se notaban usando la aplicación.
 
-No es una lista de gustos: son criterios verificables, cada uno con su
-inventario de incumplimientos actuales. La revisión es manual, antes de
-comitear cambios de front — ver [Cómo se verifica](#cómo-se-verifica).
+No es una lista de gustos: son criterios verificables. La revisión es manual,
+antes de comitear cambios de front — ver [Cómo se verifica](#cómo-se-verifica).
 
 ## Criterios
 
@@ -33,88 +45,150 @@ comitear cambios de front — ver [Cómo se verifica](#cómo-se-verifica).
 | C-6 | **Legible sin saber de ajedrez.** Todo número del motor va acompañado de etiqueta, leyenda o representación visual. `+0.35` solo, sin más, no comunica nada a quien no lee evaluaciones. |
 | C-7 | **Accesibilidad mínima.** Foco visible, `aria-label` en los botones que son solo icono, y ningún significado transmitido únicamente por color. |
 
-## Inventario de incoherencias (al 2026-09-07)
+## Inventario de incoherencias: vacío (al 2026-09-08)
 
-Revisado el 2026-09-07 tras la pasada de **cimientos compartidos** (componentes
-`Button`, `Panel`, `BoardWithEvalBar`, `MoveNavigator`, recetas de clases en
-`components/styles.ts`, `Feedback.tsx` con `SuccessBox`/`WarningBox`/
-`ProgressBox` y formateadores nuevos en `lib/format.ts`). Esa pasada cerró once
-filas y abrió cinco. Revisado otra vez el mismo día, tras el cambio de la
-**posición de partida del visor** (el ply -1 sale del PGN y no de un FEN
-estándar escrito en el archivo): abrió las filas 26, 27 y 37. Va en dos tablas,
-una por ítem del roadmap; la numeración es continua entre ambas para que una
-fila se pueda citar por su número. Dentro de cada tabla se agrupa por criterio
-—salvo las dos últimas de la tabla A, que se añadieron después de esa
-ordenación— y dentro de cada grupo va primero lo que más estorba a quien no
-sabe leer evaluaciones. Las filas 26 a 34 de la tabla B corrieron dos números
-para dejar sitio a las nuevas. Las líneas son las del estado del repositorio en
-esa fecha.
+**No queda ninguna abierta.** El inventario llegó a tener 51 filas y están todas
+cerradas. El rastro de qué se hizo está más abajo.
 
-### A · Ítem "coherencia de la interfaz entre pantallas"
+## Lo que se cerró
 
-| # | Incoherencia | Dónde | Criterio |
-| --- | -------------- | ------- | ---------- |
-| 1 | El tablero de análisis no tiene controles de navegación en pantalla: solo responde a ← y →, anunciadas en una frase al pie. El visor tiene ⏮ ◀ ▶ ⏭ y contador "jugada / total". El componente ya está sacado y listo para las dos pantallas (`MoveNavigator`); lo que falta es adoptarlo aquí. | `features/board/BoardPage.tsx:252-254` frente a `features/viewer/GameViewerPage.tsx:226-234` y `components/board/MoveNavigator.tsx` | C-1 |
-| 2 | El visor acepta además `Home` y `End`; el tablero de análisis no, sin motivo. | `GameViewerPage.tsx:115-116` vs `BoardPage.tsx:163-182` | C-1, C-2 |
-| 3 | El incumplimiento inverso del 1: el visor no anuncia ninguno de sus cuatro atajos, hay que descubrirlos probando. El tablero sí anuncia los suyos. | `GameViewerPage.tsx:109-126` | C-1 |
-| 4 | Promover (▲) y borrar (✕) una variante solo existen al pasar el ratón (`hidden group-hover:inline-flex`): sin equivalente por teclado, sin `group-focus-within` que los revele al tabular y sin ninguna vía táctil. Al tabular se cae en un botón invisible. | `features/board/VariationTree.tsx:145-166` | C-1, C-7 |
-| 5 | Previsualizar una línea del motor sobre el tablero funciona con ratón y con tabulador, pero no se anuncia: la frase de ayuda bajo el tablero solo menciona arrastrar y ← / →, y la única pista está en el `title` de cada jugada, que hay que descubrir señalando. | `BoardPage.tsx:252-254` frente a `features/board/EngineLines.tsx:50-73` | C-1 |
-| 6 | "Analizar" sigue nombrando una acción que no analiza: en el listado es un enlace que solo abre el visor. El botón del visor ya dice con qué motor analiza ("Analizar con Stockfish"), así que el choque literal desapareció, pero el verbo sigue prometiendo en el listado algo que no hace. | `features/games/GamesPage.tsx:186` frente a `GameViewerPage.tsx:190-194` | C-2 |
-| 7 | Las acciones de cabecera van en orden distinto en dos pantallas equivalentes: visor `[Girar tablero · motor · Analizar con…]`; tablero `[Partida propia · Apagar motor · Girar tablero · Copiar PGN]`. "Girar tablero" es la primera en una y la tercera en la otra. | `GameViewerPage.tsx:172-196` vs `BoardPage.tsx:206-233` | C-2 |
-| 8 | Filtrar por jugador funciona de dos maneras: en Partidas se aplica al teclear; en Estadísticas hace falta enviar el formulario con un botón "Ver". | `GamesPage.tsx:76-82` vs `features/dashboard/DashboardPage.tsx:46-65` | C-2 |
-| 9 | Dos verbos para destruir: "Eliminar" (tablero guardado) y "Borrar esta jugada y lo que sigue" escondido en el `title` de un ✕ (variante). Ninguna de las dos pide confirmación. | `features/board/BoardsPage.tsx:131-137`, `VariationTree.tsx:157-165` | C-2 |
-| 10 | El tablero de análisis solo distingue dos estados del motor: un "analizando…" en letra pequeña en la cabecera del panel, y líneas. No hay "en cola", ni progreso, ni terminado explícito; y apagar el motor hace desaparecer el panel entero en vez de mostrarlo inactivo. `ProgressBox` ya existe para esto y aquí no se usa. | `EngineLines.tsx:26-38`, `BoardPage.tsx:258-265` | C-3 |
-| 11 | `analysisQuery.isError` no se usa nunca: si el análisis de la posición falla, el panel muestra el vacío "Sin líneas para esta posición", indistinguible de que el motor no haya encontrado nada. | `BoardPage.tsx:90-95, 258-265` | C-3, C-4 |
-| 12 | Si el autoguardado falla, la cabecera se queda en "Guardando…" para siempre —`saveState` no tiene caso de error— mientras un `ErrorBox` aparece debajo diciendo lo contrario. | `BoardPage.tsx:50, 61-64, 199-203, 236` | C-3 |
-| 13 | Si falla la consulta de análisis previos, el error se traga y la pantalla afirma "Sin analizar", que es una conclusión distinta de "no se pudo consultar". | `GameViewerPage.tsx:52-55, 267-271` | C-3 |
-| 14 | La casilla "Partida propia" llama a la API fuera de toda mutación, sin estado de envío ni `catch`: si falla, la casilla se queda como estaba y no se dice nada. | `BoardPage.tsx:206-218` | C-3 |
-| 15 | "Copiar PGN" escribe en el portapapeles sin ninguna señal de que haya ocurrido, ni manejo de fallo: se pulsa y no pasa nada visible. Ahora que existe `SuccessBox`, no hay excusa de componente. | `BoardPage.tsx:227-232` | C-3 |
-| 16 | "Sin cambios sin guardar" como estado de reposo: una doble negación para decir que está todo guardado. | `BoardPage.tsx:202` | C-3, C-6 |
-| 17 | La invitación a analizar con el otro motor es un párrafo con la receta de `EmptyState` copiada a mano y encogida (`rounded border border-dashed border-slate-300 … dark:border-slate-700`), a pocas líneas del `EmptyState` de verdad. | `GameViewerPage.tsx:277-281` frente a `components/Feedback.tsx:127-133` | C-4 |
-| 18 | Significado transmitido solo por color: la fase con más pérdida media se marca pintando su barra de rojo, sin etiqueta, sin orden y sin nota que lo diga. | `DashboardPage.tsx:213-214, 228-234` | C-7 |
-| 19 | El enlace activo de la navegación repite a mano la receta del botón primario (`px-3 py-1.5 text-sm` + `bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900`) en vez de salir de `buttonClasses`. Es lo único que quedó fuera de la extracción del componente `Button`. | `components/Layout.tsx:30-34` frente a `components/styles.ts:20-32` | transversal |
-| 20 | Queda una segunda receta de caja, la de borde sin fondo (`rounded border border-slate-200 dark:border-slate-800`), escrita a mano seis veces para tablas y gráficos, mientras las demás cajas son `Panel` y sí llevan fondo. El resultado es que tablas y gráficos flotan sobre el fondo de la página y las tarjetas no, sin que nada lo justifique. | `GamesPage.tsx:146`, `DashboardPage.tsx:96,128,164,218,241` frente a `components/styles.ts:43-44` | transversal |
-| 21 | La receta del botón de jugada —el que se pulsa para ir a una posición— está copiada cuatro veces con tres variantes distintas de relleno y de marca de "actual". Es el control más repetido de la aplicación y no tiene componente. | `features/viewer/MoveList.tsx:48-50`, `GameViewerPage.tsx:339-345`, `VariationTree.tsx:136-141`, `EngineLines.tsx:62-64` | transversal |
-| 22 | La insignia de clasificación (`rounded px-1 text-[10px] leading-4` + `style.className`) está copiada tres veces, con un tamaño de letra arbitrario fuera de la escala de Tailwind. | `MoveList.tsx:54`, `features/viewer/EngineComparison.tsx:90`, `GameViewerPage.tsx:364` | transversal |
-| 23 | Paridad claro/oscuro rota en los tres gráficos: `contentStyle` solo fija el tamaño de letra, así que el tooltip de recharts conserva su `backgroundColor: '#fff'` por defecto sobre el tema oscuro, y las marcas de eje se quedan en el `#666` de fábrica. | `features/viewer/EvalChart.tsx:52-59`, `DashboardPage.tsx:139, 224-227` | transversal |
-| 24 | Escala: el panel lateral mide `22rem` en el visor y `24rem` en el tablero; las listas navegables, `28rem` y `26rem` de alto. Mismo layout, cuatro valores arbitrarios distintos. | `GameViewerPage.tsx:216, 334`, `MoveList.tsx:16`, `BoardPage.tsx:238`, `VariationTree.tsx:32` | transversal |
-| 25 | El título de página es `text-2xl` en las cuatro pantallas de listado y `text-xl` en las dos de detalle, sin que nada lo justifique. | `GamesPage.tsx:41`, `BoardsPage.tsx:56`, `DashboardPage.tsx:45`, `features/engines/EnginesPage.tsx:22` frente a `GameViewerPage.tsx:161`, `BoardPage.tsx:198` | transversal |
-| 26 | Nada dice que una partida no empiece en la posición estándar. El visor ya dibuja la posición de partida real del PGN (`[SetUp "1"]` + `[FEN ...]`: odds chess, Chess960, partidas desde posición), pero la enseña sin etiquetarla: quien no sabe de ajedrez ve un tablero con piezas de menos o descolocadas y no puede distinguir la partida de un fallo de la aplicación. En el listado no se puede ni marcar, porque `GameSummary` no trae el PGN ni un campo de variante. | `GameViewerPage.tsx:158, 168-176`, `GamesPage.tsx` (falta el campo en la API) | C-6 |
-| 27 | La numeración de jugadas del visor sigue asumiendo que el ply 0 es la primera de las blancas (`floor(ply / 2) + 1`), en los dos listados y en la comparación de motores. Desde el cambio de la posición de partida, el tablero de esas partidas ya es el suyo, pero los números no: una partida que arranca en la jugada 12 se lista desde "1.". El tablero de análisis sí lo resuelve, con `plyFromFen(root.fen)`; llevarlo al visor pide subir ese ayudante a `lib/` y pasar el ply inicial a tres componentes. | `MoveList.tsx:65-71`, `GameViewerPage.tsx:351`, `EngineComparison.tsx:44` frente a `features/board/tree.ts:179-185` | C-5, C-2 |
+Las 51 filas que llegó a tener este inventario se cerraron en cinco pasadas, y
+aquí queda el rastro de qué se hizo, para que un `git blame` no sea la única
+forma de averiguarlo.
 
-### B · Ítem "legibilidad del análisis del motor" (RF-5.2 / RF-6.2)
+**2026-09-06 · legibilidad del análisis.** Apareció la barra de evaluación, el
+tablero de análisis empezó a dibujar las flechas del motor, los vacíos del
+panel lateral pasaron a ser `EmptyState` y los botones de solo icono ganaron
+nombre accesible.
 
-| # | Incoherencia | Dónde | Criterio |
-| --- | -------------- | ------- | ---------- |
-| 28 | `ClassificationStyle.color` existe y está documentado como el color de los puntos del gráfico de evaluación, pero el gráfico no lo usa: la curva es de un solo color y no marca dónde estuvieron los errores. | `lib/classification.ts:14-15` frente a `EvalChart.tsx` | C-5, C-6 |
-| 29 | La columna de evaluación del panel del motor sigue sin encabezado ni leyenda: `+0.35`, `M3+`, sin decir qué mide ni en qué unidad. La barra de evaluación ya traduce la primera línea a porcentaje y cada flecha lleva su número encima, pero las líneas segunda y tercera del panel siguen siendo cifras desnudas. | `EngineLines.tsx:48` | C-6 |
-| 30 | El tablero de análisis no dice qué motor firma la evaluación: `analyzePosition` se llama sin `engine` y el panel se titula solo "Motor". El visor sí tiene selector. | `BoardPage.tsx:90-95`, `EngineLines.tsx:27-31` | C-2, C-5, C-6 |
-| 31 | "V/T/D" sin desarrollar como encabezado en dos tablas, y los tres números de debajo solo se distinguen entre sí por el color de fondo. | `DashboardPage.tsx:102, 170, 267-280` | C-6, C-7 |
-| 32 | La clasificación de jugada solo se ve como símbolo (`?!`, `??`, `★`) con el nombre escondido en un `title`; la única leyenda visible es el resumen del lateral, que solo aparece con el análisis ya terminado. | `MoveList.tsx:44-55`, `GameViewerPage.tsx:305-308` | C-6 |
-| 33 | "pts de diferencia" en la comparación de motores son puntos de probabilidad de victoria, pero se leen como puntos de material. Es además el último número del front formateado a mano (`toFixed(0)`), y no se pasa por `lib/format.ts` justamente porque no es un porcentaje sino una diferencia entre dos. | `EngineComparison.tsx:48` | C-5, C-6 |
-| 34 | El eje Y del gráfico de evaluación va de 0 a 100 sin título ni leyenda: lo que mide solo se descubre pasando el ratón por encima. | `EvalChart.tsx:49` | C-6 |
-| 35 | "profundidad 20 · MultiPV 3" al pie del panel de precisión, sin explicación, mientras que Motores sí acompaña MultiPV con "líneas a calcular". | `GameViewerPage.tsx:252-255` frente a `EnginesPage.tsx:122-129` | C-6 |
-| 36 | En el panel del motor, la primera jugada de cada línea se juega al pulsarla y las siguientes no hacen nada al pulsarlas, solo previsualizan al señalarlas. Todas son botones con el mismo aspecto; la diferencia se transmite con un `opacity-70` y un `title`. | `EngineLines.tsx:50-73` | C-6, C-7 |
-| 37 | "Jugada" cuenta dos cosas distintas en la misma pantalla: el gráfico de evaluación numera medias jugadas ("Jugada 41", en el eje y en el tooltip) y la lista de jugadas y la comparación de motores numeran jugadas enteras ("21."). Pinchar en el gráfico lleva a la posición correcta, pero el número que se lee por el camino no es el mismo. | `EvalChart.tsx:48, 54` frente a `MoveList.tsx:65-71` y `EngineComparison.tsx:44` | C-5, C-6 |
+**2026-09-07 · cimientos compartidos.** Salieron los componentes que faltaban
+—`Button`, `Panel`, `BoardWithEvalBar`, `MoveNavigator`, `SuccessBox`,
+`WarningBox`, `ProgressBox`— y las recetas de clases de `components/styles.ts`;
+los formateadores se juntaron en `lib/format.ts`; y las piezas de tablero se
+mudaron de `features/viewer/` a `components/board/`.
 
-Las filas **1 a 27** son el trabajo que el roadmap recoge como "coherencia de la
-interfaz entre pantallas"; las **28 a 37**, el ítem de legibilidad del análisis
-del motor (RF-5.2 / RF-6.2). Ambos en la fase 2 de
-[docs/05-roadmap.md](05-roadmap.md).
+**2026-09-08 · el resto.** La pasada que cerró las 38 filas:
 
-**Cerradas el 2026-09-07** por la pasada de cimientos compartidos, por si se
-buscan en un commit anterior: "Girar" pasó a "Girar tablero" en el tablero de
-análisis; la barra de evaluación ya no aparece y desaparece, porque
-`BoardWithEvalBar` la dibuja siempre y en su estado inactivo cuando no hay
-evaluación; el error de FEN/PGN de la creación de tableros dejó de ser un
-párrafo rojo suelto; hay `SuccessBox` y `ProgressBox` compartidos donde había
-tres formas distintas de decir "salió bien" y un recuadro de progreso hecho a
-mano; el nombre del motor, los porcentajes, la precisión y el control de tiempo
-pasan todos por `lib/format.ts`; y las recetas de botón y de tarjeta salieron a
-`components/Button.tsx`, `components/Panel.tsx` y `components/styles.ts`, con
-el bloque "barra de evaluación + tablero" extraído a
-`components/board/BoardWithEvalBar.tsx`. La precisión dejó de ser un número
-pelado, aunque la unidad que se le puso está en discusión: es la fila 19.
+- **Paridad teclado ↔ pantalla (C-1).** El tablero de análisis tiene los
+  mismos controles de navegación que el visor (`MoveNavigator`) y los mismos
+  cuatro atajos, `Home` y `End` incluidos; las dos pantallas anuncian los suyos
+  en una frase bajo el tablero, con la misma forma
+  (`BOARD_HINT_CLASSES`). Promover y borrar una variante dejaron de vivir solo
+  en `group-hover`: están siempre, atenuadas, y se realzan al señalar o al
+  enfocar.
+- **Misma acción, mismo nombre, mismo sitio (C-2).** Las cabeceras de las dos
+  pantallas de tablero ordenan igual sus acciones (girar tablero · motor ·
+  acción principal), y "Partida propia" bajó con el título, que es donde vive
+  una propiedad del tablero. El enlace del listado dice "Ver partida", que es
+  lo que hace. Filtrar por jugador se aplica al teclear en las dos pantallas
+  que lo tienen. Destruir se llama "Eliminar" en los dos sitios y los dos
+  preguntan antes. Y el control más repetido de la aplicación —el botón que
+  lleva a una posición, que estaba copiado en la lista de jugadas, el árbol de
+  variantes y las líneas del motor— es uno solo
+  (`components/board/MoveButton.tsx`), igual que los atajos que lo acompañan
+  (`components/board/useMoveNavigationKeys.ts`).
+- **La interfaz refleja lo que hace el sistema (C-3).** El panel del motor
+  distingue apagado, buscando, con error, sin líneas y con líneas; el
+  autoguardado tiene estado de error; marcar "Partida propia" y "Copiar PGN"
+  dicen si salieron bien o mal; y un fallo al consultar los análisis previos ya
+  no se lee como "Sin analizar".
+- **Estados compartidos (C-4).** Ya no queda ninguna receta de `EmptyState`
+  copiada a mano.
+- **Un dato, una forma (C-5).** La numeración de jugadas sale de
+  `lib/moves.ts` en las cinco pantallas que numeran, y parte de la posición
+  real de la partida: una que empieza en la jugada 12 se numera desde 12 en la
+  lista, en el gráfico y en la comparación de motores. El gráfico dejó de
+  contar medias jugadas. Las medidas del panel lateral y de las listas
+  navegables son una sola (`BOARD_SIDEBAR_GRID_CLASS`,
+  `MOVE_LIST_HEIGHT_CLASS`), y los títulos de pantalla, un solo tamaño.
+- **Legible sin saber de ajedrez (C-6).** La columna de evaluación del panel
+  del motor tiene encabezado; MultiPV se explica donde se enseña; "pts de
+  diferencia" dice de qué; el eje del gráfico dice qué mide; y el visor y el
+  listado avisan de las partidas que no empiezan en la posición estándar, con
+  el campo `starts_from_custom_position` que la API calcula del PGN.
+- **Accesibilidad mínima (C-7).** Nada se transmite ya solo por color: la
+  clasificación de jugada viaja con su nombre (`ClassificationBadge`), las
+  victorias/tablas/derrotas llevan su letra, la fase que más cuesta se dice con
+  palabras además de pintarse, y la barra de evaluación gira sus colores con el
+  tablero en vez de contradecir al motor. El tooltip y los ejes de los tres
+  gráficos tienen paleta propia en tema oscuro (`lib/chartTheme.ts`).
+- **Y una que era un defecto, no una incoherencia:** en el panel del motor,
+  pulsar cualquier jugada de una línea lleva el tablero hasta ahí. Antes solo
+  la primera hacía algo, con el mismo aspecto que las demás.
+
+**2026-09-08 · el barrido de comprobación.** Recorrer las seis pantallas contra
+los siete criterios, ya con las 38 cerradas, destapó nueve incoherencias más
+(las filas 39 a 47) y once arreglos mecánicos. Las nueve, cerradas el mismo
+día:
+
+- **Tres recetas que se sostenían copiando y pegando** (C-2), y que ya habían
+  divergido: la insignia sale ahora de `components/Badge.tsx` —seis sitios, con
+  tres rellenos distintos entre ellos—, las tres tablas de la aplicación de
+  `components/DataTable.tsx`, y el desplegable de motor de
+  `components/EngineSelect.tsx`, que además tenía dos textos de ayuda
+  distintos para lo mismo.
+- **Abrir un elemento de un listado** se hace igual en los dos que hay (C-2):
+  un enlace con aspecto de botón al final de la fila —"Ver partida", "Ver
+  tablero"—, separado de eliminar. En Tableros era el título entero.
+- **El filtro por jugador** está en el mismo sitio en las dos pantallas que lo
+  tienen (C-2): una barra de filtros bajo el título, no en la cabecera.
+- **La navegación marca la sección también en las pantallas de detalle**
+  (C-2): en el visor de una partida no se iluminaba nada, mientras que en el
+  tablero de análisis sí se iluminaba "Tableros".
+- **El tablero de análisis dice cuándo su evaluación es de otra posición**
+  (C-3). Mientras corre el retardo de 400 ms, el panel del motor y la barra
+  enseñaban lo de la posición anterior sin avisar: la barra llegaba a
+  contradecir al tablero durante una secuencia rápida de jugadas.
+- **La comparación de motores dice qué es cada número** (C-6), con la misma
+  solución que ya usaba el panel del motor: una línea que lo explica antes de
+  enseñarlos.
+- **Los tableros avisan de que no empiezan en la posición estándar** (C-6),
+  que es el caso normal de uno creado desde un FEN. Es la misma insignia del
+  listado de partidas y del visor.
+
+Y los once arreglos mecánicos del mismo barrido, que no llegaron a ser fila
+porque no había nada que decidir:
+
+- **C-1.** Las flechas del teclado dejan de robarle la pulsación al desplegable
+  de motor: `useMoveNavigationKeys` ya ignoraba `input` y `textarea`, y ahora
+  también `select`. Antes, con el foco ahí, una flecha cambiaba de motor **y**
+  movía el tablero.
+- **C-7.** El desplegable de motor del visor no tenía nombre accesible; el del
+  tablero de análisis sí.
+- **C-3.** Borrar un tablero no decía nada mientras la petición viajaba (ahora
+  "Eliminando…", como el resto de escrituras), y la pantalla de Motores seguía
+  diciendo "Configuración guardada" al lado de valores ya editados.
+- **C-4.** "No hay diferencias de valoración relevantes" era la última frase
+  suelta que hacía de vacío; ahora es un `EmptyState`.
+- **C-5.** El eje "Partidas por mes" componía la fecha a mano; sale de
+  `formatYearMonth` en `lib/format.ts`. Y los dos desplegables de motor tenían
+  los nombres escritos a mano en vez de pasar por `formatEngineName`: salen de
+  `ENGINE_IDS`.
+- **C-2.** El botón de cada discrepancia de la comparación de motores tenía su
+  propia receta de clases, con otro borde y otro `hover` que los demás botones;
+  usa `buttonClasses`. En Motores, las etiquetas de campo iban a opacidad plena
+  (el resto de pantallas las pone al 70 %) y sus textos de ayuda al 50 % (el
+  resto, al 60 %). Y el título de Tableros llevaba su frase de entrada pegada
+  con un margen negativo en vez de agrupada, como en Motores.
+
+**2026-09-08 · las alternativas del visor (RF-10.2).** Revisar la pantalla
+recién hecha destapó cuatro filas más, todas de la misma raíz: el panel lateral
+enseñaba las líneas de la posición **anterior** a la que había en el tablero
+—que es donde se guardan las alternativas de una jugada—, mientras que las
+flechas eran las de la posición en pantalla. Dos posiciones contadas con la
+misma forma. Se resolvió anclando el panel a la posición que se ve, la misma que
+las flechas:
+
+- Señalar una línea dibuja una continuación que sale de la posición en pantalla,
+  no una media jugada por detrás (48), y las evaluaciones de la columna y las de
+  las etiquetas de las flechas hablan ya de la misma posición (49).
+- "Lo que podías haber jugado en su lugar" se lee desde ahí: el título del panel
+  nombra la jugada que se hizo **desde** esta posición cuando salió mal, y la
+  lista marca cuál fue con una insignia, en vez de listarla entre sus propias
+  alternativas sin distinguirla (50).
+- El panel sube al principio del lateral, detrás solo de la precisión, como las
+  líneas del motor en el tablero de análisis: detrás de la lista de jugadas
+  cambiaba fuera de la pantalla al recorrer la partida (51).
 
 **Decidido el 2026-09-07, no es incoherencia.** Dos cosas que este inventario
 llegó a listar y el autor resolvió por criterio, no por descuido:
@@ -128,18 +202,15 @@ llegó a listar y el autor resolvió por criterio, no por descuido:
   distintas en la misma columna, y son los términos que el usuario ya ve en
   chess.com.
 
-**Cerradas el 2026-09-06** con el trabajo de legibilidad del análisis: no había
-barra de evaluación en ninguna pantalla; el tablero de análisis no dibujaba las
-flechas del motor; los dos vacíos del panel lateral del tablero eran párrafos
-sueltos en vez de `EmptyState`; y ningún botón de solo icono tenía nombre
-accesible.
-
-**El visor con una sola flecha no es una incoherencia**, aunque el tablero de
-análisis dibuje varias: el análisis guardado solo persiste `best_move_uci` por
-jugada (`AnalyzedMoveOut` en `packages/shared-types`), así que no hay
-alternativas que dibujar. Persistirlas y usarlas en el visor es RF-10.1 /
-RF-10.2, en la fase 2 del roadmap. Cuando eso exista, si el visor no adopta la
-misma forma de flechas que el tablero, entonces sí será fila de inventario.
+**El visor ya dibuja las mismas flechas que el tablero de análisis.** Llegó a
+tener una sola, y no era incoherencia sino falta de dato: el análisis guardado
+solo persistía `best_move_uci` por jugada. Desde RF-10 (2026-09-08) guarda
+todas las líneas, y las dos pantallas usan `arrowsFromEngineLines` y la misma
+lista de líneas (`components/board/EngineLineList.tsx`). Un análisis viejo cuyas
+posiciones ya no estén en `position_cache` se queda con su única flecha: es lo
+que hay guardado, no una forma distinta de enseñarlo, y el visor lo dice con un
+`EmptyState` en el lateral en vez de dejar el hueco. Lo que esa misma pasada
+dejó abierto son las filas 48 a 51 del inventario.
 
 **Los números no se localizan a propósito.** `formatDate` usa el locale `es`,
 pero los decimales van con punto (`+1.25`, `54.3 %`) porque la notación de
@@ -155,7 +226,7 @@ Antes de comitear cualquier cambio que toque `apps/web`:
    existe en otra pantalla, comprobar que se llama, se coloca y se formatea
    igual — o cambiar las dos a la vez.
 3. Si aparece una incoherencia que no se arregla en el mismo commit, añadirla
-   al inventario de arriba en vez de dejarla suelta.
-
-Cuando el inventario quede vacío, este documento pasa a ser solo la lista de
-criterios y el paso 3 deja de tener sentido.
+   al inventario de arriba —`# · Incoherencia · Dónde · Criterio`, numerando
+   desde el 52— en vez de dejarla suelta. Una fila se borra cuando se arregla,
+   y las demás no se renumeran: el número es la referencia con la que se habla
+   de ella en un commit o en una revisión.

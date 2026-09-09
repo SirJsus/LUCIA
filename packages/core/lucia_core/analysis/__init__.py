@@ -38,6 +38,26 @@ class AnalyzingEngine(Protocol):
 
 
 @dataclass(frozen=True)
+class EngineLine:
+    """Una de las líneas que propone el motor para una posición: su evaluación
+    y la continuación que la sostiene.
+
+    Con MultiPV > 1 el motor devuelve varias, ordenadas de mejor a peor desde
+    el punto de vista de quien mueve. Guardarlas todas —y no solo la primera—
+    es lo que permite después enseñar las **alternativas** de cada jugada
+    (RF-10.1), en vez de un único "deberías haber jugado esto".
+    """
+
+    score: chess.engine.PovScore
+    pv: tuple[chess.Move, ...]
+
+    @property
+    def move(self) -> chess.Move | None:
+        """La jugada que propone esta línea: la primera de su continuación."""
+        return self.pv[0] if self.pv else None
+
+
+@dataclass(frozen=True)
 class PositionEval:
     """Lo que el motor opina de una posición concreta de la partida."""
 
@@ -46,8 +66,19 @@ class PositionEval:
     turn: chess.Color
     """De quién es el turno en esta posición (quién va a mover a continuación)."""
     score: chess.engine.PovScore
-    best_move: chess.Move | None
-    pv: tuple[chess.Move, ...]
+    """La evaluación de la mejor línea, o la deducida si la posición es terminal."""
+    lines: tuple[EngineLine, ...] = ()
+    """MultiPV completo, de mejor a peor. Vacío en una posición terminal, donde
+    no se consulta al motor porque no hay jugada que buscar."""
+
+    @property
+    def best_move(self) -> chess.Move | None:
+        """La jugada que recomienda el motor: la de su primera línea."""
+        return self.lines[0].move if self.lines else None
+
+    @property
+    def pv(self) -> tuple[chess.Move, ...]:
+        return self.lines[0].pv if self.lines else ()
 
 
 @dataclass(frozen=True)
@@ -67,6 +98,11 @@ class AnalyzedMove:
     win_percent_before: float
     win_percent_after: float
     best_move_uci: str | None
+    alternatives: tuple[EngineLine, ...] = ()
+    """Lo que el motor proponía en la posición **anterior** a esta jugada, de
+    mejor a peor (RF-10.1). Es el material de "lo que podías haber jugado en su
+    lugar" (RF-10.2): la primera es la que recomendaba, y las demás son las que
+    también valían. Con MultiPV 1 solo está la primera."""
 
 
 @dataclass(frozen=True)
@@ -92,36 +128,26 @@ async def evaluate_positions(
     position_evals: list[PositionEval] = []
     current_board = board.copy()
     for ply in range(len(moves) + 1):
-        if current_board.is_game_over():
-            # Posición terminal: el resultado ya está decidido y no hay jugada
-            # que buscar. Además hay que evitar preguntarle al motor: Lc0 se
-            # queda colgado indefinidamente si se le pide `go` en una posición
-            # sin jugadas legales, lo que dejaba tieso el análisis de
-            # cualquier partida terminada en jaque mate.
-            position_evals.append(
-                PositionEval(
-                    ply=ply,
-                    fen=current_board.fen(),
-                    turn=current_board.turn,
-                    score=_terminal_score(current_board),
-                    best_move=None,
-                    pv=(),
-                )
+        # En una posición terminal el resultado ya está decidido y no hay
+        # jugada que buscar. Además hay que evitar preguntarle al motor: Lc0 se
+        # queda colgado indefinidamente si se le pide `go` en una posición sin
+        # jugadas legales, lo que dejaba tieso el análisis de cualquier partida
+        # terminada en jaque mate.
+        lines: tuple[EngineLine, ...] = ()
+        if not current_board.is_game_over():
+            lines = tuple(
+                EngineLine(score=line["score"], pv=tuple(line.get("pv") or []))
+                for line in await engine.analyze(current_board)
             )
-        else:
-            engine_lines = await engine.analyze(current_board)
-            best_line = engine_lines[0]
-            pv = best_line.get("pv") or []
-            position_evals.append(
-                PositionEval(
-                    ply=ply,
-                    fen=current_board.fen(),
-                    turn=current_board.turn,
-                    score=best_line["score"],
-                    best_move=pv[0] if pv else None,
-                    pv=tuple(pv),
-                )
+        position_evals.append(
+            PositionEval(
+                ply=ply,
+                fen=current_board.fen(),
+                turn=current_board.turn,
+                score=lines[0].score if lines else _terminal_score(current_board),
+                lines=lines,
             )
+        )
         if on_position is not None:
             await on_position(ply, len(moves))
         if ply < len(moves):
@@ -184,6 +210,7 @@ async def analyze_game(
                 win_percent_before=win_before,
                 win_percent_after=win_after,
                 best_move_uci=before.best_move.uci() if before.best_move else None,
+                alternatives=before.lines,
             )
         )
         current_board.push(move)

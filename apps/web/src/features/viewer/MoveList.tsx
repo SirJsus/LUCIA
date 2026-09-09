@@ -1,34 +1,44 @@
-/** Lista de jugadas con su clasificación (RF-5.1), emparejadas por turno. */
+/** Lista de jugadas con su clasificación (RF-5.1), emparejadas por turno.
+ *
+ * `startingPly` es lo que hay que sumar al ply de cada jugada para llegar al
+ * número que se lee en un tablero: en una partida que empieza en la jugada 12
+ * (odds chess, Chess960, partidas desde posición) el ply 0 no es "1." Sale de
+ * la posición de partida del PGN, en `lib/moves.ts`.
+ */
 import type { AnalyzedMoveOut } from "@lucia/shared-types";
-import { classificationStyle } from "../../lib/classification";
+import { ClassificationBadge } from "../../components/ClassificationBadge";
+import { MoveButton } from "../../components/board/MoveButton";
 import { formatAccuracy } from "../../lib/format";
+import { moveNumberOf } from "../../lib/moves";
+import { MOVE_LIST_HEIGHT_CLASS } from "../../components/styles";
 
 interface MoveListProps {
   moves: AnalyzedMoveOut[];
   currentPly: number;
+  startingPly: number;
   onSelectPly: (ply: number) => void;
 }
 
-export function MoveList({ moves, currentPly, onSelectPly }: MoveListProps) {
-  const turns = groupByTurn(moves);
+export function MoveList({ moves, currentPly, startingPly, onSelectPly }: MoveListProps) {
+  const turns = groupByTurn(moves, startingPly);
 
   return (
-    <ol className="max-h-[28rem] overflow-y-auto text-sm">
+    <ol className={`${MOVE_LIST_HEIGHT_CLASS} overflow-y-auto text-sm`}>
       {turns.map(({ number, white, black }) => (
         <li
           key={number}
           className="grid grid-cols-[2.5rem_1fr_1fr] items-center gap-1 border-b border-slate-100 py-0.5 dark:border-slate-800"
         >
           <span className="pl-1 tabular-nums opacity-50">{number}.</span>
-          <MoveButton move={white} currentPly={currentPly} onSelect={onSelectPly} />
-          <MoveButton move={black} currentPly={currentPly} onSelect={onSelectPly} />
+          <AnalyzedMoveButton move={white} currentPly={currentPly} onSelect={onSelectPly} />
+          <AnalyzedMoveButton move={black} currentPly={currentPly} onSelect={onSelectPly} />
         </li>
       ))}
     </ol>
   );
 }
 
-function MoveButton({
+function AnalyzedMoveButton({
   move,
   currentPly,
   onSelect,
@@ -38,21 +48,15 @@ function MoveButton({
   onSelect: (ply: number) => void;
 }) {
   if (!move) return <span />;
-  const style = classificationStyle(move.classification);
-  const isCurrent = move.ply === currentPly;
 
   return (
-    <button
-      type="button"
-      onClick={() => onSelect(move.ply)}
-      title={`${style.label} · precisión ${formatAccuracy(move.move_accuracy)}`}
-      className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 text-left hover:bg-slate-100 dark:hover:bg-slate-800 ${
-        isCurrent ? "bg-indigo-100 font-medium dark:bg-indigo-900/60" : ""
-      }`}
-    >
-      <span className="font-mono">{move.san}</span>
-      <span className={`rounded px-1 text-[10px] leading-4 ${style.className}`}>{style.symbol}</span>
-    </button>
+    <MoveButton isCurrent={move.ply === currentPly} onClick={() => onSelect(move.ply)}>
+      <span>{move.san}</span>
+      <ClassificationBadge
+        classification={move.classification}
+        detail={`precisión ${formatAccuracy(move.move_accuracy)}`}
+      />
+    </MoveButton>
   );
 }
 
@@ -62,12 +66,12 @@ interface Turn {
   black?: AnalyzedMoveOut;
 }
 
-/** El ply 0 es la primera jugada de las blancas, así que el número de turno
- * es `ply / 2 + 1` y la paridad decide de qué color es. */
-function groupByTurn(moves: AnalyzedMoveOut[]): Turn[] {
+/** El ply 0 es la primera jugada de la partida, que no tiene por qué ser la
+ * del turno 1: el número sale de sumarle el ply de la posición de partida. */
+function groupByTurn(moves: AnalyzedMoveOut[], startingPly: number): Turn[] {
   const turns: Turn[] = [];
   for (const move of moves) {
-    const number = Math.floor(move.ply / 2) + 1;
+    const number = moveNumberOf(move.ply + startingPly);
     let turn = turns.find((t) => t.number === number);
     if (!turn) {
       turn = { number };

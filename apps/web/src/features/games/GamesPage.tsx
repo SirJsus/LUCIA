@@ -4,8 +4,16 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "../../components/Button";
+import { CustomPositionBadge } from "../../components/CustomPositionBadge";
 import { EmptyState, ErrorBox, Spinner, SuccessBox } from "../../components/Feedback";
-import { buttonClasses, FIELD_CLASSES, PANEL_CLASSES } from "../../components/styles";
+import { DataTable } from "../../components/DataTable";
+import {
+  buttonClasses,
+  FIELD_CLASSES,
+  PANEL_CLASSES,
+  TABLE_CELL_CLASSES,
+  TABLE_ROW_CLASSES,
+} from "../../components/styles";
 import { api, type GameFilters } from "../../lib/api";
 import { formatDate, formatTimeClass, formatTimeControl, gameResult } from "../../lib/format";
 
@@ -143,54 +151,40 @@ export function GamesPage() {
 
       {gamesQuery.data && gamesQuery.data.length > 0 && (
         <>
-          <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-800">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-100 text-left dark:bg-slate-800">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Fecha</th>
-                  <th className="px-3 py-2 font-medium">Blancas</th>
-                  <th className="px-3 py-2 font-medium">Negras</th>
-                  <th className="px-3 py-2 font-medium">Resultado</th>
-                  <th className="px-3 py-2 font-medium">Control</th>
-                  <th className="px-3 py-2" />
-                </tr>
-              </thead>
-              <tbody>
-                {gamesQuery.data.map((game) => (
-                  <tr
-                    key={game.id}
-                    className="border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900"
+          <DataTable headers={["Fecha", "Blancas", "Negras", "Resultado", "Control", ""]}>
+            {gamesQuery.data.map((game) => (
+              <tr key={game.id} className={TABLE_ROW_CLASSES}>
+                <td className={`whitespace-nowrap opacity-70 ${TABLE_CELL_CLASSES}`}>
+                  {formatDate(game.played_at)}
+                </td>
+                <td className={TABLE_CELL_CLASSES}>
+                  {game.white_username} <span className="opacity-60">({game.white_rating})</span>
+                  {game.starts_from_custom_position && (
+                    <span className="ml-1.5">
+                      <CustomPositionBadge />
+                    </span>
+                  )}
+                </td>
+                <td className={TABLE_CELL_CLASSES}>
+                  {game.black_username} <span className="opacity-60">({game.black_rating})</span>
+                </td>
+                <td className={`font-mono ${TABLE_CELL_CLASSES}`}>{gameResult(game)}</td>
+                <td className={`whitespace-nowrap opacity-70 ${TABLE_CELL_CLASSES}`}>
+                  {formatTimeControl(game.time_control)}{" "}
+                  <span className="opacity-70">{formatTimeClass(game.time_class)}</span>
+                </td>
+                <td className={`text-right ${TABLE_CELL_CLASSES}`}>
+                  <Link
+                    to="/games/$gameId"
+                    params={{ gameId: String(game.id) }}
+                    className={buttonClasses("secondary", "sm")}
                   >
-                    <td className="whitespace-nowrap px-3 py-2 opacity-70">
-                      {formatDate(game.played_at)}
-                    </td>
-                    <td className="px-3 py-2">
-                      {game.white_username}{" "}
-                      <span className="opacity-60">({game.white_rating})</span>
-                    </td>
-                    <td className="px-3 py-2">
-                      {game.black_username}{" "}
-                      <span className="opacity-60">({game.black_rating})</span>
-                    </td>
-                    <td className="px-3 py-2 font-mono">{gameResult(game)}</td>
-                    <td className="whitespace-nowrap px-3 py-2 opacity-70">
-                      {formatTimeControl(game.time_control)}{" "}
-                      <span className="opacity-70">{formatTimeClass(game.time_class)}</span>
-                    </td>
-                    <td className="px-3 py-2 text-right">
-                      <Link
-                        to="/games/$gameId"
-                        params={{ gameId: String(game.id) }}
-                        className={buttonClasses("secondary", "sm")}
-                      >
-                        Analizar
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    Ver partida
+                  </Link>
+                </td>
+              </tr>
+            ))}
+          </DataTable>
 
           <div className="flex items-center gap-3 text-sm">
             <Button

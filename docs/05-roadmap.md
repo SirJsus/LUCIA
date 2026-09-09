@@ -151,39 +151,66 @@
         las mismas capacidades visuales que RF-5.2: MultiPV, flechas, barra de
         evaluación y previsualización", y las cuatro están en el tablero de
         análisis.
-      - **De RF-5.2 queda la mitad del visor**, y no por decisión de interfaz.
-        El visor se queda con una sola flecha porque el análisis guardado solo
-        tiene `best_move_uci` por jugada: llevar las flechas múltiples ahí es
-        RF-10.2, en esta misma fase. Y "explorar variantes del motor desde
-        cualquier posición" del visor sigue pendiente en el ítem de RF-6.6
-        (abrir una partida importada como copia desacoplada), también en esta
-        fase. Hasta que esos dos ítems se marquen, RF-5.2 no está entregado.
-- [ ] Alternativas por jugada en el análisis guardado (RF-10.1 y RF-10.2).
+      - **De RF-5.2 quedaba la mitad del visor**, y no por decisión de
+        interfaz: el análisis guardado solo tenía `best_move_uci` por jugada,
+        así que solo se podía dibujar una flecha. Lo resolvió RF-10 el
+        2026-09-08, en esta misma fase. Sigue pendiente "explorar variantes del
+        motor desde cualquier posición" en el visor, que es el ítem de RF-6.6
+        (abrir una partida importada como copia desacoplada). Hasta que ese se
+        marque, RF-5.2 no está entregado del todo.
+- [x] Alternativas por jugada en el análisis guardado (RF-10.1 y RF-10.2).
       Persistir las N mejores líneas de cada posición analizada, no solo
-      `best_move_uci`, y usarlas en el visor: flechas múltiples por jugada como
-      las que ya tiene el tablero de análisis, y "lo que podías haber jugado"
-      al pararse en un error. Movido al alcance de v1.0 el 2026-09-06 porque es
-      cambio de esquema y de flujo de análisis: dejarlo para después obligaría
-      a migrar la base o a re-analizar partidas. Antes de escribir esquema
-      nuevo, mirar `position_cache.lines_json`, que ya guarda todas las líneas
-      por FEN (RF-2.7) y puede ahorrar el trabajo o parte de él.
-- [ ] Coherencia de la interfaz entre pantallas (RF-5.1 y RNF-6 sin
-      terminar; criterios e inventario en
-      [docs/07-coherencia-ui.md](07-coherencia-ui.md), filas 1 a 27 del
-      inventario, tabla A). El tablero de análisis se navega solo con el
-      teclado y su pantalla es siempre la misma, mientras que el visor tiene
-      controles visibles y cambia según lo que hace el motor: quien no sabe ya
-      de análisis lee el tablero como una herramienta tosca. Entra: controles
-      de navegación en pantalla y los mismos atajos que el visor (`Home`/`End`
-      incluidos), estados del motor visibles (en cola / analizando con progreso
-      / listo / vacío / error), etiquetas y selector de motor iguales en ambas
-      pantallas. Los cimientos compartidos ya están puestos (2026-09-07):
-      `Feedback.tsx` tiene `ProgressBox`, `SuccessBox` y `WarningBox`; los
-      controles de navegación y el bloque de tablero con barra de evaluación
-      viven en `components/board/`; y las recetas de botón, panel y campo, en
-      `components/Button.tsx`, `components/Panel.tsx` y
-      `components/styles.ts`. Lo que queda es adoptarlos en el tablero de
-      análisis. Cuenta para 1.0.0 porque son
+      `best_move_uci`, y usarlas en el visor. Movido al alcance de v1.0 el
+      2026-09-06 porque es cambio de esquema y de flujo de análisis; hecho el
+      2026-09-08. Cómo quedó:
+      1. **El núcleo guarda el MultiPV entero.** `PositionEval.lines` conserva
+         todas las líneas que devuelve el motor (`lucia_core.analysis`), y
+         `best_move`/`pv` pasan a derivarse de la primera, que es lo que eran.
+         Cada `AnalyzedMove` se lleva las de la posición **anterior** a la
+         jugada: eso es "lo que podías haber jugado en su lugar".
+      2. **Se persisten en `analyzed_moves.alternatives_json`** (migración
+         `7a1c4e9d2b30`), con el mismo formato serializado que
+         `position_cache.lines_json`. La notación SAN no se guarda: depende de
+         la posición y se deriva de `fen_before` al servir.
+      3. **Los análisis anteriores no hay que repetirlos**, que era el motivo
+         de meter esto en 1.0: sus posiciones siguen en `position_cache` con
+         todas sus líneas (RF-2.7), así que `GET /analysis/{id}` las recupera
+         de ahí cuando la clave coincide exactamente —misma posición, motor,
+         red, límite y MultiPV—. Comprobado sobre la base del autor: un
+         análisis de 56 jugadas recuperó las tres alternativas de todas ellas
+         sin gastar motor.
+      4. **El visor las usa** (RF-10.2): flechas múltiples por jugada, las
+         mismas que el tablero de análisis (`arrowsFromEngineLines`), y un
+         panel "podías haber jugado" al pararse en una jugada, con la lista de
+         líneas compartida (`components/board/EngineLineList.tsx`). Señalar o
+         pulsar una jugada de una línea la dibuja sobre el tablero.
+
+      Queda fuera RF-10.3 (usar las alternativas en los puzzles de RF-4.1),
+      que es P2 y vive en la fase 3 con el resto de entrenamiento.
+- [x] Coherencia de la interfaz entre pantallas (RF-5.1 y RNF-6; criterios en
+      [docs/07-coherencia-ui.md](07-coherencia-ui.md), cuyo inventario de
+      incumplimientos quedó **vacío** el 2026-09-08). El tablero de análisis se
+      navegaba solo con el teclado y su pantalla era siempre la misma, mientras
+      que el visor tenía controles visibles y cambiaba según lo que hace el
+      motor: quien no sabe ya de análisis leía el tablero como una herramienta
+      tosca. Entró: controles de navegación en pantalla y los mismos atajos que
+      el visor (`Home`/`End` incluidos), estados del motor visibles (en cola /
+      analizando con progreso / listo / vacío / error), etiquetas y selector de
+      motor iguales en ambas pantallas. Se hizo en cuatro pasadas: legibilidad
+      del análisis (2026-09-06), cimientos compartidos (2026-09-07), el resto
+      (2026-09-08), que adoptó los componentes en el tablero de análisis y
+      cerró las 38 filas del inventario, y el barrido de comprobación de las
+      seis pantallas contra los siete criterios, que destapó y cerró nueve
+      más. Revisar después las alternativas por jugada del visor (RF-10.2)
+      añadió cuatro, cerradas igualmente: 51 en total. Entraron además seis piezas compartidas nuevas —la
+      insignia (`components/Badge.tsx`) y sus dos usos con significado
+      (`ClassificationBadge`, `CustomPositionBadge`), la tabla de datos
+      (`DataTable`), el selector de motor (`EngineSelect`) y el botón de jugada
+      (`components/board/MoveButton.tsx`) con sus atajos
+      (`useMoveNavigationKeys`)— y dos módulos de `lib/`: la numeración de
+      jugadas (`moves.ts`) y la paleta de los gráficos (`chartTheme.ts`).
+      La API ganó para esto un solo campo, `starts_from_custom_position`,
+      derivado del PGN y sin migración. Cuenta para 1.0.0 porque son
       incumplimientos de RF-5.1 y RNF-6 (progreso y errores del motor
       visibles), ya congelados; lo visual de RF-6.2 ("las mismas capacidades
       visuales que RF-5.2") lo cerró el ítem de legibilidad de más arriba y ya

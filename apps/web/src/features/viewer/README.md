@@ -5,8 +5,10 @@ jugada, con su clasificación, su gráfico de evaluación y el disparo del
 análisis con progreso en vivo (RF-2.4).
 
 Las piezas de tablero que comparte con el tablero de análisis (`Chessboard`,
-`EvalBar`, `BoardWithEvalBar`, `MoveNavigator`, `boardConfig`) ya no viven
-aquí, sino en `components/board/`: la regla es que el visor y el tablero de
+`EvalBar`, `BoardWithEvalBar`, `MoveNavigator`, `MoveButton`, `EngineLineList`,
+`boardConfig` y los atajos de `useMoveNavigationKeys`) ya no viven aquí, sino en
+`components/board/`; fuera de tablero comparte con él `EngineSelect` y
+`ClassificationBadge`: la regla es que el visor y el tablero de
 análisis enseñen lo mismo de la misma forma (RNF-11 y criterio C-5 de
 [`docs/07-coherencia-ui.md`](../../../../../docs/07-coherencia-ui.md)); si una
 de las dos se desviara, el problema es la desviación, no el compartir.
@@ -14,7 +16,7 @@ de las dos se desviara, el problema es la desviación, no el compartir.
 | Archivo | Qué es | Quién lo usa |
 | --- | --- | --- |
 | `GameViewerPage.tsx` | La pantalla del visor: tablero, navegación, análisis y comparación de motores | ruta `/games/$gameId` |
-| `EvalChart.tsx` | Gráfico de evaluación de la partida (**Recharts**), eje Y en win% | visor |
+| `EvalChart.tsx` | Gráfico de evaluación de la partida (**Recharts**), eje Y en win%, con cada punto del color de su clasificación y los errores más grandes | visor |
 | `MoveList.tsx` | Jugadas emparejadas por turno con su clasificación | visor |
 | `EngineComparison.tsx` | Dónde discrepan dos motores sobre la misma partida (RF-2.6) | visor |
 | `useAnalysisProgress.ts` | Progreso del análisis por WebSocket, con respaldo HTTP (RF-2.4) | visor |
@@ -27,6 +29,29 @@ de las dos se desviara, el problema es la desviación, no el compartir.
   centipawns o mate: convierte esa evaluación a probabilidad de victoria en el
   cliente (`lib/score.ts`, decisión registrada en
   [ADR-0006](../../../../../docs/adr/0006-probabilidad-de-victoria-en-el-cliente.md)).
-- El análisis guardado solo tiene la mejor jugada de cada posición, así que en
-  el visor la flecha es una sola; las flechas múltiples son cosa del tablero de
-  análisis hasta que RF-10 persista las alternativas.
+- El análisis guardado trae, desde RF-10.1, las N mejores líneas de cada
+  posición (`alternatives`), así que el visor dibuja las mismas flechas
+  múltiples que el tablero de análisis y puede enseñar "lo que podías haber
+  jugado" al pararse en una jugada. Un análisis anterior a RF-10 cuyas
+  posiciones ya no estén en `position_cache` se queda con una sola flecha, que
+  es lo único que se guardó de él.
+
+## De qué posición son las alternativas
+
+De la que está en el tablero, siempre: las flechas y la lista del lateral
+hablan de lo mismo. Lo que despista es dónde viajan guardadas — con la jugada
+**siguiente**, no con la que llevó hasta aquí, porque son las líneas que el
+motor daba en la posición anterior a esa jugada (RF-10.1). De ahí el
+`analysis.moves[currentPly + 1]` de `GameViewerPage`, que es también la jugada
+que se hizo desde esta posición: por eso el panel puede titularse "Podías haber
+jugado, en vez de X" cuando salió mal, y marcar en la lista cuál fue.
+
+## Qué número de jugada se enseña
+
+El `ply` que manejan la API y esta pantalla cuenta desde la primera jugada de
+la partida, que no tiene por qué ser la del turno 1: una partida con ventaja o
+una empezada desde una posición dada arranca donde diga su PGN. El número que
+se lee sale de sumarle el ply de esa posición de partida (`lib/moves.ts`), y lo
+hacen igual la lista de jugadas, el gráfico y la comparación de motores. La
+cabecera avisa además de esas partidas, con el campo
+`starts_from_custom_position` que trae la API.

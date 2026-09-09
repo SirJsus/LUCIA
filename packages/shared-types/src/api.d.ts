@@ -358,6 +358,11 @@ export interface components {
             win_percent_after: number;
             /** Best Move Uci */
             best_move_uci: string | null;
+            /**
+             * Alternatives
+             * @default []
+             */
+            alternatives: components["schemas"]["EngineLineOut"][];
         };
         /** BoardCreate */
         BoardCreate: {
@@ -490,7 +495,12 @@ export interface components {
             /** Multipv */
             multipv: number;
         };
-        /** EngineLineOut */
+        /**
+         * EngineLineOut
+         * @description Una línea del motor, igual la calcule en vivo `POST /analysis/position`
+         *     o venga guardada con una jugada analizada (RF-10.1): mismo formato en los
+         *     dos sitios, para que el front la dibuje igual.
+         */
         EngineLineOut: {
             /** Rank */
             rank: number;
@@ -537,6 +547,8 @@ export interface components {
              * Format: date-time
              */
             played_at: string;
+            /** Starts From Custom Position */
+            starts_from_custom_position: boolean;
             /** Pgn */
             pgn: string;
             /** Clocks Json */
@@ -571,6 +583,8 @@ export interface components {
              * Format: date-time
              */
             played_at: string;
+            /** Starts From Custom Position */
+            starts_from_custom_position: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {

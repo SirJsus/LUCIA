@@ -1,21 +1,32 @@
 /** Tablero de análisis (RF-6.2 a RF-6.5): mover piezas, ramificar variantes,
  * ver lo que dice el motor en vivo y autoguardar.
  *
- * El tablero, la barra de evaluación y las flechas se comparten con el visor
- * de partidas: viven en `components/board/` (`Chessboard`, `EvalBar`,
- * `BoardWithEvalBar`, `boardConfig`) para que las dos pantallas enseñen lo
- * mismo de la misma forma. Lo propio de aquí es el árbol de variantes
- * (`tree.ts`, `VariationTree`) y el panel del motor (`EngineLines`). */
+ * El tablero, la barra de evaluación, las flechas y los controles de
+ * navegación se comparten con el visor de partidas: viven en
+ * `components/board/` (`Chessboard`, `EvalBar`, `BoardWithEvalBar`,
+ * `MoveNavigator`, `boardConfig`) para que las dos pantallas enseñen lo mismo
+ * de la misma forma. Lo propio de aquí es el árbol de variantes (`tree.ts`,
+ * `VariationTree`) y el panel del motor (`EngineLines`).
+ *
+ * La cabecera coloca las acciones en el mismo orden que el visor —girar
+ * tablero, motor, acción principal— porque tenerlas en orden distinto obliga a
+ * buscarlas cada vez que se cambia de pantalla (criterio C-2 de
+ * docs/07-coherencia-ui.md). */
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
 import { Chess } from "chess.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/Button";
+import { EngineSelect } from "../../components/EngineSelect";
 import { BoardWithEvalBar } from "../../components/board/BoardWithEvalBar";
+import { MoveNavigator } from "../../components/board/MoveNavigator";
+import { useMoveNavigationKeys } from "../../components/board/useMoveNavigationKeys";
 import { arrowsFromEngineLines, arrowsFromPreviewLine } from "../../components/board/boardConfig";
-import { ErrorBox, Spinner } from "../../components/Feedback";
+import { ErrorBox, Spinner, SuccessBox } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
+import { BOARD_HINT_CLASSES, BOARD_SIDEBAR_GRID_CLASS } from "../../components/styles";
 import { api } from "../../lib/api";
+import { type EngineId } from "../../lib/format";
 import { whiteWinPercentFromScore } from "../../lib/score";
 import { EngineLines } from "./EngineLines";
 import { VariationTree } from "./VariationTree";
@@ -25,6 +36,7 @@ import {
   deleteNode,
   findNode,
   isTreeNode,
+  mainLine,
   pathToNode,
   promoteNode,
   toPgn,
@@ -45,9 +57,10 @@ export function BoardPage() {
   const [tree, setTree] = useState<TreeNode | null>(null);
   const [currentId, setCurrentId] = useState("root");
   const [orientation, setOrientation] = useState<"white" | "black">("white");
+  const [engine, setEngine] = useState<EngineId>("stockfish");
   const [engineOn, setEngineOn] = useState(true);
   const [previewPvUci, setPreviewPvUci] = useState<string[] | null>(null);
-  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
 
   // Carga inicial del árbol guardado. Un `tree_json` con forma inesperada
   // (versión anterior, edición manual) no debe romper la pantalla: se empieza
@@ -61,6 +74,21 @@ export function BoardPage() {
   const saveMutation = useMutation({
     mutationFn: (updated: TreeNode) => api.updateBoard(id, { tree_json: updated }),
     onSuccess: () => setSaveState("saved"),
+    // Sin esto la cabecera se quedaba en "Guardando…" para siempre mientras
+    // un recuadro de error decía lo contrario dos líneas más abajo.
+    onError: () => setSaveState("error"),
+  });
+
+  // Marcar el tablero como partida propia cambia lo que cuenta en las
+  // estadísticas (RF-6.5): es una escritura y se trata como tal, con estado
+  // de envío y error a la vista.
+  const ownGameMutation = useMutation({
+    mutationFn: (isOwnGame: boolean) => api.updateBoard(id, { is_own_game: isOwnGame }),
+    onSuccess: () => boardQuery.refetch(),
+  });
+
+  const copyPgnMutation = useMutation({
+    mutationFn: (pgn: string) => navigator.clipboard.writeText(pgn),
   });
 
   // Autoguardado con retardo (RF-6.8).
@@ -87,9 +115,14 @@ export function BoardPage() {
     return () => clearTimeout(timer);
   }, [currentFen, engineOn]);
 
+  // Mientras el retardo no ha vencido, lo que hay en pantalla es la evaluación
+  // de la posición anterior. Callarlo hace que la barra contradiga al tablero
+  // durante una secuencia rápida de jugadas (criterio C-3).
+  const isEvaluationStale = engineOn && currentFen !== "" && analysisFen !== currentFen;
+
   const analysisQuery = useQuery({
-    queryKey: ["position", analysisFen],
-    queryFn: () => api.analyzePosition({ fen: analysisFen }),
+    queryKey: ["position", analysisFen, engine],
+    queryFn: () => api.analyzePosition({ fen: analysisFen, engine }),
     enabled: engineOn && analysisFen !== "",
     staleTime: Infinity, // la evaluación de una posición no cambia sola
   });
@@ -117,14 +150,25 @@ export function BoardPage() {
   const legalMoves = useMemo(() => movesByOrigin(currentFen), [currentFen]);
   const turnColor = currentFen.split(" ")[1] === "b" ? "black" : "white";
 
-  const playSan = useCallback(
-    (san: string) => {
+  /** Juega una secuencia de jugadas desde la posición actual, dejando el
+   * cursor al final. Con una sola jugada es el caso de arrastrar una pieza;
+   * con varias, el de pulsar una jugada del panel del motor. */
+  const playLine = useCallback(
+    (sanMoves: string[]) => {
       if (!tree) return;
-      const result = addMove(tree, currentId, san);
-      if (!result) return; // jugada ilegal: se ignora en silencio
-      setTree(result.root);
-      setCurrentId(result.nodeId);
-      if (!result.existed) scheduleSave(result.root);
+      let updatedTree = tree;
+      let cursorId = currentId;
+      let addedSomething = false;
+      for (const san of sanMoves) {
+        const result = addMove(updatedTree, cursorId, san);
+        if (!result) break; // jugada ilegal: se para donde llegó
+        updatedTree = result.root;
+        cursorId = result.nodeId;
+        addedSomething ||= !result.existed;
+      }
+      setTree(updatedTree);
+      setCurrentId(cursorId);
+      if (addedSomething) scheduleSave(updatedTree);
     },
     [tree, currentId, scheduleSave],
   );
@@ -137,12 +181,12 @@ export function BoardPage() {
         // La promoción siempre a dama: elegir pieza es un extra que no aporta
         // en un tablero de análisis y complicaría el flujo de arrastre.
         const move = chess.move({ from, to, promotion: "q" });
-        playSan(move.san);
+        playLine([move.san]);
       } catch {
         // movimiento ilegal (chessground ya filtra casi todos)
       }
     },
-    [currentFen, playSan],
+    [currentFen, playLine],
   );
 
   function mutateTree(transform: (current: TreeNode) => TreeNode, fallbackId?: string) {
@@ -153,33 +197,36 @@ export function BoardPage() {
     scheduleSave(updated);
   }
 
-  // Navegación con teclado por la línea actual. El camino va en `useMemo`
-  // porque es dependencia del efecto de abajo: recalcularlo en cada render
-  // volvería a registrar el listener continuamente.
+  // Navegación por la línea actual: lo que queda detrás del cursor y lo que
+  // queda delante. Los dos caminos van en `useMemo` porque de ellos cuelgan
+  // los saltos de abajo y, a través de ellos, el listener de teclado:
+  // recalcularlos en cada render volvería a registrarlo continuamente.
   const pathToCurrent = useMemo(
     () => (tree ? pathToNode(tree, currentId) : []),
     [tree, currentId],
   );
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-      if (event.key === "ArrowLeft" && pathToCurrent.length > 1) {
-        event.preventDefault();
-        setCurrentId(pathToCurrent[pathToCurrent.length - 2].id);
-      }
-      if (event.key === "ArrowRight") {
-        const nextNode = findNode(tree ?? createRoot(""), currentId)?.children[0];
-        if (nextNode) {
-          event.preventDefault();
-          setCurrentId(nextNode.id);
-        }
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [pathToCurrent, currentId, tree]);
+  const lineAhead = useMemo(() => (currentNode ? mainLine(currentNode) : []), [currentNode]);
+  const movesBehind = Math.max(0, pathToCurrent.length - 1);
+
+  const goToStart = useCallback(() => tree && setCurrentId(tree.id), [tree]);
+  const goToPrevious = useCallback(() => {
+    if (pathToCurrent.length > 1) setCurrentId(pathToCurrent[pathToCurrent.length - 2].id);
+  }, [pathToCurrent]);
+  const goToNext = useCallback(() => {
+    const nextNode = currentNode?.children[0];
+    if (nextNode) setCurrentId(nextNode.id);
+  }, [currentNode]);
+  const goToEnd = useCallback(() => {
+    const lastNode = lineAhead[lineAhead.length - 1];
+    if (lastNode) setCurrentId(lastNode.id);
+  }, [lineAhead]);
+
+  useMoveNavigationKeys({
+    onFirst: goToStart,
+    onPrevious: goToPrevious,
+    onNext: goToNext,
+    onLast: goToEnd,
+  });
 
   if (boardQuery.isPending) return <Spinner label="Cargando el tablero…" />;
   if (boardQuery.isError) return <ErrorBox error={boardQuery.error} onRetry={boardQuery.refetch} />;
@@ -195,37 +242,40 @@ export function BoardPage() {
           <Link to="/boards" className="text-sm opacity-70 hover:underline">
             ← Volver a tableros
           </Link>
-          <h1 className="mt-1 text-xl font-bold">{board.title}</h1>
+          <h1 className="mt-1 text-2xl font-bold">{board.title}</h1>
           <p className="text-sm opacity-60">
             {saveState === "saving" && "Guardando…"}
             {saveState === "saved" && "Guardado"}
-            {saveState === "idle" && "Sin cambios sin guardar"}
+            {saveState === "error" && "No se pudo guardar"}
+            {saveState === "idle" && "Todo guardado"}
           </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-1.5 text-sm">
+          {/* Es una propiedad del tablero, no una acción sobre él: vive con el
+              título y deja la barra de acciones con el mismo orden que el
+              visor. */}
+          <label className="mt-1 flex items-center gap-1.5 text-sm">
             <input
               type="checkbox"
               checked={board.is_own_game}
-              onChange={(event) =>
-                api
-                  .updateBoard(id, { is_own_game: event.target.checked })
-                  .then(() => boardQuery.refetch())
-              }
+              disabled={ownGameMutation.isPending}
+              onChange={(event) => ownGameMutation.mutate(event.target.checked)}
             />
             Partida propia
+            {ownGameMutation.isPending && <span className="opacity-60">guardando…</span>}
           </label>
-          <Button onClick={() => setEngineOn(!engineOn)}>
-            {engineOn ? "Apagar motor" : "Encender motor"}
-          </Button>
-          {/* Mismo nombre que en el visor: era "Girar" aquí y "Girar tablero"
-              allí para la misma acción. */}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Mismo nombre y misma posición que en el visor. */}
           <Button onClick={() => setOrientation(orientation === "white" ? "black" : "white")}>
             Girar tablero
           </Button>
+          <EngineSelect value={engine} onChange={setEngine} />
+          <Button onClick={() => setEngineOn(!engineOn)}>
+            {engineOn ? "Apagar motor" : "Encender motor"}
+          </Button>
           <Button
-            onClick={() => navigator.clipboard.writeText(toPgn(tree))}
+            variant="primary"
+            onClick={() => copyPgnMutation.mutate(toPgn(tree))}
             title="Copia el árbol completo, con variantes, al portapapeles"
           >
             Copiar PGN
@@ -234,8 +284,11 @@ export function BoardPage() {
       </div>
 
       {saveMutation.isError && <ErrorBox error={saveMutation.error} />}
+      {ownGameMutation.isError && <ErrorBox error={ownGameMutation.error} />}
+      {copyPgnMutation.isError && <ErrorBox error={copyPgnMutation.error} />}
+      {copyPgnMutation.isSuccess && <SuccessBox>PGN copiado al portapapeles.</SuccessBox>}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]">
+      <div className={BOARD_SIDEBAR_GRID_CLASS}>
         <div className="space-y-3">
           <BoardWithEvalBar
             fen={currentFen}
@@ -246,23 +299,38 @@ export function BoardPage() {
             turnColor={turnColor}
             onMove={handleBoardMove}
             whiteWinPercent={
-              engineOn && bestLine ? whiteWinPercentFromScore(bestLine) : null
+              engineOn && bestLine && !isEvaluationStale
+                ? whiteWinPercentFromScore(bestLine)
+                : null
             }
           />
-          <p className="text-center text-xs opacity-60">
-            Arrastra una pieza para añadir la jugada. ← y → recorren la línea actual.
+
+          <MoveNavigator
+            onFirst={goToStart}
+            onPrevious={goToPrevious}
+            onNext={goToNext}
+            onLast={goToEnd}
+            canGoBack={movesBehind > 0}
+            canGoForward={lineAhead.length > 0}
+            position={`${movesBehind} / ${movesBehind + lineAhead.length}`}
+          />
+
+          <p className={BOARD_HINT_CLASSES}>
+            Arrastra una pieza para añadir la jugada. ← → recorren la línea, Inicio y Fin van a
+            sus extremos. Señala una jugada del panel del motor para verla sobre el tablero.
           </p>
         </div>
 
         <aside className="space-y-3">
-          {engineOn && (
-            <EngineLines
-              lines={analysisQuery.data}
-              isLoading={analysisQuery.isFetching}
-              onPlayMove={playSan}
-              onPreviewLine={setPreviewPvUci}
-            />
-          )}
+          <EngineLines
+            lines={analysisQuery.data}
+            engineName={engine}
+            isEngineOn={engineOn}
+            isLoading={analysisQuery.isFetching || isEvaluationStale}
+            error={analysisQuery.isError ? analysisQuery.error : null}
+            onPlayLine={playLine}
+            onPreviewLine={setPreviewPvUci}
+          />
 
           <Panel title="Variantes" bodyClassName="">
             <VariationTree
@@ -270,9 +338,12 @@ export function BoardPage() {
               currentId={currentId}
               onSelect={setCurrentId}
               onPromote={(nodeId) => mutateTree((current) => promoteNode(current, nodeId))}
-              onDelete={(nodeId) =>
-                mutateTree((current) => deleteNode(current, nodeId), tree.id)
-              }
+              onDelete={(nodeId) => {
+                const move = findNode(tree, nodeId)?.san ?? "esta jugada";
+                if (window.confirm(`¿Eliminar ${move} y todo lo que sigue? No se puede deshacer.`)) {
+                  mutateTree((current) => deleteNode(current, nodeId), tree.id);
+                }
+              }}
             />
           </Panel>
         </aside>

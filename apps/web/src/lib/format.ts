@@ -26,18 +26,39 @@ export function formatPercent(value: number, decimals = 0): string {
   return `${value.toFixed(decimals)} %`;
 }
 
+/** Diferencia entre dos probabilidades de victoria: "12 pts de prob. de
+ * victoria".
+ *
+ * No es un porcentaje —es la distancia entre dos—, y sin unidad se leía como
+ * puntos de material, que es justo lo contrario de lo que mide: 12 puntos de
+ * material es una dama y una torre (criterio C-6 de docs/07-coherencia-ui.md).
+ */
+export function formatWinPercentPoints(points: number): string {
+  return `${points.toFixed(0)} pts de prob. de victoria`;
+}
+
+/** Los motores que LUCIA sabe usar, en el orden en que se ofrecen.
+ *
+ * El desplegable de las dos pantallas que eligen motor sale de esta lista: los
+ * tenían escritos a mano cada una, así que añadir un tercero pedía acordarse
+ * de dos sitios y sus nombres se saltaban `formatEngineName` (criterio C-5 de
+ * docs/07-coherencia-ui.md). */
+export const ENGINE_IDS = ["stockfish", "lc0"] as const;
+
+export type EngineId = (typeof ENGINE_IDS)[number];
+
 /** Nombre del motor tal como se enseña: "Stockfish", "Lc0".
  *
  * En la base y en la API viaja en minúscula (`stockfish`), y se estaba
  * mostrando de tres formas distintas: cruda, capitalizada por CSS y escrita a
  * mano en un desplegable. */
-const ENGINE_DISPLAY_NAMES: Record<string, string> = {
+const ENGINE_DISPLAY_NAMES: Record<EngineId, string> = {
   stockfish: "Stockfish",
   lc0: "Lc0",
 };
 
 export function formatEngineName(engine: string): string {
-  return ENGINE_DISPLAY_NAMES[engine] ?? capitalize(engine);
+  return ENGINE_DISPLAY_NAMES[engine as EngineId] ?? capitalize(engine);
 }
 
 /** Control de tiempo de chess.com tal como se enseña: "Blitz", "Rapid"…
@@ -55,6 +76,17 @@ export function formatTimeClass(timeClass: string): string {
 
 function capitalize(text: string): string {
   return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** Mes de una serie temporal: "2026-09".
+ *
+ * No pasa por `formatDate` a propósito: "sept 2026" no cabe en un eje con una
+ * marca por mes, y ahí interesa que se ordene a simple vista. Vive aquí igual
+ * porque una fecha compuesta a mano dentro de una pantalla es justo lo que el
+ * criterio C-5 evita.
+ */
+export function formatYearMonth(year: number, month: number): string {
+  return `${year}-${String(month).padStart(2, "0")}`;
 }
 
 /** Segundos transcurridos como "m:ss", o "h:mm:ss" si pasa de una hora.

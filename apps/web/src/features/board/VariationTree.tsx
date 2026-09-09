@@ -1,7 +1,10 @@
 /** Árbol de variantes navegable (RF-6.3): la línea principal en línea, las
  * variantes indentadas, con acciones de promover y borrar. */
 import { EmptyState } from "../../components/Feedback";
-import { plyFromFen, type TreeNode } from "./tree";
+import { MoveButton } from "../../components/board/MoveButton";
+import { MOVE_LIST_HEIGHT_CLASS } from "../../components/styles";
+import { moveNumberLabel, plyFromFen } from "../../lib/moves";
+import { type TreeNode } from "./tree";
 
 interface VariationTreeProps {
   root: TreeNode;
@@ -29,7 +32,7 @@ export function VariationTree({
   }
 
   return (
-    <div className="max-h-[26rem] overflow-y-auto p-2 text-sm">
+    <div className={`${MOVE_LIST_HEIGHT_CLASS} overflow-y-auto p-2 text-sm`}>
       <Variation
         node={root}
         // El tablero puede arrancar de un FEN o de un PGN con `[SetUp "1"]`:
@@ -135,38 +138,53 @@ function MoveChip({
 }) {
   return (
     <span className="group mr-1 inline-flex items-center gap-1">
-      {ply % 2 === 0 && <span className="opacity-50">{Math.floor(ply / 2) + 1}.</span>}
-      <button
-        type="button"
-        onClick={() => onSelect(node.id)}
-        className={`rounded px-1 font-mono hover:bg-slate-100 dark:hover:bg-slate-800 ${
-          isCurrent ? "bg-indigo-100 font-medium dark:bg-indigo-900/60" : ""
-        }`}
-      >
+      {ply % 2 === 0 && <span className="opacity-50">{moveNumberLabel(ply)}</span>}
+      <MoveButton isCurrent={isCurrent} onClick={() => onSelect(node.id)} className="px-1">
         {node.san}
-      </button>
-      <span className="hidden gap-0.5 group-hover:inline-flex">
+      </MoveButton>
+      {/* Promover y borrar estaban solo en `group-hover`: sin ratón no había
+          forma de llegar a ellas, y al tabular se caía en un botón invisible.
+          Ahora están siempre, atenuadas, y se realzan al señalar o al enfocar
+          (criterios C-1 y C-7 de docs/07-coherencia-ui.md). */}
+      <span className="inline-flex gap-0.5 opacity-40 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
         {canPromote && (
-          <button
-            type="button"
+          <ChipAction
             onClick={() => onPromote(node.id)}
-            aria-label={`Convertir ${node.san} en línea principal`}
-            title="Convertir en línea principal"
-            className="rounded px-1 text-xs opacity-60 hover:bg-slate-200 hover:opacity-100 dark:hover:bg-slate-700"
-          >
-            ▲
-          </button>
+            accessibleName={`Convertir ${node.san} en línea principal`}
+            symbol="▲"
+          />
         )}
-        <button
-          type="button"
+        <ChipAction
           onClick={() => onDelete(node.id)}
-          aria-label={`Borrar ${node.san} y lo que sigue`}
-          title="Borrar esta jugada y lo que sigue"
-          className="rounded px-1 text-xs opacity-60 hover:bg-red-100 hover:opacity-100 dark:hover:bg-red-900/60"
-        >
-          ✕
-        </button>
+          accessibleName={`Eliminar ${node.san} y lo que sigue`}
+          symbol="✕"
+          className="hover:bg-red-100 dark:hover:bg-red-900/60"
+        />
       </span>
     </span>
+  );
+}
+
+function ChipAction({
+  onClick,
+  accessibleName,
+  symbol,
+  className = "hover:bg-slate-200 dark:hover:bg-slate-700",
+}: {
+  onClick: () => void;
+  accessibleName: string;
+  symbol: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={accessibleName}
+      title={accessibleName}
+      className={`rounded px-1 text-xs ${className}`}
+    >
+      {symbol}
+    </button>
   );
 }

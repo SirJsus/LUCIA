@@ -1,80 +1,63 @@
 /** Líneas del motor para la posición actual (RF-6.2), con evaluación desde el
  * punto de vista de las blancas, como es costumbre en ajedrez.
  *
- * Recorrer una línea con el ratón o con el tabulador la previsualiza sobre el
- * tablero: al señalar la jugada n se dibujan las n primeras de esa línea. Sin
- * eso hay que reconstruir "Cf3 d5 c4 e6" mentalmente, que es justo lo que no
- * puede hacer quien todavía no lee bien una variante.
+ * Lo propio de este panel son los **estados** del motor —apagado, buscando,
+ * con error, sin líneas y con líneas—, porque es la pantalla que más depende
+ * de él (criterio C-3 de docs/07-coherencia-ui.md). Las líneas en sí las pinta
+ * `EngineLineList`, que comparte con el visor: es el mismo dato, y desde
+ * RF-10.2 el visor también lo enseña.
  */
 import type { EngineLine } from "@lucia/shared-types";
-import { EmptyState } from "../../components/Feedback";
+import { EmptyState, ErrorBox, ProgressBox } from "../../components/Feedback";
+import { EngineLineList } from "../../components/board/EngineLineList";
 import { Panel } from "../../components/Panel";
-import { formatScore } from "../../lib/score";
+import { formatEngineName } from "../../lib/format";
 
 export function EngineLines({
   lines,
+  engineName,
+  isEngineOn,
   isLoading,
-  onPlayMove,
+  error,
+  onPlayLine,
   onPreviewLine,
 }: {
   lines: EngineLine[] | undefined;
+  /** Qué motor firma estas líneas: sin decirlo, dos evaluaciones distintas de
+   * la misma posición no se pueden comparar (criterio C-5). */
+  engineName: string;
+  isEngineOn: boolean;
   isLoading: boolean;
-  onPlayMove: (san: string) => void;
+  error: unknown;
+  /** Jugadas (SAN) a jugar desde la posición actual, en orden. */
+  onPlayLine: (sanMoves: string[]) => void;
   /** Continuación a dibujar en el tablero, o `null` para dejar de dibujarla. */
   onPreviewLine: (pvUci: string[] | null) => void;
 }) {
-  return (
-    <Panel
-      title="Motor"
-      aside={isLoading && <span className="text-xs font-normal opacity-60">analizando…</span>}
-      bodyClassName=""
-    >
-      {!lines?.length && !isLoading && (
-        <div className="p-3">
-          <EmptyState title="Sin líneas para esta posición">
-            El motor no propone ninguna jugada aquí.
-          </EmptyState>
-        </div>
-      )}
+  // Qué le pasa al motor ahora mismo, si es que hay algo que contar. El panel
+  // se quedaba fuera de la pantalla al apagarlo, y "no hay panel" se confunde
+  // con "el motor no dice nada".
+  const status = !isEngineOn ? (
+    <EmptyState title="Motor apagado">
+      Enciéndelo en la cabecera para ver qué jugadas propone aquí.
+    </EmptyState>
+  ) : isLoading ? (
+    <ProgressBox label="Analizando la posición…" progress={null} />
+  ) : error ? (
+    <ErrorBox error={error} />
+  ) : !lines?.length ? (
+    <EmptyState title="Sin líneas para esta posición">
+      El motor no propone ninguna jugada aquí.
+    </EmptyState>
+  ) : null;
 
-      <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
-        {lines?.map((line) => (
-          <li
-            key={line.rank}
-            className="flex gap-2 px-3 py-2"
-            onMouseLeave={() => onPreviewLine(null)}
-            onBlur={() => onPreviewLine(null)}
-          >
-            <span className="w-14 shrink-0 font-mono tabular-nums">{formatScore(line)}</span>
-            <span className="flex flex-wrap gap-x-1.5 gap-y-0.5">
-              {line.pv_san.slice(0, 12).map((san, index) => (
-                <button
-                  key={`${line.rank}-${index}`}
-                  type="button"
-                  // Solo la primera jugada es aplicable desde la posición
-                  // actual; el resto ya depende de las anteriores. Aun así
-                  // todas se pueden señalar para previsualizarlas, y por eso
-                  // no se deshabilitan: un botón deshabilitado no recibe
-                  // ratón ni foco.
-                  onClick={() => index === 0 && onPlayMove(san)}
-                  onMouseEnter={() => onPreviewLine(line.pv_uci.slice(0, index + 1))}
-                  onFocus={() => onPreviewLine(line.pv_uci.slice(0, index + 1))}
-                  className={`rounded px-0.5 font-mono hover:bg-slate-100 dark:hover:bg-slate-800 ${
-                    index === 0 ? "" : "opacity-70"
-                  }`}
-                  title={
-                    index === 0
-                      ? "Jugar esta jugada"
-                      : "Señala para ver la línea hasta aquí en el tablero"
-                  }
-                >
-                  {san}
-                </button>
-              ))}
-            </span>
-          </li>
-        ))}
-      </ul>
+  return (
+    <Panel title={`Motor · ${formatEngineName(engineName)}`} bodyClassName="">
+      {status && <div className="p-3">{status}</div>}
+
+      {isEngineOn && !!lines?.length && (
+        <EngineLineList lines={lines} onPreviewLine={onPreviewLine} onPlayLine={onPlayLine} />
+      )}
     </Panel>
   );
 }

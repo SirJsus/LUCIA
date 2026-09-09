@@ -12,6 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 PGN = '[White "a"]\n[Black "b"]\n[Result "1-0"]\n\n1. e4 e5 1-0\n'
 
+# Partida de ventaja: empieza sin las torres blancas, y el PGN lo dice.
+ODDS_PGN = (
+    '[White "a"]\n[Black "b"]\n[Result "1-0"]\n[SetUp "1"]\n'
+    '[FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/1NBQKBN1 w kq - 0 1"]\n\n1. e4 e5 1-0\n'
+)
+
 
 async def _create_game(
     session: AsyncSession,
@@ -22,6 +28,7 @@ async def _create_game(
     time_class: str = "blitz",
     rated: bool = True,
     days_ago: int = 0,
+    pgn: str = PGN,
 ) -> Game:
     player = (
         await session.execute(select(Player).where(Player.username == white))
@@ -34,7 +41,7 @@ async def _create_game(
         player_id=player.id,
         platform="chesscom",
         platform_id=platform_id,
-        pgn=PGN,
+        pgn=pgn,
         white_username=white,
         white_rating=1500,
         white_result="win",
@@ -178,3 +185,25 @@ async def test_get_game_with_unknown_id_returns_404(db_session: AsyncSession) ->
         app.dependency_overrides.clear()
 
     assert response.status_code == 404
+
+
+async def test_list_games_flags_the_ones_from_a_custom_position(
+    db_session: AsyncSession,
+) -> None:
+    """El listado tiene que poder avisar de una partida que no empieza en la
+    posición estándar; si no, un tablero con piezas de menos parece un fallo."""
+    standard = await _create_game(db_session, platform_id="normal", white="ana", black="beto")
+    odds = await _create_game(
+        db_session, platform_id="ventaja", white="ana", black="beto", pgn=ODDS_PGN
+    )
+    standard_id, odds_id = standard.id, odds.id
+
+    _override(db_session)
+    try:
+        with TestClient(app) as http:
+            games = {game["id"]: game for game in http.get("/games").json()}
+    finally:
+        app.dependency_overrides.clear()
+
+    assert games[standard_id]["starts_from_custom_position"] is False
+    assert games[odds_id]["starts_from_custom_position"] is True

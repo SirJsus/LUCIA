@@ -6,7 +6,7 @@
  */
 import type { PhaseStats, PlayerStats, RecordSummary } from "@lucia/shared-types";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -17,12 +17,28 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Button } from "../../components/Button";
+import { Badge, type BadgeTone } from "../../components/Badge";
+import { DataTable } from "../../components/DataTable";
 import { Panel } from "../../components/Panel";
 import { EmptyState, ErrorBox, Spinner } from "../../components/Feedback";
-import { FIELD_CLASSES } from "../../components/styles";
+import {
+  FIELD_CLASSES,
+  PANEL_CLASSES,
+  TABLE_CELL_CLASSES,
+  TABLE_ROW_CLASSES,
+} from "../../components/styles";
 import { api } from "../../lib/api";
-import { formatAccuracy, formatPercent, formatTimeClass } from "../../lib/format";
+import { useChartTheme } from "../../lib/chartTheme";
+import {
+  formatAccuracy,
+  formatPercent,
+  formatTimeClass,
+  formatYearMonth,
+} from "../../lib/format";
+
+/** El encabezado de la columna de marcador, en las dos tablas que lo tienen:
+ * la abreviatura sola no se entiende sin desarrollarla (criterio C-6). */
+const RECORD_HEADER = <abbr title="Victorias / Tablas / Derrotas">V/T/D</abbr>;
 
 const PHASE_LABELS: Record<string, string> = {
   opening: "Apertura",
@@ -30,39 +46,44 @@ const PHASE_LABELS: Record<string, string> = {
   endgame: "Final",
 };
 
+/** Espera antes de consultar con el nombre tecleado. En Partidas el filtro se
+ * aplica al escribir y aquí hacía falta pulsar un botón "Ver": la misma acción
+ * funcionaba de dos maneras según la pantalla (criterio C-2 de
+ * docs/07-coherencia-ui.md). El retardo evita una consulta por tecla, que es
+ * lo que el botón estaba resolviendo a mano. */
+const FILTER_DELAY_MS = 400;
+
 export function DashboardPage() {
   const [username, setUsername] = useState("");
-  const [applied, setApplied] = useState<string | undefined>(undefined);
+  const [appliedUsername, setAppliedUsername] = useState<string | undefined>(undefined);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAppliedUsername(username || undefined), FILTER_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [username]);
 
   const statsQuery = useQuery({
-    queryKey: ["stats", applied],
-    queryFn: () => api.getStats(applied),
+    queryKey: ["stats", appliedUsername],
+    queryFn: () => api.getStats(appliedUsername),
   });
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <h1 className="text-2xl font-bold">Estadísticas</h1>
-        <form
-          className="flex items-end gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            setApplied(username || undefined);
-          }}
-        >
-          <label className="text-sm">
-            <span className="mb-1 block opacity-70">Jugador</span>
-            <input
-              value={username}
-              onChange={(event) => setUsername(event.target.value)}
-              placeholder="el de .env"
-              className={`w-52 ${FIELD_CLASSES}`}
-            />
-          </label>
-          <Button type="submit" variant="primary">
-            Ver
-          </Button>
-        </form>
+      <h1 className="text-2xl font-bold">Estadísticas</h1>
+
+      {/* La barra de filtros va bajo el título y con la misma forma que la de
+          Partidas: era el mismo filtro en dos sitios distintos (criterio C-2
+          de docs/07-coherencia-ui.md). */}
+      <div className={`flex flex-wrap gap-3 p-3 text-sm ${PANEL_CLASSES}`}>
+        <label className="flex flex-col gap-1">
+          <span className="opacity-70">Jugador</span>
+          <input
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+            placeholder="el de .env"
+            className={`w-52 ${FIELD_CLASSES}`}
+          />
+        </label>
       </div>
 
       {statsQuery.isPending && <Spinner />}
@@ -73,6 +94,8 @@ export function DashboardPage() {
 }
 
 function StatsContent({ stats }: { stats: PlayerStats }) {
+  const theme = useChartTheme();
+
   if (stats.total_games === 0) {
     return (
       <EmptyState title={`Sin partidas de "${stats.username}"`}>
@@ -93,54 +116,48 @@ function StatsContent({ stats }: { stats: PlayerStats }) {
 
       <section className="space-y-2">
         <h2 className="font-semibold">Por control de tiempo</h2>
-        <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-800">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-100 text-left dark:bg-slate-800">
-              <tr>
-                <th className="px-3 py-2 font-medium">Control</th>
-                <th className="px-3 py-2 font-medium">Rating</th>
-                <th className="px-3 py-2 font-medium">V/T/D</th>
-                <th className="px-3 py-2 font-medium">Puntuación</th>
-                <th className="px-3 py-2 font-medium">Partidas</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.by_time_class.map((item) => (
-                <tr key={item.time_class} className="border-t border-slate-200 dark:border-slate-800">
-                  <td className="px-3 py-2">{formatTimeClass(item.time_class)}</td>
-                  <td className="px-3 py-2 tabular-nums">{item.current_rating ?? "—"}</td>
-                  <td className="px-3 py-2">
-                    <RecordBadges record={item.record} />
-                  </td>
-                  <td className="px-3 py-2 tabular-nums">
-                    {formatPercent(item.record.score_percent, 1)}
-                  </td>
-                  <td className="px-3 py-2 tabular-nums opacity-70">{item.record.total}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <DataTable headers={["Control", "Rating", RECORD_HEADER, "Puntuación", "Partidas"]}>
+          {stats.by_time_class.map((item) => (
+            <tr key={item.time_class} className={TABLE_ROW_CLASSES}>
+              <td className={TABLE_CELL_CLASSES}>{formatTimeClass(item.time_class)}</td>
+              <td className={`tabular-nums ${TABLE_CELL_CLASSES}`}>{item.current_rating ?? "—"}</td>
+              <td className={TABLE_CELL_CLASSES}>
+                <RecordBadges record={item.record} />
+              </td>
+              <td className={`tabular-nums ${TABLE_CELL_CLASSES}`}>
+                {formatPercent(item.record.score_percent, 1)}
+              </td>
+              <td className={`tabular-nums opacity-70 ${TABLE_CELL_CLASSES}`}>
+                {item.record.total}
+              </td>
+            </tr>
+          ))}
+        </DataTable>
       </section>
 
       <section className="space-y-2">
         <h2 className="font-semibold">Partidas por mes</h2>
-        <div className="h-48 rounded border border-slate-200 p-2 dark:border-slate-800">
+        <Panel bodyClassName="h-48 p-2">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
-              data={stats.by_month.map((m) => ({
-                label: `${m.year}-${String(m.month).padStart(2, "0")}`,
-                games: m.games,
+              data={stats.by_month.map((month) => ({
+                label: formatYearMonth(month.year, month.month),
+                games: month.games,
               }))}
             >
               <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-              <YAxis allowDecimals={false} tick={{ fontSize: 11 }} width={32} />
-              <Tooltip contentStyle={{ fontSize: 12 }} />
-              <Bar dataKey="games" fill="#6366f1" isAnimationActive={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: theme.axisColor }} stroke={theme.axisColor} />
+              <YAxis
+                allowDecimals={false}
+                tick={{ fontSize: 11, fill: theme.axisColor }}
+                stroke={theme.axisColor}
+                width={32}
+              />
+              <Tooltip contentStyle={theme.tooltipStyle} formatter={(value: number) => [value, "Partidas"]} />
+              <Bar dataKey="games" fill={theme.seriesColor} isAnimationActive={false} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </Panel>
       </section>
 
       <section className="space-y-2">
@@ -161,41 +178,25 @@ function StatsContent({ stats }: { stats: PlayerStats }) {
             chess.com no reportó la apertura de estas partidas.
           </EmptyState>
         ) : (
-          <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-800">
-            <table className="w-full text-sm">
-              <thead className="bg-slate-100 text-left dark:bg-slate-800">
-                <tr>
-                  <th className="px-3 py-2 font-medium">Apertura</th>
-                  <th className="px-3 py-2 font-medium">Color</th>
-                  <th className="px-3 py-2 font-medium">V/T/D</th>
-                  <th className="px-3 py-2 font-medium">Puntuación</th>
-                  <th className="px-3 py-2 font-medium">Precisión</th>
-                </tr>
-              </thead>
-              <tbody>
-                {stats.by_opening.map((item) => (
-                  <tr
-                    key={`${item.opening}-${item.color}`}
-                    className="border-t border-slate-200 dark:border-slate-800"
-                  >
-                    <td className="px-3 py-2">{item.opening}</td>
-                    <td className="px-3 py-2 opacity-70">
-                      {item.color === "white" ? "Blancas" : "Negras"}
-                    </td>
-                    <td className="px-3 py-2">
-                      <RecordBadges record={item.record} />
-                    </td>
-                    <td className="px-3 py-2 tabular-nums">
-                      {formatPercent(item.record.score_percent, 1)}
-                    </td>
-                    <td className="px-3 py-2 tabular-nums opacity-70">
-                      {formatAccuracy(item.average_accuracy)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <DataTable headers={["Apertura", "Color", RECORD_HEADER, "Puntuación", "Precisión"]}>
+            {stats.by_opening.map((item) => (
+              <tr key={`${item.opening}-${item.color}`} className={TABLE_ROW_CLASSES}>
+                <td className={TABLE_CELL_CLASSES}>{item.opening}</td>
+                <td className={`opacity-70 ${TABLE_CELL_CLASSES}`}>
+                  {item.color === "white" ? "Blancas" : "Negras"}
+                </td>
+                <td className={TABLE_CELL_CLASSES}>
+                  <RecordBadges record={item.record} />
+                </td>
+                <td className={`tabular-nums ${TABLE_CELL_CLASSES}`}>
+                  {formatPercent(item.record.score_percent, 1)}
+                </td>
+                <td className={`tabular-nums opacity-70 ${TABLE_CELL_CLASSES}`}>
+                  {formatAccuracy(item.average_accuracy)}
+                </td>
+              </tr>
+            ))}
+          </DataTable>
         )}
       </section>
     </div>
@@ -203,6 +204,7 @@ function StatsContent({ stats }: { stats: PlayerStats }) {
 }
 
 function PhaseSection({ phases }: { phases: PhaseStats[] }) {
+  const theme = useChartTheme();
   const data = phases.map((phase) => ({
     label: PHASE_LABELS[phase.phase] ?? phase.phase,
     lost: Number(phase.average_win_percent_lost.toFixed(2)),
@@ -215,36 +217,56 @@ function PhaseSection({ phases }: { phases: PhaseStats[] }) {
 
   return (
     <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_20rem]">
-      <div className="h-48 rounded border border-slate-200 p-2 dark:border-slate-800">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-            <YAxis tick={{ fontSize: 11 }} width={36} />
-            <Tooltip
-              contentStyle={{ fontSize: 12 }}
-              formatter={(value: number) => [
-                formatPercent(value, 2),
-                "Prob. de victoria perdida por jugada",
-              ]}
-            />
-            <Bar dataKey="lost" isAnimationActive={false}>
-              {data.map((entry) => (
-                <Cell key={entry.label} fill={entry.label === worst.label ? "#ef4444" : "#6366f1"} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+      <div className="space-y-1">
+        <Panel bodyClassName="h-48 p-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={data}>
+              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: theme.axisColor }} stroke={theme.axisColor} />
+              <YAxis
+                tick={{ fontSize: 11, fill: theme.axisColor }}
+                stroke={theme.axisColor}
+                width={36}
+                unit="%"
+              />
+              <Tooltip
+                contentStyle={theme.tooltipStyle}
+                formatter={(value: number) => [
+                  formatPercent(value, 2),
+                  "Prob. de victoria perdida por jugada",
+                ]}
+              />
+              <Bar dataKey="lost" isAnimationActive={false}>
+                {data.map((entry) => (
+                  <Cell
+                    key={entry.label}
+                    fill={entry.label === worst.label ? theme.highlightColor : theme.seriesColor}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </Panel>
+        {/* La barra destacada se explicaba sola con el color, que no dice qué
+            significa ni sirve a quien no lo distingue (criterio C-7). */}
+        <p className="text-xs opacity-60">
+          Probabilidad de victoria que se pierde por jugada en cada fase. Destacada, la fase donde
+          más se pierde: {worst.label}.
+        </p>
       </div>
 
       <ul className="space-y-2 text-sm">
         {data.map((phase) => (
-          <li
-            key={phase.label}
-            className="rounded border border-slate-200 p-2 dark:border-slate-800"
-          >
+          <li key={phase.label} className={`p-2 ${PANEL_CLASSES}`}>
             <div className="flex justify-between font-medium">
-              <span>{phase.label}</span>
+              <span>
+                {phase.label}
+                {phase.label === worst.label && (
+                  <span className="ml-1.5 font-normal">
+                    <Badge tone="danger">la que más cuesta</Badge>
+                  </span>
+                )}
+              </span>
               <span className="tabular-nums">{formatAccuracy(phase.accuracy)}</span>
             </div>
             <p className="mt-0.5 text-xs opacity-60">
@@ -267,18 +289,33 @@ function StatCard({ label, value }: { label: string; value: string }) {
   );
 }
 
+/** Victorias, tablas y derrotas. Cada número lleva su letra: los tres se
+ * distinguían solo por el color de fondo, que no es una diferencia para quien
+ * no los ve (criterio C-7 de docs/07-coherencia-ui.md). */
 function RecordBadges({ record }: { record: RecordSummary }) {
   return (
-    <span className="flex gap-1 text-xs">
-      <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200">
-        {record.wins}
-      </span>
-      <span className="rounded bg-slate-200 px-1.5 py-0.5 text-slate-700 dark:bg-slate-700 dark:text-slate-200">
-        {record.draws}
-      </span>
-      <span className="rounded bg-red-100 px-1.5 py-0.5 text-red-800 dark:bg-red-900/60 dark:text-red-200">
-        {record.losses}
-      </span>
+    <span className="flex gap-1">
+      <RecordBadge count={record.wins} letter="V" name="victorias" tone="success" />
+      <RecordBadge count={record.draws} letter="T" name="tablas" tone="neutral" />
+      <RecordBadge count={record.losses} letter="D" name="derrotas" tone="danger" />
     </span>
+  );
+}
+
+function RecordBadge({
+  count,
+  letter,
+  name,
+  tone,
+}: {
+  count: number;
+  letter: string;
+  name: string;
+  tone: BadgeTone;
+}) {
+  return (
+    <Badge tone={tone} title={`${count} ${name}`}>
+      <span className="tabular-nums">{count}</span> {letter}
+    </Badge>
   );
 }

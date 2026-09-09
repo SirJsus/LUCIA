@@ -1172,6 +1172,14 @@
               }
             ],
             "title": "Best Move Uci"
+          },
+          "alternatives": {
+            "items": {
+              "$ref": "#/components/schemas/EngineLineOut"
+            },
+            "type": "array",
+            "title": "Alternatives",
+            "default": []
           }
         },
         "type": "object",
@@ -1572,7 +1580,8 @@
           "pv_uci",
           "pv_san"
         ],
-        "title": "EngineLineOut"
+        "title": "EngineLineOut",
+        "description": "Una línea del motor, igual la calcule en vivo `POST /analysis/position`\no venga guardada con una jugada analizada (RF-10.1): mismo formato en los\ndos sitios, para que el front la dibuje igual."
       },
       "EnginesConfigOut": {
         "properties": {
@@ -1648,6 +1657,10 @@
             "format": "date-time",
             "title": "Played At"
           },
+          "starts_from_custom_position": {
+            "type": "boolean",
+            "title": "Starts From Custom Position"
+          },
           "pgn": {
             "type": "string",
             "title": "Pgn"
@@ -1679,6 +1692,7 @@
           "rated",
           "eco",
           "played_at",
+          "starts_from_custom_position",
           "pgn",
           "clocks_json"
         ],
@@ -1741,6 +1755,10 @@
             "type": "string",
             "format": "date-time",
             "title": "Played At"
+          },
+          "starts_from_custom_position": {
+            "type": "boolean",
+            "title": "Starts From Custom Position"
           }
         },
         "type": "object",
@@ -1756,7 +1774,8 @@
           "time_class",
           "rated",
           "eco",
-          "played_at"
+          "played_at",
+          "starts_from_custom_position"
         ],
         "title": "GameSummary"
       },

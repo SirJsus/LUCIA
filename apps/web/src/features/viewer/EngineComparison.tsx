@@ -5,15 +5,22 @@
  * concreto y la valoración posicional apuntan a cosas distintas.
  */
 import type { AnalysisComparison } from "@lucia/shared-types";
+import { ClassificationBadge } from "../../components/ClassificationBadge";
+import { EmptyState } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
-import { classificationStyle } from "../../lib/classification";
-import { formatEngineName, formatPercent } from "../../lib/format";
+import { buttonClasses } from "../../components/styles";
+import { formatEngineName, formatPercent, formatWinPercentPoints } from "../../lib/format";
+import { moveNumberLabel } from "../../lib/moves";
 
 export function EngineComparison({
   comparison,
+  startingPly,
   onSelectPly,
 }: {
   comparison: AnalysisComparison;
+  /** Ply de la posición de partida: la numeración es la de la partida, no la
+   * del índice interno (ver `lib/moves.ts`). */
+  startingPly: number;
   onSelectPly: (ply: number) => void;
 }) {
   return (
@@ -25,27 +32,43 @@ export function EngineComparison({
         Coinciden en la mejor jugada en {comparison.agreed_best_moves} de{" "}
         {comparison.total_moves} ({formatPercent(comparison.best_move_agreement_percent)}).
       </p>
+      {/* Lo mismo que hace el panel del motor con su encabezado: decir qué es
+          cada número antes de enseñarlo (criterio C-6). */}
+      {comparison.disagreements.length > 0 && (
+        <p className="mt-1 text-xs opacity-60">
+          De cada motor: cómo clasifica la jugada, la probabilidad de victoria de las blancas
+          después de ella y, entre paréntesis, la jugada que prefería.
+        </p>
+      )}
 
       {comparison.disagreements.length === 0 ? (
-        <p className="mt-3 text-xs opacity-60">
-          No hay diferencias de valoración relevantes: los dos motores ven la partida igual.
-        </p>
+        // El vacío se dice con el recuadro compartido, como en el resto de la
+        // aplicación: era la última frase suelta que hacía de vacío (C-4).
+        <div className="mt-3">
+          <EmptyState title="Sin discrepancias">
+            Los dos motores ven la partida igual: no hay diferencias de valoración relevantes.
+          </EmptyState>
+        </div>
       ) : (
         <ul className="mt-3 space-y-2">
           {comparison.disagreements.slice(0, 8).map((item) => (
             <li key={item.ply}>
+              {/* La receta del botón estaba copiada a mano y se había quedado
+                  con otro borde y otro `hover` que el resto (C-2). */}
               <button
                 type="button"
                 onClick={() => onSelectPly(item.ply)}
-                className="w-full rounded border border-slate-200 px-2 py-1.5 text-left hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"
+                className={`${buttonClasses("secondary")} w-full text-left`}
               >
                 <div className="flex items-center justify-between">
                   <span>
-                    <span className="opacity-50">{Math.floor(item.ply / 2) + 1}.</span>{" "}
+                    <span className="opacity-50">{moveNumberLabel(item.ply + startingPly)}</span>{" "}
                     <span className="font-mono">{item.san}</span>
                   </span>
-                  <span className="tabular-nums text-xs opacity-70">
-                    {item.win_percent_gap.toFixed(0)} pts de diferencia
+                  {/* "pts" a secas se leía como puntos de material, que es lo
+                      contrario de lo que mide. */}
+                  <span className="text-xs opacity-70">
+                    {formatWinPercentPoints(item.win_percent_gap)} de diferencia
                   </span>
                 </div>
 
@@ -83,15 +106,21 @@ function EngineOpinion({
   winPercent: number;
   bestMove: string | null;
 }) {
-  const style = classificationStyle(classification);
   return (
     <span className="flex items-center gap-1">
       <span className="opacity-60">{formatEngineName(engine)}:</span>
-      <span className={`rounded px-1 text-[10px] leading-4 ${style.className}`}>
-        {style.symbol}
+      <ClassificationBadge classification={classification} />
+      <span
+        className="tabular-nums opacity-70"
+        title="Probabilidad de victoria de las blancas tras la jugada"
+      >
+        {formatPercent(winPercent)}
       </span>
-      <span className="tabular-nums opacity-70">{formatPercent(winPercent)}</span>
-      {bestMove && <span className="font-mono opacity-60">({bestMove})</span>}
+      {bestMove && (
+        <span className="font-mono opacity-60" title="Jugada que prefería este motor">
+          ({bestMove})
+        </span>
+      )}
     </span>
   );
 }
