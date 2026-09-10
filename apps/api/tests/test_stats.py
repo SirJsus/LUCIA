@@ -29,6 +29,8 @@ async def _add_game(
     white_rating: int = 1500,
     black_rating: int = 1500,
     eco: str | None = None,
+    opening_name: str | None = None,
+    opening_eco: str | None = None,
     year: int = 2024,
     month: int = 1,
     days_ago: int = 0,
@@ -52,6 +54,8 @@ async def _add_game(
         rules="chess",
         rated=True,
         eco=eco,
+        opening_name=opening_name,
+        opening_eco=opening_eco,
         played_at=dt.datetime.now(dt.UTC) - dt.timedelta(days=days_ago),
         year=year,
         month=month,
@@ -209,30 +213,23 @@ async def test_groups_games_by_month(db_session: AsyncSession) -> None:
 
 
 async def test_opening_performance_separates_colors(db_session: AsyncSession) -> None:
-    italian_game_url = "https://www.chess.com/openings/Italian-Game"
-    await _add_game(
-        db_session,
-        platform_id="g1",
-        white="ana",
-        black="beto",
-        white_result="win",
-        black_result="resigned",
-        eco=italian_game_url,
-    )
-    await _add_game(
-        db_session,
-        platform_id="g2",
-        white="beto",
-        black="ana",
-        white_result="win",
-        black_result="resigned",
-        eco=italian_game_url,
-    )
+    for platform_id, white, black in (("g1", "ana", "beto"), ("g2", "beto", "ana")):
+        await _add_game(
+            db_session,
+            platform_id=platform_id,
+            white=white,
+            black=black,
+            white_result="win",
+            black_result="resigned",
+            opening_name="Italian Game",
+            opening_eco="C50",
+        )
 
     stats = await get_player_stats(db_session, "ana")
     by_color = {item.color: item for item in stats.by_opening}
 
-    assert by_color["white"].opening == "Italian Game"  # nombre legible, no la URL
+    assert by_color["white"].opening == "Italian Game"
+    assert by_color["white"].eco == "C50"  # la tabla propia sí trae el código
     assert by_color["white"].record.wins == 1
     assert by_color["black"].record.losses == 1
 
@@ -356,3 +353,172 @@ async def test_stats_endpoint_without_username_or_config_returns_422(
         app.dependency_overrides.clear()
 
     assert response.status_code == 422
+
+
+async def _add_analyzed_game(
+    session: AsyncSession,
+    *,
+    platform_id: str,
+    white: str,
+    black: str,
+    moves: list[dict],
+    clocks: list[float] | None = None,
+    opening_name: str | None = None,
+    opening_eco: str | None = None,
+) -> Game:
+    """Una partida con análisis terminado y las jugadas que se le pasen.
+
+    Cada dict de `moves` son los campos de `AnalyzedMove` que el test necesita;
+    el resto se rellena con valores neutros para no repetirlos en cada caso.
+    """
+    game = await _add_game(
+        session,
+        platform_id=platform_id,
+        white=white,
+        black=black,
+        white_result="win",
+        black_result="checkmated",
+        opening_name=opening_name,
+        opening_eco=opening_eco,
+    )
+    game.clocks_json = clocks
+    analysis = Analysis(game_id=game.id, engine="stockfish", depth=10, multipv=3, status="done")
+    session.add(analysis)
+    await session.flush()
+    for ply, move in enumerate(moves):
+        session.add(
+            AnalyzedMove(
+                analysis_id=analysis.id,
+                ply=move.get("ply", ply),
+                color=move.get("color", "white"),
+                san=move.get("san", "e4"),
+                uci="e2e4",
+                fen_before=move.get("fen_before", "x"),
+                classification=move.get("classification", "good"),
+                phase=move.get("phase", "middlegame"),
+                move_accuracy=move.get("move_accuracy", 90.0),
+                win_percent_before=move.get("win_percent_before", 50.0),
+                win_percent_after=move.get("win_percent_after", 50.0),
+                alternatives_json=move.get("alternatives_json"),
+            )
+        )
+    await session.commit()
+    return game
+
+
+async def test_mistakes_are_grouped_by_type(db_session: AsyncSession) -> None:
+    """RF-3.4: no basta con cuántos errores hay, hace falta saber por qué."""
+    await _add_analyzed_game(
+        db_session,
+        platform_id="patrones-1",
+        white="ana",
+        black="beto",
+        # Reloj por media jugada: la tercera jugada de ana se juega con 5 s.
+        clocks=[120.0, 120.0, 90.0, 90.0, 5.0, 60.0],
+        moves=[
+            {"ply": 0, "color": "white", "classification": "good"},
+            {"ply": 1, "color": "black", "classification": "blunder"},
+            {"ply": 2, "color": "white", "classification": "mistake", "phase": "endgame"},
+            {"ply": 3, "color": "black", "classification": "good"},
+            {"ply": 4, "color": "white", "classification": "blunder"},
+            {"ply": 5, "color": "black", "classification": "good"},
+        ],
+    )
+
+    stats = await get_player_stats(db_session, "ana")
+
+    by_type = {item.mistake_type: item for item in stats.by_mistake_type}
+    # El de la jugada 4 se juega con 5 segundos: la causa es el reloj.
+    assert by_type["time"].mistakes == 1
+    assert by_type["time"].blunders == 1
+    # El de la jugada 2 es un final sin captura ni jaque que ver.
+    assert by_type["endgame"].mistakes == 1
+    # Y el blunder del rival no cuenta: son los patrones de ana, no los de beto.
+    assert sum(item.mistakes for item in stats.by_mistake_type) == 2
+
+
+async def test_time_pressure_groups_moves_by_clock_left(db_session: AsyncSession) -> None:
+    """RF-3.5: cómo cae la calidad de juego según baja el reloj."""
+    await _add_analyzed_game(
+        db_session,
+        platform_id="patrones-2",
+        white="ana",
+        black="beto",
+        clocks=[120.0, 120.0, 8.0, 60.0],
+        moves=[
+            {"ply": 0, "color": "white", "move_accuracy": 95.0},
+            {"ply": 1, "color": "black"},
+            {"ply": 2, "color": "white", "move_accuracy": 25.0, "classification": "blunder"},
+            {"ply": 3, "color": "black"},
+        ],
+    )
+
+    stats = await get_player_stats(db_session, "ana")
+
+    buckets = {bucket.max_seconds_left: bucket for bucket in stats.by_time_left}
+    assert buckets[None].moves == 1  # con 120 s: tiempo de sobra
+    assert buckets[None].average_accuracy == 95.0
+    assert buckets[10.0].moves == 1  # con 8 s: apuros
+    assert buckets[10.0].blunders == 1
+    assert stats.time_trouble is not None
+    assert stats.time_trouble.games_in_time_trouble == 1
+    assert stats.time_trouble.analyzed_games_with_clocks == 1
+
+
+async def test_opening_exit_evaluation_per_opening(db_session: AsyncSession) -> None:
+    """RF-3.2: con qué posición se sale de la apertura."""
+    await _add_analyzed_game(
+        db_session,
+        platform_id="patrones-3",
+        white="ana",
+        black="beto",
+        opening_name="Italian Game",
+        opening_eco="C50",
+        moves=[
+            {"ply": 0, "color": "white", "phase": "opening", "win_percent_after": 55.0},
+            {"ply": 2, "color": "white", "phase": "opening", "win_percent_after": 61.0},
+            {"ply": 4, "color": "white", "phase": "middlegame", "win_percent_after": 40.0},
+        ],
+    )
+
+    stats = await get_player_stats(db_session, "ana")
+
+    italian = next(item for item in stats.by_opening if item.opening == "Italian Game")
+    # La última jugada en apertura es la del ply 2, no la mejor ni la media.
+    assert italian.average_opening_exit_win_percent == 61.0
+
+
+async def test_a_game_analyzed_twice_counts_once(db_session: AsyncSession) -> None:
+    """Una partida con análisis de los dos motores (RF-2.6) no puede contar
+    doble: diría que se juega el doble de partidas y de errores."""
+    game = await _add_analyzed_game(
+        db_session,
+        platform_id="patrones-4",
+        white="ana",
+        black="beto",
+        moves=[{"ply": 0, "color": "white", "classification": "blunder"}],
+    )
+    second_analysis = Analysis(game_id=game.id, engine="lc0", depth=1600, multipv=1, status="done")
+    db_session.add(second_analysis)
+    await db_session.flush()
+    db_session.add(
+        AnalyzedMove(
+            analysis_id=second_analysis.id,
+            ply=0,
+            color="white",
+            san="e4",
+            uci="e2e4",
+            fen_before="x",
+            classification="blunder",
+            phase="middlegame",
+            move_accuracy=20.0,
+            win_percent_before=50.0,
+            win_percent_after=20.0,
+        )
+    )
+    await db_session.commit()
+
+    stats = await get_player_stats(db_session, "ana")
+
+    assert stats.analyzed_games == 1
+    assert sum(item.mistakes for item in stats.by_mistake_type) == 1

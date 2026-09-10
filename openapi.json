@@ -982,6 +982,14 @@
             },
             "type": "array",
             "title": "Moves"
+          },
+          "critical_moments": {
+            "items": {
+              "$ref": "#/components/schemas/CriticalMomentOut"
+            },
+            "type": "array",
+            "title": "Critical Moments",
+            "default": []
           }
         },
         "type": "object",
@@ -1412,6 +1420,60 @@
         "title": "BoardUpdate",
         "description": "Todos los campos son opcionales: la UI autoguarda solo lo que cambió."
       },
+      "CriticalMomentOut": {
+        "properties": {
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "san": {
+            "type": "string",
+            "title": "San"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kinds"
+          },
+          "win_percent_before": {
+            "type": "number",
+            "title": "Win Percent Before"
+          },
+          "win_percent_after": {
+            "type": "number",
+            "title": "Win Percent After"
+          },
+          "best_alternative_san": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Alternative San"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ply",
+          "color",
+          "san",
+          "kinds",
+          "win_percent_before",
+          "win_percent_after",
+          "best_alternative_san"
+        ],
+        "title": "CriticalMomentOut",
+        "description": "Una posición donde la partida se decidía (RF-2.8)."
+      },
       "EngineConfigOut": {
         "properties": {
           "name": {
@@ -1792,6 +1854,30 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "MistakeTypeStatsOut": {
+        "properties": {
+          "mistake_type": {
+            "type": "string",
+            "title": "Mistake Type"
+          },
+          "mistakes": {
+            "type": "integer",
+            "title": "Mistakes"
+          },
+          "blunders": {
+            "type": "integer",
+            "title": "Blunders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mistake_type",
+          "mistakes",
+          "blunders"
+        ],
+        "title": "MistakeTypeStatsOut",
+        "description": "Cuántos errores de cada tipo y por qué (RF-3.4)."
+      },
       "MonthlyCountOut": {
         "properties": {
           "year": {
@@ -1898,6 +1984,17 @@
             "type": "string",
             "title": "Opening"
           },
+          "eco": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eco"
+          },
           "color": {
             "type": "string",
             "title": "Color"
@@ -1915,14 +2012,27 @@
               }
             ],
             "title": "Average Accuracy"
+          },
+          "average_opening_exit_win_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Opening Exit Win Percent"
           }
         },
         "type": "object",
         "required": [
           "opening",
+          "eco",
           "color",
           "record",
-          "average_accuracy"
+          "average_accuracy",
+          "average_opening_exit_win_percent"
         ],
         "title": "OpeningStatsOut"
       },
@@ -2000,6 +2110,30 @@
             "type": "array",
             "title": "By Phase"
           },
+          "by_mistake_type": {
+            "items": {
+              "$ref": "#/components/schemas/MistakeTypeStatsOut"
+            },
+            "type": "array",
+            "title": "By Mistake Type"
+          },
+          "by_time_left": {
+            "items": {
+              "$ref": "#/components/schemas/TimeBucketStatsOut"
+            },
+            "type": "array",
+            "title": "By Time Left"
+          },
+          "time_trouble": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeTroubleOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "analyzed_games": {
             "type": "integer",
             "title": "Analyzed Games"
@@ -2025,6 +2159,9 @@
           "by_month",
           "by_opening",
           "by_phase",
+          "by_mistake_type",
+          "by_time_left",
+          "time_trouble",
           "analyzed_games",
           "average_accuracy"
         ],
@@ -2164,6 +2301,47 @@
         ],
         "title": "SyncSummary"
       },
+      "TimeBucketStatsOut": {
+        "properties": {
+          "max_seconds_left": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Seconds Left"
+          },
+          "moves": {
+            "type": "integer",
+            "title": "Moves"
+          },
+          "average_accuracy": {
+            "type": "number",
+            "title": "Average Accuracy"
+          },
+          "mistakes": {
+            "type": "integer",
+            "title": "Mistakes"
+          },
+          "blunders": {
+            "type": "integer",
+            "title": "Blunders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "max_seconds_left",
+          "moves",
+          "average_accuracy",
+          "mistakes",
+          "blunders"
+        ],
+        "title": "TimeBucketStatsOut",
+        "description": "Calidad de juego con un reloj determinado (RF-3.5)."
+      },
       "TimeClassStatsOut": {
         "properties": {
           "time_class": {
@@ -2192,6 +2370,29 @@
           "current_rating"
         ],
         "title": "TimeClassStatsOut"
+      },
+      "TimeTroubleOut": {
+        "properties": {
+          "games_in_time_trouble": {
+            "type": "integer",
+            "title": "Games In Time Trouble"
+          },
+          "analyzed_games_with_clocks": {
+            "type": "integer",
+            "title": "Analyzed Games With Clocks"
+          },
+          "share_of_games": {
+            "type": "number",
+            "title": "Share Of Games"
+          }
+        },
+        "type": "object",
+        "required": [
+          "games_in_time_trouble",
+          "analyzed_games_with_clocks",
+          "share_of_games"
+        ],
+        "title": "TimeTroubleOut"
       },
       "ValidationError": {
         "properties": {

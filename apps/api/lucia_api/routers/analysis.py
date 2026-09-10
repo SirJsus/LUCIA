@@ -15,6 +15,7 @@ from lucia_api.db.models import Analysis, AnalyzedMove, Game
 from lucia_api.dependencies import get_worker
 from lucia_api.services.analysis import (
     alternatives_from_cache,
+    alternatives_of,
     analyze_position,
     engine_lines_from_serialized,
 )
@@ -24,6 +25,7 @@ from lucia_api.services.comparison import (
     compare_analyses,
 )
 from lucia_api.services.engines import get_effective_config
+from lucia_api.services.insights import analysis_critical_moments
 from lucia_api.worker import AnalysisWorker
 
 router = APIRouter(tags=["analysis"])
@@ -91,8 +93,31 @@ class AnalyzedMoveOut(BaseModel):
     ya no están en la caché."""
 
 
+class CriticalMomentOut(BaseModel):
+    """Una posición donde la partida se decidía (RF-2.8)."""
+
+    ply: int
+    color: str
+    """"white" | "black": de quién es la jugada. La probabilidad de victoria de
+    abajo va desde su punto de vista, como en `AnalyzedMoveOut`; el front la
+    gira a la de las blancas para enseñarla igual que la barra y el gráfico."""
+    san: str
+    kinds: list[str]
+    """"only_move" (solo valía una jugada), "swing" (la partida cambió de manos)
+    o "missed_chance" (había una ganada y se escapó); puede ser por más de un
+    motivo a la vez."""
+    win_percent_before: float
+    win_percent_after: float
+    best_alternative_san: str | None
+
+
 class AnalysisDetail(AnalysisSummary):
     moves: list[AnalyzedMoveOut]
+    critical_moments: list[CriticalMomentOut] = []
+    """Las jugadas que decidieron la partida (RF-2.8). Se deducen de lo que ya
+    está guardado —evaluaciones y alternativas—, sin volver a preguntar al
+    motor; un análisis anterior a RF-10 sin alternativas recuperables sale con
+    menos momentos, porque los de "jugada única" necesitan el MultiPV."""
 
 
 @router.post("/analysis", response_model=list[AnalysisSummary])
@@ -257,11 +282,7 @@ async def get_analysis(
 
     moves_out: list[AnalyzedMoveOut] = []
     for move in moves:
-        serialized_alternatives = (
-            move.alternatives_json
-            if move.alternatives_json is not None
-            else cached_alternatives.get(move.ply, [])
-        )
+        serialized_alternatives = alternatives_of(move, cached_alternatives)
         move_out = AnalyzedMoveOut.model_validate(move)
         # La SAN de cada línea se nombra desde `fen_before`, que es justo la
         # posición de la que salieron las alternativas: se guardan con la
@@ -272,7 +293,22 @@ async def get_analysis(
         ]
         moves_out.append(move_out)
 
-    return AnalysisDetail(**AnalysisSummary.model_validate(analysis).model_dump(), moves=moves_out)
+    return AnalysisDetail(
+        **AnalysisSummary.model_validate(analysis).model_dump(),
+        moves=moves_out,
+        critical_moments=[
+            CriticalMomentOut(
+                ply=moment.ply,
+                color=moment.color,
+                san=moment.san,
+                kinds=list(moment.kinds),
+                win_percent_before=moment.win_percent_before,
+                win_percent_after=moment.win_percent_after,
+                best_alternative_san=moment.best_alternative_san,
+            )
+            for moment in analysis_critical_moments(moves, cached_alternatives)
+        ],
+    )
 
 
 @router.websocket("/ws/analysis/{analysis_id}")

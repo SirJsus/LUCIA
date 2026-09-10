@@ -34,6 +34,7 @@ import {
 } from "../../lib/format";
 import { moveNumberLabel, plyFromFen } from "../../lib/moves";
 import { whiteWinPercentAfterMove } from "../../lib/score";
+import { CriticalMoments } from "./CriticalMoments";
 import { EngineComparison } from "./EngineComparison";
 import { EvalChart } from "./EvalChart";
 import { MoveList } from "./MoveList";
@@ -339,6 +340,15 @@ export function GameViewerPage() {
             </Panel>
           )}
 
+          {analysis?.status === "done" && (
+            <CriticalMoments
+              moments={analysis.critical_moments}
+              currentPly={currentPly}
+              startingPly={startingPly}
+              onSelectPly={goTo}
+            />
+          )}
+
           <Panel bodyClassName="p-2">
             {analysis?.status === "done" ? (
               <MoveList
@@ -459,6 +469,20 @@ function ClassificationSummary({ counts }: { counts: Map<string, number> }) {
                 {style.label}
               </span>
               <span className="tabular-nums opacity-70">{count}</span>
+            </li>
+          );
+        })}
+      </ul>
+      {/* Este panel es la leyenda de hecho de las clasificaciones, así que
+          lleva su regla escrita, como la tabla de tipos de error del panel de
+          estadísticas: "Teoría" no dice por sí solo por qué se aplica
+          (criterio C-6 de docs/07-coherencia-ui.md). */}
+      <ul className="mt-2 space-y-0.5 border-t border-slate-100 pt-2 text-xs opacity-60 dark:border-slate-800">
+        {entries.map(([classification]) => {
+          const style = classificationStyle(classification);
+          return (
+            <li key={classification}>
+              <strong className="font-medium">{style.label}:</strong> {style.description}
             </li>
           );
         })}

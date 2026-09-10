@@ -70,6 +70,16 @@ class Game(Base):
     rules: Mapped[str]
     rated: Mapped[bool]
     eco: Mapped[str | None] = mapped_column(default=None)
+    """Apertura tal como la reporta chess.com: una URL, y no en todas las
+    partidas. Se conserva como dato de origen; para agrupar y enseñar se usan
+    las dos columnas de abajo."""
+    opening_eco: Mapped[str | None] = mapped_column(default=None)
+    opening_name: Mapped[str | None] = mapped_column(default=None)
+    """Apertura deducida de las jugadas con la tabla ECO propia
+    (`lucia_core.openings`, RF-3.2): sale en toda partida que empiece en la
+    posición estándar, trae el código ECO —que chess.com no da— y reconoce
+    transposiciones. `None` en las que empiezan desde otra posición (odds
+    chess, Chess960), donde no hay apertura que nombrar."""
     clocks_json: Mapped[list | None] = mapped_column(JSON, default=None)
     """Reloj restante en segundos tras cada jugada (ver lucia_chesscom.parse_move_clocks)."""
 

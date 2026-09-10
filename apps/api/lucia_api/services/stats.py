@@ -1,19 +1,38 @@
 """Estadísticas agregadas sobre las partidas y sus análisis (RF-3).
 
-Todo se calcula con SQL sobre lo que ya está guardado: no se lanza ningún
-motor aquí. Una partida sin analizar cuenta para resultados y ratings
-(RF-3.1) pero no para precisión ni fases (RF-3.2 / RF-3.3), que necesitan un
-`Analysis` terminado.
+Nada de esto lanza un motor: todo sale de lo que ya está guardado. Lo que se
+puede contar en SQL se agrega aquí (marcador, ratings, partidas por mes,
+precisión y reparto por fases); lo que hay que leer jugada a jugada —tipo de
+error, tramos de reloj y evaluación al salir de la apertura— se lo pide a
+`lucia_core.insights` a través de `services/insights.py`, y las reglas viven
+allí, no aquí.
+
+Una partida sin analizar cuenta para resultados y ratings (RF-3.1) pero no
+para lo demás, que necesita un `Analysis` terminado. Y una analizada con los
+dos motores (RF-2.6) cuenta **una sola vez**, con su análisis más reciente
+(`latest_analysis_ids`): sumar las dos filas contaba dos veces la misma
+partida y torcía la precisión media, el número de partidas analizadas y el
+reparto por fases.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from lucia_core.insights import (
+    MistakeTypeCount,
+    MoveContext,
+    TimeBucketStats,
+    is_time_trouble,
+    mistakes_by_type,
+    opening_exit_win_percent,
+    time_pressure,
+)
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db.models import Analysis, AnalyzedMove, Game
+from lucia_api.services.insights import latest_analysis_ids, player_move_contexts
 
 #: Valores de `white_result`/`black_result` de chess.com que significan tablas.
 DRAW_RESULTS = (
@@ -64,17 +83,23 @@ class MonthlyCount:
 class OpeningStats:
     """Rendimiento por apertura (RF-3.2).
 
-    El nombre sale de la URL de apertura que reporta chess.com (`games.eco`);
-    la clasificación ECO propia llegará con `lucia_core.openings`. Falta de
-    RF-3.2 la "eval promedio al salir de la apertura": necesita localizar la
-    última jugada de fase `opening` de cada partida, y se hará junto con los
-    extractores de patrones (RF-3.4, fase 2).
+    El nombre y el código salen de la tabla ECO propia
+    (`lucia_core.openings`), no de la URL que reporta chess.com: sale en más
+    partidas, trae el código —que chess.com no da— y reconoce transposiciones.
+    Las partidas que no empiezan en la posición estándar no tienen apertura y
+    no aparecen aquí.
     """
 
     opening: str
+    eco: str | None
     color: str
     record: RecordSummary
     average_accuracy: float | None = None
+    average_opening_exit_win_percent: float | None = None
+    """Con qué posición se sale de la apertura, en probabilidad de victoria del
+    jugador (RF-3.2): la media de la evaluación tras su última jugada de fase
+    `opening` en cada partida. `None` si ninguna de esas partidas está
+    analizada."""
 
 
 @dataclass
@@ -89,6 +114,22 @@ class PhaseStats:
 
 
 @dataclass
+class TimeTroubleSummary:
+    """Cuánto se juega con el reloj encima (RF-3.5)."""
+
+    games_in_time_trouble: int
+    """Partidas analizadas en las que se llegó a jugar con apuros."""
+    analyzed_games_with_clocks: int
+    """Sobre cuántas se puede decir: las que traen relojes de chess.com."""
+
+    @property
+    def share_of_games(self) -> float:
+        if self.analyzed_games_with_clocks == 0:
+            return 0.0
+        return self.games_in_time_trouble / self.analyzed_games_with_clocks * 100
+
+
+@dataclass
 class PlayerStats:
     username: str
     total_games: int
@@ -97,6 +138,11 @@ class PlayerStats:
     by_month: list[MonthlyCount] = field(default_factory=list)
     by_opening: list[OpeningStats] = field(default_factory=list)
     by_phase: list[PhaseStats] = field(default_factory=list)
+    by_mistake_type: list[MistakeTypeCount] = field(default_factory=list)
+    """Por qué se falla, no solo cuánto (RF-3.4)."""
+    by_time_left: list[TimeBucketStats] = field(default_factory=list)
+    """Cómo cae la calidad de juego según baja el reloj (RF-3.5)."""
+    time_trouble: TimeTroubleSummary | None = None
     analyzed_games: int = 0
     average_accuracy: float | None = None
 
@@ -174,6 +220,12 @@ async def get_player_stats(
     # --- Precisión media y partidas analizadas ---
     analyzed_games, average_accuracy = await _accuracy_summary(session, username)
 
+    # --- Patrones (RF-2.8, RF-3.4, RF-3.5) ---
+    # Las jugadas del jugador se cargan una sola vez: los tres extractores
+    # miran el mismo material desde ángulos distintos.
+    move_contexts = await player_move_contexts(session, username)
+    moves = [context for _game_id, context in move_contexts]
+
     return PlayerStats(
         username=username,
         total_games=overall.total,
@@ -187,10 +239,34 @@ async def get_player_stats(
         by_month=[
             MonthlyCount(year=year, month=month, games=games) for year, month, games in monthly_rows
         ],
-        by_opening=await _opening_stats(session, username, limit_openings),
+        by_opening=await _opening_stats(session, username, limit_openings, move_contexts),
         by_phase=await _phase_stats(session, username),
+        by_mistake_type=mistakes_by_type(moves),
+        by_time_left=time_pressure(moves),
+        time_trouble=_time_trouble_summary(move_contexts),
         analyzed_games=analyzed_games,
         average_accuracy=average_accuracy,
+    )
+
+
+def _time_trouble_summary(
+    move_contexts: list[tuple[int, MoveContext]],
+) -> TimeTroubleSummary:
+    """En cuántas partidas se llegó a jugar con apuros (RF-3.5).
+
+    Se cuenta por partidas y no por jugadas porque la pregunta es de hábito:
+    "me pasa a menudo" es una respuesta distinta de "un día me pasó veinte
+    veces seguidas".
+    """
+    games_with_clocks = {
+        game_id for game_id, move in move_contexts if move.seconds_left is not None
+    }
+    games_in_trouble = {
+        game_id for game_id, move in move_contexts if is_time_trouble(move.seconds_left)
+    }
+    return TimeTroubleSummary(
+        games_in_time_trouble=len(games_in_trouble),
+        analyzed_games_with_clocks=len(games_with_clocks),
     )
 
 
@@ -222,7 +298,12 @@ async def _current_ratings(session: AsyncSession, username: str) -> dict[str, in
 
 async def _accuracy_summary(session: AsyncSession, username: str) -> tuple[int, float | None]:
     """Cuántas partidas tienen análisis terminado y la precisión media del
-    usuario en ellas."""
+    usuario en ellas.
+
+    Una partida analizada con los dos motores (RF-2.6) cuenta una sola vez: se
+    toma su análisis más reciente, igual que en el reparto por fases y en los
+    patrones, o la misma partida contaría dos veces y la media saldría torcida.
+    """
     player_accuracy = case(
         (_is_white(username), Analysis.white_accuracy),
         else_=Analysis.black_accuracy,
@@ -232,42 +313,58 @@ async def _accuracy_summary(session: AsyncSession, username: str) -> tuple[int, 
             select(func.count(), func.avg(player_accuracy))
             .select_from(Analysis)
             .join(Game, Analysis.game_id == Game.id)
-            .where(_is_player(username), Analysis.status == "done")
+            .where(_is_player(username), Analysis.id.in_(latest_analysis_ids()))
         )
     ).one()
     analyzed_games, average_accuracy = accuracy_row
     return analyzed_games, float(average_accuracy) if average_accuracy is not None else None
 
 
-async def _opening_stats(session: AsyncSession, username: str, limit: int) -> list[OpeningStats]:
+async def _opening_stats(
+    session: AsyncSession,
+    username: str,
+    limit: int,
+    move_contexts: list[tuple[int, MoveContext]],
+) -> list[OpeningStats]:
     color = case((_is_white(username), "white"), else_="black")
     outcome = _outcome_for(username)
 
     opening_rows = (
         await session.execute(
-            select(Game.eco, color.label("color"), outcome.label("outcome"), func.count())
-            .where(_is_player(username), Game.eco.is_not(None))
-            .group_by(Game.eco, "color", "outcome")
+            select(
+                Game.opening_name,
+                Game.opening_eco,
+                color.label("color"),
+                outcome.label("outcome"),
+                func.count(),
+            )
+            .where(_is_player(username), Game.opening_name.is_not(None))
+            .group_by(Game.opening_name, Game.opening_eco, "color", "outcome")
         )
     ).all()
 
+    eco_by_opening: dict[str, str | None] = {}
     records_by_opening: dict[tuple[str, str], RecordSummary] = {}
-    for eco, played_color, player_outcome, game_count in opening_rows:
-        opening_key = (_opening_name(eco), played_color)
+    for opening_name, eco, played_color, player_outcome, game_count in opening_rows:
+        eco_by_opening[opening_name] = eco
+        opening_key = (opening_name, played_color)
         _add(
             records_by_opening.setdefault(opening_key, RecordSummary()), player_outcome, game_count
         )
 
     accuracy_by_opening = await _accuracy_by_opening(session, username)
+    exit_by_opening = await _opening_exit_by_opening(session, username, move_contexts)
     sorted_openings = sorted(
         records_by_opening.items(), key=lambda item: item[1].total, reverse=True
     )
     return [
         OpeningStats(
             opening=opening_name,
+            eco=eco_by_opening.get(opening_name),
             color=played_color,
             record=record,
             average_accuracy=accuracy_by_opening.get((opening_name, played_color)),
+            average_opening_exit_win_percent=exit_by_opening.get((opening_name, played_color)),
         )
         for (opening_name, played_color), record in sorted_openings[:limit]
     ]
@@ -285,26 +382,57 @@ async def _accuracy_by_opening(
     )
     accuracy_rows = (
         await session.execute(
-            select(Game.eco, color.label("color"), func.avg(player_accuracy))
+            select(Game.opening_name, color.label("color"), func.avg(player_accuracy))
             .select_from(Analysis)
             .join(Game, Analysis.game_id == Game.id)
-            .where(_is_player(username), Analysis.status == "done", Game.eco.is_not(None))
-            .group_by(Game.eco, "color")
+            .where(
+                _is_player(username),
+                Analysis.id.in_(latest_analysis_ids()),
+                Game.opening_name.is_not(None),
+            )
+            .group_by(Game.opening_name, "color")
         )
     ).all()
     return {
-        (_opening_name(eco), played_color): float(average_accuracy)
-        for eco, played_color, average_accuracy in accuracy_rows
+        (opening_name, played_color): float(average_accuracy)
+        for opening_name, played_color, average_accuracy in accuracy_rows
         if average_accuracy is not None
     }
 
 
-def _opening_name(eco_url: str) -> str:
-    """chess.com da la apertura como URL
-    (`https://www.chess.com/openings/Italian-Game-2.Nf3`); aquí solo se
-    extrae el nombre legible."""
-    name = eco_url.rstrip("/").rsplit("/", 1)[-1]
-    return name.replace("-", " ")
+async def _opening_exit_by_opening(
+    session: AsyncSession, username: str, move_contexts: list[tuple[int, MoveContext]]
+) -> dict[tuple[str, str], float]:
+    """Evaluación media al salir de la apertura, por apertura y color (RF-3.2).
+
+    La saca `lucia_core.insights.opening_exit_win_percent` partida a partida; lo
+    que hace falta aquí es saber a qué apertura pertenece cada una.
+    """
+    opening_rows = (
+        await session.execute(
+            select(
+                Game.id, Game.opening_name, case((_is_white(username), "white"), else_="black")
+            ).where(_is_player(username), Game.opening_name.is_not(None))
+        )
+    ).all()
+    opening_by_game = {
+        game_id: (opening_name, played_color)
+        for game_id, opening_name, played_color in opening_rows
+    }
+
+    moves_by_game: dict[int, list[MoveContext]] = {}
+    for game_id, move in move_contexts:
+        moves_by_game.setdefault(game_id, []).append(move)
+
+    exits_by_opening: dict[tuple[str, str], list[float]] = {}
+    for game_id, game_moves in moves_by_game.items():
+        opening_key = opening_by_game.get(game_id)
+        exit_win_percent = opening_exit_win_percent(game_moves)
+        if opening_key is None or exit_win_percent is None:
+            continue
+        exits_by_opening.setdefault(opening_key, []).append(exit_win_percent)
+
+    return {opening_key: sum(exits) / len(exits) for opening_key, exits in exits_by_opening.items()}
 
 
 async def _phase_stats(session: AsyncSession, username: str) -> list[PhaseStats]:
@@ -330,7 +458,7 @@ async def _phase_stats(session: AsyncSession, username: str) -> list[PhaseStats]
             .join(Game, Analysis.game_id == Game.id)
             .where(
                 _is_player(username),
-                Analysis.status == "done",
+                Analysis.id.in_(latest_analysis_ids()),
                 AnalyzedMove.color == player_color,
             )
             .group_by(AnalyzedMove.phase)

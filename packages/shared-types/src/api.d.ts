@@ -297,6 +297,11 @@ export interface components {
             black_accuracy: number | null;
             /** Moves */
             moves: components["schemas"]["AnalyzedMoveOut"][];
+            /**
+             * Critical Moments
+             * @default []
+             */
+            critical_moments: components["schemas"]["CriticalMomentOut"][];
         };
         /** AnalysisRequest */
         AnalysisRequest: {
@@ -454,6 +459,26 @@ export interface components {
             /** Is Own Game */
             is_own_game?: boolean | null;
         };
+        /**
+         * CriticalMomentOut
+         * @description Una posición donde la partida se decidía (RF-2.8).
+         */
+        CriticalMomentOut: {
+            /** Ply */
+            ply: number;
+            /** Color */
+            color: string;
+            /** San */
+            san: string;
+            /** Kinds */
+            kinds: string[];
+            /** Win Percent Before */
+            win_percent_before: number;
+            /** Win Percent After */
+            win_percent_after: number;
+            /** Best Alternative San */
+            best_alternative_san: string | null;
+        };
         /** EngineConfigOut */
         EngineConfigOut: {
             /** Name */
@@ -591,6 +616,18 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * MistakeTypeStatsOut
+         * @description Cuántos errores de cada tipo y por qué (RF-3.4).
+         */
+        MistakeTypeStatsOut: {
+            /** Mistake Type */
+            mistake_type: string;
+            /** Mistakes */
+            mistakes: number;
+            /** Blunders */
+            blunders: number;
+        };
         /** MonthlyCountOut */
         MonthlyCountOut: {
             /** Year */
@@ -629,11 +666,15 @@ export interface components {
         OpeningStatsOut: {
             /** Opening */
             opening: string;
+            /** Eco */
+            eco: string | null;
             /** Color */
             color: string;
             record: components["schemas"]["RecordOut"];
             /** Average Accuracy */
             average_accuracy: number | null;
+            /** Average Opening Exit Win Percent */
+            average_opening_exit_win_percent: number | null;
         };
         /** PhaseStatsOut */
         PhaseStatsOut: {
@@ -663,6 +704,11 @@ export interface components {
             by_opening: components["schemas"]["OpeningStatsOut"][];
             /** By Phase */
             by_phase: components["schemas"]["PhaseStatsOut"][];
+            /** By Mistake Type */
+            by_mistake_type: components["schemas"]["MistakeTypeStatsOut"][];
+            /** By Time Left */
+            by_time_left: components["schemas"]["TimeBucketStatsOut"][];
+            time_trouble: components["schemas"]["TimeTroubleOut"] | null;
             /** Analyzed Games */
             analyzed_games: number;
             /** Average Accuracy */
@@ -713,6 +759,22 @@ export interface components {
             /** Games Upserted */
             games_upserted: number;
         };
+        /**
+         * TimeBucketStatsOut
+         * @description Calidad de juego con un reloj determinado (RF-3.5).
+         */
+        TimeBucketStatsOut: {
+            /** Max Seconds Left */
+            max_seconds_left: number | null;
+            /** Moves */
+            moves: number;
+            /** Average Accuracy */
+            average_accuracy: number;
+            /** Mistakes */
+            mistakes: number;
+            /** Blunders */
+            blunders: number;
+        };
         /** TimeClassStatsOut */
         TimeClassStatsOut: {
             /** Time Class */
@@ -720,6 +782,15 @@ export interface components {
             record: components["schemas"]["RecordOut"];
             /** Current Rating */
             current_rating: number | null;
+        };
+        /** TimeTroubleOut */
+        TimeTroubleOut: {
+            /** Games In Time Trouble */
+            games_in_time_trouble: number;
+            /** Analyzed Games With Clocks */
+            analyzed_games_with_clocks: number;
+            /** Share Of Games */
+            share_of_games: number;
         };
         /** ValidationError */
         ValidationError: {

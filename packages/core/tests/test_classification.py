@@ -89,3 +89,20 @@ def test_delivering_the_mate_is_not_missed_win() -> None:
     after = _pos(11, cp=0, best_move=None, mate=0, turn=chess.BLACK)
     classification, _, _ = classify_move(before, after, played=E4)
     assert classification == "best"
+
+
+def test_a_move_in_the_opening_book_is_theory() -> None:
+    before = _pos(2, cp=25, best_move=D4)
+    after = _pos(3, cp=20, best_move=E4)
+    classification, _, _ = classify_move(before, after, played=E4, in_opening_book=True)
+    assert classification == "book"
+
+
+def test_theory_does_not_hide_a_blunder() -> None:
+    """La tabla ECO nombra celadas y bromas —el mate del loco tiene nombre—, así
+    que una jugada del libro que además hunde la posición se clasifica por lo
+    que hizo."""
+    before = _pos(2, cp=20, best_move=D4)
+    after = _pos(3, cp=-900, best_move=D4)
+    classification, _, _ = classify_move(before, after, played=E4, in_opening_book=True)
+    assert classification == "blunder"

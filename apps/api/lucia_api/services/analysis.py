@@ -156,6 +156,14 @@ async def alternatives_from_cache(
     return {ply: lines_by_fen[fen] for ply, fen in fens_by_ply.items() if fen in lines_by_fen}
 
 
+def alternatives_of(move: AnalyzedMove, cached_alternatives: dict[int, list[dict]]) -> list[dict]:
+    """Las alternativas de una jugada: las suyas, o las que `alternatives_from_cache`
+    haya rescatado si el análisis es anterior a RF-10.1 y no las guardó."""
+    if move.alternatives_json is not None:
+        return move.alternatives_json
+    return cached_alternatives.get(move.ply, [])
+
+
 @dataclass(frozen=True)
 class EngineLine:
     """Una línea del motor para una posición suelta (RF-5.2 / RF-6.2)."""
@@ -293,7 +301,10 @@ async def run_analysis(
         async with EngineBridge(config) as real_engine:
             cached_engine = CachedEngineBridge(session, real_engine, analysis.engine)
             analysis_result = await analyze_game(
-                cached_engine, pgn_starting_board, moves, on_position=on_progress
+                cached_engine,
+                pgn_starting_board,
+                moves,
+                on_position=on_progress,
             )
 
         for analyzed_move in analysis_result.moves:

@@ -9,6 +9,7 @@ import datetime as dt
 
 from lucia_chesscom import ChessComClient, ChessComGame, parse_move_clocks
 from lucia_chesscom.sync import months_to_sync
+from lucia_core.openings import opening_of_pgn
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -107,6 +108,11 @@ async def _upsert_game(
     game.rules = chesscom_game.rules
     game.rated = chesscom_game.rated
     game.eco = chesscom_game.eco
+    # La apertura propia, deducida de las jugadas: chess.com no la trae en
+    # todas las partidas y nunca da el código ECO (RF-3.2).
+    opening = opening_of_pgn(chesscom_game.pgn)
+    game.opening_eco = opening.eco if opening else None
+    game.opening_name = opening.name if opening else None
     game.clocks_json = parse_move_clocks(chesscom_game.pgn)
     game.played_at = dt.datetime.fromtimestamp(chesscom_game.end_time, tz=dt.UTC)
     game.year = year

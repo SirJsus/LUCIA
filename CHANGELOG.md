@@ -13,8 +13,7 @@ SemVer para la serie `0.x`).
 
 Camino a v1.0.0 — ver progreso en [docs/05-roadmap.md](docs/05-roadmap.md) y
 alcance congelado en [docs/02-requerimientos.md](docs/02-requerimientos.md).
-De la **fase 2** quedan nueve ítems: extractores de patrones (RF-2.8, RF-3.2),
-tabla ECO y categoría "book" (RF-2.2), repertorio contra Lichess Explorer
+De la **fase 2** quedan siete ítems: repertorio contra Lichess Explorer
 (RF-3.6), importación de PGN manual (RF-1.5), filtros de `/games` (RF-5.3),
 tendencias (RF-3.7), extras del tablero de análisis (RF-6.6 a 6.9), capa de
 ocupación (RF-7.1 a 7.7) y exportación de PGN anotado.
@@ -27,10 +26,48 @@ sparring calibrado de RF-4.3, ambos alcance de 1.0), **RF-9 · Comparación de
 evaluaciones entre motores** (ampliación de RF-2.6, sin fase propia) y
 **RNF-11 · Coherencia de interfaz**, criterio permanente cuyos incumplimientos
 concretos se arreglaron dentro de 1.0: su inventario en
-[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) quedó vacío el
-2026-09-08.
+[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) está vacío, con las 55
+filas que llegó a tener cerradas.
 
 ### Añadido
+
+- **Tabla de aperturas propia** (`lucia_core.openings`), con la clasificación
+  ECO de [chess-openings de Lichess](https://github.com/lichess-org/chess-openings)
+  (CC0, dominio público). Se versiona ya procesada —3.810 posiciones con su
+  código y su nombre— porque la aplicación no puede depender de tener red para
+  nombrar una apertura (RNF-1); la regenera `scripts/build-openings-table.py`.
+  - **Se busca por posición, no por secuencia de jugadas**, así que reconoce
+    transposiciones: llegar a la Najdorf por otro orden da el mismo nombre.
+  - **Categoría "Teoría" en la clasificación de jugadas** (RF-2.2, que estaba
+    definida pero no se producía nunca): mientras la partida siga en el libro,
+    la jugada no se puntúa como acierto de quien la juega. Con una excepción
+    aprendida probándolo: la tabla nombra también celadas —el mate del loco
+    tiene nombre—, así que una jugada de libro que hunde la posición se
+    clasifica por lo que hizo. La teoría no tapa un error.
+  - **La apertura se guarda al importar la partida** (`games.opening_eco` y
+    `opening_name`, migración `9c2d51ab7e04`, que rellena también las ya
+    importadas). Sale en 262 de las 324 partidas del autor, frente a las 260
+    que traía chess.com, y ahora con código ECO. Las 62 restantes son las que
+    no empiezan en la posición estándar, donde no hay apertura que nombrar.
+  - **Estadísticas por apertura** (RF-3.2) pasan a usar esta clasificación en
+    vez de la URL que reporta chess.com, con el código ECO a la vista.
+
+- **Extractores de patrones** (RF-2.8, RF-3.4, RF-3.5 y lo que faltaba de
+  RF-3.2), en `lucia_core.insights`. Ninguno vuelve a llamar al motor: leen lo
+  que el análisis ya guardó, así que las partidas analizadas antes también
+  entran.
+  - **Momentos críticos** en el visor: las jugadas donde se decidió la partida,
+    con el motivo de cada una —solo valía una jugada, la partida cambió de
+    manos, o había una ganada y se escapó— y un clic para ir a esa posición.
+    Llegan en `GET /analysis/{id}`.
+  - **Por qué fallas**, en Estadísticas: los errores repartidos por tipo (con
+    el reloj encima, táctico, de final, posicional), cada uno con la regla con
+    la que se decidió, porque "posicional" no significa nada sin ella.
+  - **Con el reloj en la mano**, en Estadísticas: precisión y errores por tramo
+    de reloj restante, y en cuántas partidas se llegó a jugar con menos de
+    veinte segundos.
+  - **Al salir de la apertura**: columna nueva en la tabla de aperturas con la
+    probabilidad de victoria media al terminar la fase de apertura.
 
 - **Alternativas por jugada en el análisis guardado** (RF-10.1 y RF-10.2). El
   análisis persiste ahora las N mejores líneas de cada posición, no solo
@@ -51,6 +88,13 @@ concretos se arreglaron dentro de 1.0: su inventario en
     motor, red, límite y MultiPV). Comprobado sobre la base del autor: un
     análisis de 56 jugadas recuperó las tres alternativas de todas ellas sin
     gastar motor.
+
+### Corregido
+
+- Una partida analizada con **los dos motores** (RF-2.6) contaba dos veces en
+  las estadísticas: en la precisión media, en el número de partidas analizadas
+  y en el reparto por fases. Ahora cada partida cuenta una vez, con su análisis
+  más reciente, que es el que la interfaz enseña.
 
 ### Cambiado
 

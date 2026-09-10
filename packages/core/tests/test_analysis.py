@@ -135,3 +135,41 @@ async def test_analyzed_move_carries_the_alternatives_of_the_previous_position()
     assert blunder.alternatives[0].move is not None
     assert blunder.alternatives[0].move.uci() == blunder.best_move_uci
     assert len(blunder.alternatives) == 3
+
+
+class BookEngine:
+    """Motor falso que siempre ve la posición equilibrada: así la clasificación
+    de las primeras jugadas solo puede venir del libro de aperturas."""
+
+    async def analyze(self, board: chess.Board) -> list[chess.engine.InfoDict]:
+        return [{"score": chess.engine.PovScore(chess.engine.Cp(10), board.turn), "pv": []}]
+
+
+async def test_moves_still_in_theory_are_classified_as_book() -> None:
+    """RF-2.2: mientras la partida siga en la tabla ECO, la jugada es teoría y
+    no un acierto de quien la juega."""
+    board = chess.Board()
+    italian = board.copy()
+    for san in ("e4", "e5", "Nf3", "Nc6", "Bc4", "Bc5", "c3", "Nf6"):
+        italian.push_san(san)
+    moves = list(italian.move_stack)
+
+    analyzed_game = await analyze_game(BookEngine(), board, moves)
+
+    # Las ocho son teoría conocida: la italiana está en la tabla hasta el final
+    # de esta línea, así que ninguna se puntúa como acierto del jugador.
+    assert [move.classification for move in analyzed_game.moves] == ["book"] * 8
+
+
+async def test_moves_out_of_theory_are_classified_by_evaluation() -> None:
+    """En cuanto la partida se sale del repertorio, vuelve a mandar el motor."""
+    board = chess.Board()
+    off_book = board.copy()
+    for san in ("a3", "h6", "b3", "g5", "c3", "f6"):
+        off_book.push_san(san)
+
+    analyzed_game = await analyze_game(BookEngine(), board, list(off_book.move_stack))
+
+    classifications = [move.classification for move in analyzed_game.moves]
+    assert classifications[0] == "book"  # "1. a3" tiene nombre
+    assert "book" not in classifications[2:]

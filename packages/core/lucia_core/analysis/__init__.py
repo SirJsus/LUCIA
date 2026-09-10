@@ -22,6 +22,7 @@ from lucia_core.classification import (
     MoveClassification,
     classify_move,
 )
+from lucia_core.openings import identify_opening
 from lucia_core.phases import Phase, phases_by_ply
 
 OnPosition = Callable[[int, int], Awaitable[None]]
@@ -180,6 +181,9 @@ async def analyze_game(
     `apps/api`, `pgn_game.board()`), no un `chess.Board()` recién creado, o
     las jugadas de una partida con `[SetUp "1"]` + `[FEN ...]` se replicarán
     sobre un tablero que no es el suyo.
+
+    Las jugadas que siguen en la tabla ECO se marcan como teoría y no se
+    puntúan como aciertos de quien las jugó (RF-2.2).
     """
     position_evals = await evaluate_positions(engine, board, moves, on_position)
 
@@ -192,11 +196,17 @@ async def analyze_game(
         replay_board.push(move)
     phases = phases_by_ply(boards_by_ply)
 
+    # Hasta dónde llega la teoría: las jugadas de esa racha inicial se
+    # etiquetan como "book" y no como acierto o error de quien las jugó.
+    book_plies = identify_opening(board, moves).book_plies
+
     analyzed_moves: list[AnalyzedMove] = []
     current_board = board.copy()
     for i, move in enumerate(moves):
         before, after = position_evals[i], position_evals[i + 1]
-        classification, win_before, win_after = classify_move(before, after, move, thresholds)
+        classification, win_before, win_after = classify_move(
+            before, after, move, thresholds, in_opening_book=i < book_plies
+        )
         analyzed_moves.append(
             AnalyzedMove(
                 ply=i,

@@ -189,7 +189,9 @@
       que es P2 y vive en la fase 3 con el resto de entrenamiento.
 - [x] Coherencia de la interfaz entre pantallas (RF-5.1 y RNF-6; criterios en
       [docs/07-coherencia-ui.md](07-coherencia-ui.md), cuyo inventario de
-      incumplimientos quedó **vacío** el 2026-09-08). El tablero de análisis se
+      incumplimientos está **vacío**: las 55 filas que llegó a tener, cerradas
+      —las dos últimas, las que abrieron los extractores de patrones el
+      2026-09-09—). El tablero de análisis se
       navegaba solo con el teclado y su pantalla era siempre la misma, mientras
       que el visor tenía controles visibles y cambiaba según lo que hace el
       motor: quien no sabe ya de análisis leía el tablero como una herramienta
@@ -218,18 +220,73 @@
       del tablero de análisis, que ningún RF congelado pedía y se aceptan
       dentro de 1.0 por ser cuatro botones sobre lógica de navegación ya
       escrita.
-- [ ] Extractores de patrones: errores por tipo, *time trouble*, momentos
-      críticos (RF-2.8, con MultiPV real en la clasificación) y "eval al salir
-      de la apertura" (lo que falta de RF-3.2).
+- [x] Extractores de patrones: errores por tipo (RF-3.4), *time trouble*
+      (RF-3.5), momentos críticos (RF-2.8) y "eval al salir de la apertura"
+      (lo que faltaba de RF-3.2). Hecho el 2026-09-09, apoyado en el MultiPV
+      que RF-10 acababa de persistir: distinguir "jugada única" de "tres
+      alternativas igual de buenas" necesita exactamente ese material, y por
+      eso los dos ítems iban juntos.
 
-      Va junto con el ítem de RF-10 de más arriba: las varias líneas por
-      posición que RF-2.8 necesita para distinguir "jugada única" de "tres
-      alternativas igual de buenas" son el mismo material que RF-10.1 tiene que
-      persistir. Hacerlos por separado significa recorrer dos veces el flujo de
-      análisis.
-- [ ] `lucia_core.openings`: tabla ECO (chess-openings de Lichess, CC0) para
+      Todo vive en `lucia_core.insights`, que era el módulo vacío con un TODO:
+      son reglas de lectura de partidas, no consultas a una base. **No se
+      vuelve a llamar al motor y nada se persiste**: los cuatro extractores
+      leen lo que el análisis ya guardó, así que las partidas analizadas antes
+      también entran ([ADR-0008](adr/0008-patrones-deducidos-al-leer.md)).
+
+      1. **Momentos críticos** (RF-2.8): una posición es crítica si solo valía
+         una jugada (la mejor línea le saca 10 puntos de probabilidad de
+         victoria a la segunda), si la jugada cruzó el 50 % moviendo la
+         evaluación al menos 15 puntos, o si había una ganada y se escapó. No
+         son "las jugadas malas": la jugada única encontrada también cuenta, y
+         saberlo es la mitad de lo que se viene a aprender. Salen con
+         `GET /analysis/{id}` y el visor las lista con el motivo de cada una.
+      2. **Tipo de error** (RF-3.4): cada error recibe un solo tipo, en este
+         orden —reloj, táctico, final, posicional—, de la causa más específica
+         a la más general. Que la partida esté en un final es contexto; haber
+         tenido delante una captura ganadora es una causa.
+      3. **Apuros de tiempo** (RF-3.5): la calidad de juego repartida por
+         tramos de reloj restante, y en cuántas partidas se llegó a jugar con
+         menos de veinte segundos. Solo cuentan las jugadas con reloj conocido.
+      4. **Evaluación al salir de la apertura** (RF-3.2): la de la última
+         jugada de fase `opening` de cada partida, promediada por apertura.
+
+      De paso se corrigió un fallo de conteo que venía de antes: una partida
+      analizada con los dos motores (RF-2.6) contaba **dos veces** en precisión
+      media, en partidas analizadas y en el reparto por fases. Ahora, en
+      estadísticas, cada partida cuenta una vez, con su análisis más reciente.
+- [x] `lucia_core.openings`: tabla ECO (chess-openings de Lichess, CC0) para
       clasificar aperturas sin depender de lo que reporte chess.com, y con
-      ella la categoría "book" de `classify_move` (lo que falta de RF-2.2).
+      ella la categoría "book" de `classify_move` (lo que faltaba de RF-2.2).
+      Hecho el 2026-09-09.
+
+      1. **La tabla se versiona ya procesada** en
+         `packages/core/lucia_core/openings/data/openings.tsv`: 3.810
+         posiciones con su código ECO y su nombre. Lo que se guarda es la
+         posición (EPD), no la secuencia de jugadas, y eso es lo que hace que
+         las **transposiciones** funcionen: llegar a la Najdorf por otro orden
+         de jugadas da el mismo nombre. La genera
+         `scripts/build-openings-table.py` desde el repositorio de Lichess; se
+         versiona porque la aplicación no puede depender de tener red para
+         nombrar una apertura (RNF-1).
+      2. **La tabla tiene huecos y hay que contar con ellos**: solo nombra las
+         posiciones donde termina alguna línea con nombre, así que en mitad de
+         una Najdorf hay jugadas sin nombre. La búsqueda los tolera —hasta
+         cuatro seguidas— y se queda con la posición conocida más profunda, que
+         es la que da el nombre más específico. Pararse en el primer hueco
+         dejaba la partida en "Siciliana" a secas.
+      3. **La categoría "book"** (RF-2.2) marca las jugadas que siguen en
+         teoría, en vez de puntuarlas como aciertos de quien las juega. Con una
+         excepción que se vio al probarlo: la tabla nombra también celadas —`1.
+         f3 e5 2. g4` es el mate del loco y tiene nombre—, así que una jugada
+         de libro que además hunde la posición se clasifica por lo que hizo. La
+         teoría no tapa un error.
+      4. **La apertura de cada partida se guarda al importarla**
+         (`games.opening_eco` / `opening_name`, migración `9c2d51ab7e04`, con
+         relleno de las ya importadas): sale en 262 de las 324 partidas del
+         autor —chess.com daba 260, y sin código ECO—, y las 62 que faltan son
+         exactamente las que no empiezan en la posición estándar, donde no hay
+         apertura que nombrar. Las estadísticas por apertura (RF-3.2) usan ya
+         esta clasificación, con su código ECO a la vista.
 - [ ] Comparación de repertorio con Lichess Explorer (RF-3.6).
 - [ ] Importar PGN manual de otras fuentes —OTB, lichess— al historial (RF-1.5).
 - [ ] Filtros de `/games` por apertura, rango de fechas y rival (lo que falta

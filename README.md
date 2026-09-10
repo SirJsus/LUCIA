@@ -12,12 +12,13 @@ LUCIA/
 │   ├── api/            # Backend FastAPI (Python): orquesta motores, expone análisis
 │   └── web/            # Frontend React + Vite + TypeScript: tablero, gráficas, entrenamiento
 ├── packages/
-│   ├── core/           # Python: puente UCI con Stockfish/Lc0, clasificación de jugadas, métricas
+│   ├── core/           # Python: puente UCI con Stockfish/Lc0, clasificación de jugadas, métricas,
+│   │                   #   patrones de juego y tabla ECO de aperturas (datos incluidos)
 │   ├── chesscom/       # Python: cliente de la API pública de chess.com (perfil, archivos PGN)
 │   └── shared-types/   # TypeScript: tipos compartidos API <-> web (generados desde OpenAPI)
 ├── engines/            # Sub-módulos git: stockfish/ y lc0/ (fuente C++, compilado a engines/bin/)
 ├── infra/docker/       # docker-compose y Docker-files
-├── scripts/            # setup-engines.sh, utilidades
+├── scripts/            # setup-engines.sh, build-openings-table.py, utilidades
 └── docs/               # Visión, requerimientos, arquitectura, stack, roadmap, ADRs
 ```
 
@@ -51,7 +52,8 @@ La web tiene cinco pantallas: **Partidas** (lista con filtros y sincronización
 desde chess.com), **Visor** (tablero, jugadas clasificadas, gráfico de
 evaluación y análisis con progreso en vivo), **Tableros** (análisis libre desde
 FEN o PGN, con árbol de variantes y motor en vivo), **Estadísticas** (marcador,
-ratings, aperturas y en qué fase se pierde más ventaja) y **Motores**
+ratings, aperturas con su código ECO, en qué fase se pierde más ventaja, de qué
+tipo son los errores y qué pasa cuando baja el reloj) y **Motores**
 (profundidad, MultiPV, hilos y hash, editables).
 
 Ctrl+C apaga todos los servicios. Los logs también quedan en `data/logs/<servicio>.log`.
@@ -64,3 +66,5 @@ Docker (`infra/docker/`) queda como vía de portabilidad y reproducibilidad, no 
 ## Licencia
 
 GPL-3.0. Stockfish y Lc0 son GPL-3.0; al integrarlos y distribuirlos, LUCIA adopta la misma licencia. Ver [ADR-0004](docs/adr/0004-licencia-gpl3.md).
+
+La tabla de aperturas versionada en `packages/core/lucia_core/openings/data/` deriva de [chess-openings de Lichess](https://github.com/lichess-org/chess-openings), publicada bajo **CC0 1.0** (dominio público), compatible con la GPL-3.0. La regenera `scripts/build-openings-table.py`.

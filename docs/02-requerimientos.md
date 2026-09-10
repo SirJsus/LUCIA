@@ -61,6 +61,22 @@ Prioridad: **P0** = MVP imprescindible · **P1** = siguiente iteración · **P2*
 | RF-2.8 | Detección de momentos críticos: jugada única, cambio de signo de eval, oportunidad táctica perdida. | P1 |
 | RF-2.9 | Explicación en lenguaje natural de por qué una jugada es error (basada en heurísticas: pieza colgada, mate en N, pérdida de material, etc.). | P2 |
 
+RF-2.8 se entregó el 2026-09-09 junto con RF-3.4 y RF-3.5, con los que comparte
+extractor y material: los tres leen lo que el análisis ya guardó. Las reglas y
+umbrales concretos están anotados al final de [RF-3](#rf-3--estadísticas-e-insight).
+
+**RF-2.2, la categoría "Libro"** (**2026-09-09**). Estaba en la lista desde el
+principio pero no se producía nunca: hacía falta una tabla de aperturas. Con
+`lucia_core.openings` en pie, una jugada se marca "Libro" mientras la posición
+resultante siga en la tabla ECO, porque puntuar como acierto una jugada que se
+juega porque está en el libro diría algo del repertorio y no de quien lo sigue.
+**Con una excepción, encontrada al probarlo: la teoría no tapa un error.** La
+tabla nombra también celadas y bromas —`1. f3 e5 2. g4` es el mate del loco y
+tiene nombre—, así que una jugada de libro que además hunde la posición se
+clasifica por lo que hizo. A diferencia de las demás categorías, esta no sale
+de un umbral: la decide una consulta a la tabla, y por eso el umbral que sí
+interviene es el de "esto ya es una imprecisión", el mismo de siempre.
+
 ### RF-3 · Estadísticas e insight
 
 | ID | Requerimiento | Prioridad |
@@ -73,6 +89,65 @@ Prioridad: **P0** = MVP imprescindible · **P1** = siguiente iteración · **P2*
 | RF-3.6 | Comparación de repertorio con teoría (Lichess Opening Explorer / base de maestros): dónde me salgo de la línea principal y con qué resultado. | P1 |
 | RF-3.7 | Tendencias: evolución de precisión y tipo de errores en el tiempo. | P1 |
 | RF-3.8 | Análisis de rivales: patrones contra rivales recurrentes. | P2 |
+
+Con qué reglas se cumplieron RF-2.8, RF-3.4, RF-3.5 y el "eval al salir de la
+apertura" de RF-3.2 (**2026-09-09**). El texto de los requerimientos no cambia;
+esto es la lectura concreta que se les dio, escrita aquí para que un resultado
+sorprendente se pueda contrastar con una regla y no con una intuición. Los
+umbrales son constantes con nombre y ajustables
+(`lucia_core.insights.InsightThresholds`), como en `phases` y `classification`.
+
+- **RF-2.8, momentos críticos.** Una posición es crítica por uno o varios de
+  tres motivos: *jugada única* (la mejor línea del motor le saca **10 puntos**
+  de probabilidad de victoria a la segunda), *vuelco* (la jugada cruza el 50 %
+  moviendo la evaluación al menos **15 puntos**; hacen falta las dos
+  condiciones, o una posición que oscila alrededor de la igualdad "cambiaría de
+  manos" cada jugada) y *ocasión perdida* (se tenía ≥ **75 %** y tras la jugada
+  queda por debajo del **60 %**). No son "las jugadas malas": la jugada única
+  encontrada también es un momento crítico. "Jugada única" necesita el MultiPV
+  de RF-10.1; un análisis anterior sin alternativas recuperables sale con menos
+  momentos, no con momentos inventados.
+- **RF-3.4, tipo de error.** Cada error recibe **un solo** tipo, comprobados en
+  este orden: *reloj* → *táctico* → *final* → *posicional*, de la causa más
+  específica a la más general. Que la partida esté en un final es contexto;
+  haber tenido delante una captura ganadora es una causa, y por eso "táctico"
+  se comprueba antes. Táctico se decide mirando si la jugada que el motor
+  proponía era una captura o un jaque. Cuentan como error las imprecisiones,
+  errores, blunders y mates perdidos, y de cada tipo se dice además cuántos
+  fueron blunders.
+- **RF-3.5, gestión de tiempo.** Tramos de reloj **restante** (más de 1 min,
+  menos de 1 min, menos de 30 s, menos de 10 s) con precisión, errores y
+  blunders de cada uno, y el recuento de partidas en las que se llegó a jugar
+  con menos de **20 segundos** —el umbral de apuros, absoluto a propósito: un
+  porcentaje del control de tiempo metería en apuros media partida por
+  correspondencia—. El *time trouble* recurrente se cuenta por partidas y no
+  por jugadas, porque la pregunta es de hábito. Solo entran las jugadas con
+  reloj conocido (`%clk` de chess.com, RF-1.2): una partida sin relojes no dice
+  nada de esto y contarla como "tiempo de sobra" mentiría.
+- **RF-3.2, eval al salir de la apertura.** Es la probabilidad de victoria tras
+  la última jugada del jugador en fase `opening` (RF-3.3 decide dónde termina),
+  promediada por apertura y color.
+
+Nada de esto vuelve a llamar al motor ni se persiste: se deduce al leer, sobre
+lo que el análisis ya guardó, así que las partidas analizadas antes también
+entran — razonado en [ADR-0008](adr/0008-patrones-deducidos-al-leer.md). Al implementarlo se corrigió además un fallo de conteo anterior: una
+partida analizada con los dos motores (RF-2.6) contaba dos veces en precisión
+media, partidas analizadas y reparto por fases; ahora cada partida cuenta una
+vez, con su análisis más reciente.
+
+**De dónde sale el nombre de la apertura** (**2026-09-09**). RF-3.2 pide
+"ECO / nombre", y hasta esa fecha se agrupaba por la URL de apertura que reporta
+chess.com (`games.eco`), que no venía en todas las partidas y nunca traía el
+código. Ahora se agrupa por la clasificación propia
+(`lucia_core.openings`, `games.opening_eco` / `opening_name`), deducida de las
+jugadas al importar la partida: sale en más partidas —262 de las 324 del autor,
+frente a 260—, trae el código ECO y reconoce transposiciones, porque busca por
+posición y no por orden de jugadas. Las que faltan son exactamente las que no
+empiezan en la posición estándar (odds chess, Chess960): ahí no hay apertura
+ECO que nombrar, y ponerle una sería inventarla. La URL de chess.com se sigue
+guardando como dato de origen, pero ya no se usa para agrupar. La tabla se
+versiona en el repositorio en vez de descargarse
+([ADR-0009](adr/0009-tabla-de-aperturas-versionada.md)).
 
 ### RF-4 · Entrenamiento
 
@@ -158,10 +233,11 @@ razonada en [ADR-0007](adr/0007-alternativas-por-jugada-json-y-cache.md):
   una línea calculada con otra configuración no es la que produjo esa
   clasificación.
 - **RF-10.3 sigue pendiente**, con RF-4.1: los puzzles no existen todavía.
-- **Se solapa con RF-2.8** ("momentos críticos, con MultiPV real en la
-  clasificación", pendiente en la fase 2): distinguir una jugada única de una
-  con tres alternativas igual de buenas necesita exactamente este material, que
-  ahora ya está guardado. Ese ítem se apoya en esto en vez de repetirlo.
+- **RF-2.8 se apoyó en esto**, un día después: distinguir una jugada única de
+  una con tres alternativas igual de buenas necesita exactamente este material.
+  El extractor de momentos críticos lee `alternatives_json` —o lo que se
+  rescate de `position_cache`— y no vuelve a llamar al motor; ver la nota de
+  reglas al final de [RF-3](#rf-3--estadísticas-e-insight).
 
 ## Requerimientos no funcionales
 
@@ -177,6 +253,18 @@ razonada en [ADR-0007](adr/0007-alternativas-por-jugada-json-y-cache.md):
 | RNF-8 | **Calidad**: tests unitarios para clasificación de jugadas y cálculo de precisión (son el corazón del producto); CI en cada push. |
 | RNF-9 | **Extensibilidad**: cualquier motor UCI debe poder enchufarse (Komodo, Berserk, etc.) sin cambiar el núcleo. |
 | RNF-10 | **Respeto a terceros**: cumplir los términos de la API pública de chess.com (User-Agent identificable, no scraping, no paralelismo agresivo). |
+
+**RNF-5 y los datos de terceros que viajan dentro del repositorio.** La licencia
+cubre el código, pero desde el 2026-09-09 el repositorio incluye además un dato
+ajeno: la tabla ECO de
+[chess-openings de Lichess](https://github.com/lichess-org/chess-openings), en
+`packages/core/lucia_core/openings/data/`. Es **CC0 1.0 (dominio público)**, que
+no impone condiciones al derivado y por tanto es compatible con la GPL-3.0
+([ADR-0004](adr/0004-licencia-gpl3.md)). Se atribuye igualmente —en el
+[README](../README.md), en la cabecera del propio archivo y en el script que lo
+genera—, porque quien lo encuentre dentro de un paquete GPL tiene que poder
+saber de dónde salió. Toda fuente de datos que se versione en adelante lleva la
+misma exigencia: licencia compatible y atribución visible desde el archivo.
 
 ## Post 1.0 (futuro)
 
@@ -273,4 +361,4 @@ Notas técnicas, para cuando se retome:
 
 | ID | Requerimiento |
 | ---- | --------------- |
-| RNF-11 | La interfaz se comporta igual en todas las pantallas: paridad entre lo que se puede hacer con el teclado y lo que hay como control visible, mismo nombre y misma posición para la misma acción, estados explícitos de lo que está haciendo el sistema (en cola, trabajando con progreso, listo, vacío, error), estados de carga/error/vacío compartidos, un solo formato por dato, y ningún número del motor sin etiqueta o representación visual que lo explique. Los criterios verificables están en [docs/07-coherencia-ui.md](07-coherencia-ui.md), donde también se lleva el inventario de incumplimientos: vacío desde el 2026-09-08. |
+| RNF-11 | La interfaz se comporta igual en todas las pantallas: paridad entre lo que se puede hacer con el teclado y lo que hay como control visible, mismo nombre y misma posición para la misma acción, estados explícitos de lo que está haciendo el sistema (en cola, trabajando con progreso, listo, vacío, error), estados de carga/error/vacío compartidos, un solo formato por dato, y ningún número del motor sin etiqueta o representación visual que lo explique. Los criterios verificables están en [docs/07-coherencia-ui.md](07-coherencia-ui.md), donde también se lleva el inventario de incumplimientos: vacío, con las 55 filas que llegó a tener cerradas. |

@@ -13,7 +13,12 @@ cada cambio nuevo de `apps/web`. El barrido completo que se hizo ese mismo día
 para comprobar que no quedaba nada destapó nueve incumplimientos más, las filas
 39 a 47, cerradas también ese día. La revisión de RF-10.2 —las alternativas por
 jugada del visor, ese mismo 2026-09-08— abrió otras cuatro, de la 48 a la 51,
-cerradas igualmente. El inventario está vacío, que es como debería encontrarse
+cerradas igualmente. La revisión de los extractores de patrones (RF-2.8,
+RF-3.4, RF-3.5, RF-3.2) abrió dos más el 2026-09-09, la 52 y la 53, cerradas
+también. Ese mismo día, la tabla ECO propia (RF-3.2) puso en pantalla por
+primera vez la categoría "Teoría" de la clasificación de jugadas, que estaba
+definida desde el principio pero no se producía nunca, y con ella las filas 54
+y 55, que siguen abiertas. El inventario vacío es como debería encontrarse
 siempre que se lea este documento.
 
 **Qué es cada mitad de este documento.** Los criterios C-1 a C-7 son
@@ -45,14 +50,14 @@ antes de comitear cambios de front — ver [Cómo se verifica](#cómo-se-verific
 | C-6 | **Legible sin saber de ajedrez.** Todo número del motor va acompañado de etiqueta, leyenda o representación visual. `+0.35` solo, sin más, no comunica nada a quien no lee evaluaciones. |
 | C-7 | **Accesibilidad mínima.** Foco visible, `aria-label` en los botones que son solo icono, y ningún significado transmitido únicamente por color. |
 
-## Inventario de incoherencias: vacío (al 2026-09-08)
+## Inventario de incoherencias: vacío (al 2026-09-09)
 
-**No queda ninguna abierta.** El inventario llegó a tener 51 filas y están todas
+**No queda ninguna abierta.** El inventario llegó a tener 55 filas y están todas
 cerradas. El rastro de qué se hizo está más abajo.
 
 ## Lo que se cerró
 
-Las 51 filas que llegó a tener este inventario se cerraron en cinco pasadas, y
+Las 55 filas que llegó a tener este inventario se cerraron en siete pasadas, y
 aquí queda el rastro de qué se hizo, para que un `git blame` no sea la única
 forma de averiguarlo.
 
@@ -190,6 +195,64 @@ las flechas:
   líneas del motor en el tablero de análisis: detrás de la lista de jugadas
   cambiaba fuera de la pantalla al recorrer la partida (51).
 
+**2026-09-09 · los extractores de patrones (RF-2.8, RF-3.4, RF-3.5, RF-3.2).**
+Revisar las dos secciones nuevas del panel de estadísticas y el panel de
+momentos críticos del visor dejó abiertas las filas 52 y 53, y tres arreglos
+mecánicos sin nada que decidir:
+
+- **C-6.** El panel de momentos críticos enseñaba "72 % → 31 %" con la
+  explicación solo en un `title`; ahora la lleva delante, en una línea, como ya
+  hacían el panel del motor y la comparación de motores.
+- **C-6.** "Al salir", la columna nueva de la tabla de aperturas, decía
+  "probabilidad de victoria media" sin decir de quién, cuando es la del usuario
+  del panel.
+- **C-2.** La columna "De ellos, blunders" se pintaba a opacidad plena en la
+  tabla de tipos de error y atenuada en la del reloj, dos tablas seguidas de la
+  misma pantalla.
+
+Y las dos filas que sí eran decisiones de presentación, resueltas el mismo día:
+
+- **El punto de vista de la probabilidad de victoria** (52, C-5): el panel de
+  momentos críticos la daba desde quien movió, así que tras un error de las
+  negras decía 31 % con la barra de evaluación en 69 %, en la misma pantalla y
+  a la vez. Ahora la da desde las blancas, como la barra, el gráfico y la
+  comparación de motores. La API manda el color de la jugada para poder
+  girarla, igual que ya hacía con cada jugada analizada.
+- **La regla de cada motivo, escrita** (53, C-6): "Cambió de manos" y "Ocasión
+  perdida" solo se explicaban en un `title`. Ahora el panel lleva al pie la
+  regla de los motivos que salen en esa partida, como la tabla de tipos de
+  error del panel de estadísticas. Solo los que salen: la lista completa sería
+  una leyenda de tres líneas que casi nunca aplican todas.
+
+**2026-09-09 · la apertura deducida (RF-3.2).** La tabla ECO propia trajo la
+columna ECO de la tabla de aperturas y cambió de dónde salen los nombres. Un
+arreglo mecánico del mismo día, sin nada que decidir:
+
+- **C-2.** El vacío de "Por apertura" decía "Importa partidas que empiecen en la
+  posición inicial". El concepto ya tiene nombre en la aplicación —"posición
+  estándar", y la insignia que lo avisa dice "posición dada"
+  (`components/CustomPositionBadge.tsx`)—, y además importar no es lo que
+  faltaba: las partidas ya guardadas reciben su apertura en la migración, así
+  que las que no aparecen es porque no arrancan en la posición estándar. El
+  vacío lo dice ahora con esas palabras.
+
+**2026-09-09 · la insignia "Teoría", que hasta hoy no salía nunca.** La
+categoría `book` estaba definida en `lib/classification.ts` desde el principio,
+pero no se producía: hasta que existió la tabla ECO, ninguna jugada podía ser
+teoría. En cuanto empezó a verse, dos cosas cantaban:
+
+- **Su símbolo era un emoji y los otros siete no** (54, C-2). `📖` se pinta con
+  su propia paleta, ignora el color de la insignia, ocupa más alto que el resto
+  en una lista donde todas son `text-xs`, y cambia de dibujo según el sistema.
+  Ahora es `▤`, monocromo como `★`, `?!` o `??`.
+- **"Teoría" no se explicaba en ninguna parte** (55, C-6). Era la única
+  categoría cuyo nombre no dice por qué se aplica —y menos con el matiz que
+  tiene: una jugada de libro que hunde la posición se clasifica por lo que
+  hizo—. Ahora las ocho clasificaciones llevan su regla en
+  `lib/classification.ts` y el resumen de jugadas del visor las escribe, que es
+  la leyenda de hecho, con la misma forma que la tabla de tipos de error del
+  panel de estadísticas.
+
 **Decidido el 2026-09-07, no es incoherencia.** Dos cosas que este inventario
 llegó a listar y el autor resolvió por criterio, no por descuido:
 
@@ -227,6 +290,6 @@ Antes de comitear cualquier cambio que toque `apps/web`:
    igual — o cambiar las dos a la vez.
 3. Si aparece una incoherencia que no se arregla en el mismo commit, añadirla
    al inventario de arriba —`# · Incoherencia · Dónde · Criterio`, numerando
-   desde el 52— en vez de dejarla suelta. Una fila se borra cuando se arregla,
+   desde el 56— en vez de dejarla suelta. Una fila se borra cuando se arregla,
    y las demás no se renumeran: el número es la referencia con la que se habla
    de ella en un commit o en una revisión.

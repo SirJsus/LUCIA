@@ -60,7 +60,11 @@ export function whiteWinPercentFromScore(score: EngineScore): number | null {
 }
 
 /** Lleva a la perspectiva de las blancas el `win_percent_after` de una jugada
- * analizada, que la API devuelve desde el punto de vista de quien movió. */
+ * analizada, que la API devuelve desde el punto de vista de quien movió.
+ *
+ * Acepta cualquier cosa que traiga esos dos campos, no solo un `AnalyzedMove`:
+ * los momentos críticos (RF-2.8) llegan con la misma convención y se enseñan
+ * en la misma escala que la barra y el gráfico. */
 export function whiteWinPercentAfterMove(
   move: Pick<AnalyzedMoveOut, "color" | "win_percent_after">,
 ): number {

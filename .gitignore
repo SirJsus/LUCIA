@@ -21,7 +21,10 @@ engines/stockfish/src/*.o
 engines/lc0/build/
 
 # Datos locales
-data/
+# Solo el de la raíz (base SQLite y logs). La barra inicial es necesaria: sin
+# ella la regla también se tragaba la tabla de aperturas que se versiona a
+# propósito en packages/core/lucia_core/openings/data/.
+/data/
 *.db
 *.sqlite
 *.sqlite3

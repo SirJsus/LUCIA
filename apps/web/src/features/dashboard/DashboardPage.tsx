@@ -1,10 +1,17 @@
-/** Dashboard de estadísticas (RF-3.1 a RF-3.3).
+/** Dashboard de estadísticas (RF-3.1 a RF-3.5).
  *
  * Todo se calcula en la API sobre lo ya guardado; aquí solo se presenta. Las
  * secciones que dependen de un análisis terminado avisan cuando no hay
  * ninguno, en vez de mostrar ceros que parecerían un rendimiento pésimo.
  */
-import type { PhaseStats, PlayerStats, RecordSummary } from "@lucia/shared-types";
+import type {
+  MistakeTypeStats,
+  PhaseStats,
+  PlayerStats,
+  RecordSummary,
+  TimeBucketStats,
+  TimeTrouble,
+} from "@lucia/shared-types";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import {
@@ -35,10 +42,22 @@ import {
   formatTimeClass,
   formatYearMonth,
 } from "../../lib/format";
+import { formatTimeLeftBucket, mistakeTypeStyle } from "../../lib/insights";
 
 /** El encabezado de la columna de marcador, en las dos tablas que lo tienen:
  * la abreviatura sola no se entiende sin desarrollarla (criterio C-6). */
 const RECORD_HEADER = <abbr title="Victorias / Tablas / Derrotas">V/T/D</abbr>;
+
+/** El código de la apertura en la clasificación ECO, el que usan las bases de
+ * datos de ajedrez. Va abreviado porque la columna es estrecha. */
+const ECO_HEADER = <abbr title="Código de la Enciclopedia de Aperturas de Ajedrez">ECO</abbr>;
+
+/** Con qué posición se sale de la apertura (RF-3.2). El encabezado lleva la
+ * explicación porque el número no se entiende solo: es probabilidad de
+ * victoria, no puntuación. */
+const OPENING_EXIT_HEADER = (
+  <abbr title="Tu probabilidad de victoria media al terminar la apertura">Al salir</abbr>
+);
 
 const PHASE_LABELS: Record<string, string> = {
   opening: "Apertura",
@@ -172,15 +191,50 @@ function StatsContent({ stats }: { stats: PlayerStats }) {
       </section>
 
       <section className="space-y-2">
+        <h2 className="font-semibold">Por qué fallas</h2>
+        {stats.by_mistake_type.length === 0 ? (
+          <EmptyState title="Aún no hay errores que repartir">
+            Analiza alguna partida desde su visor para ver de qué tipo son tus errores.
+          </EmptyState>
+        ) : (
+          <MistakeTypeSection mistakeTypes={stats.by_mistake_type} />
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="font-semibold">Con el reloj en la mano</h2>
+        {stats.by_time_left.length === 0 ? (
+          <EmptyState title="Sin relojes que mirar">
+            Solo las partidas de chess.com con reloj por jugada cuentan aquí, y ninguna de las
+            analizadas lo trae.
+          </EmptyState>
+        ) : (
+          <TimePressureSection buckets={stats.by_time_left} timeTrouble={stats.time_trouble} />
+        )}
+      </section>
+
+      <section className="space-y-2">
         <h2 className="font-semibold">Por apertura</h2>
         {stats.by_opening.length === 0 ? (
           <EmptyState title="Sin datos de apertura">
-            chess.com no reportó la apertura de estas partidas.
+            Aquí solo cuentan las partidas que empiezan en la posición estándar: las marcadas como
+            «posición dada» no tienen apertura que deducir.
           </EmptyState>
         ) : (
-          <DataTable headers={["Apertura", "Color", RECORD_HEADER, "Puntuación", "Precisión"]}>
+          <DataTable
+            headers={[
+              ECO_HEADER,
+              "Apertura",
+              "Color",
+              RECORD_HEADER,
+              "Puntuación",
+              "Precisión",
+              OPENING_EXIT_HEADER,
+            ]}
+          >
             {stats.by_opening.map((item) => (
               <tr key={`${item.opening}-${item.color}`} className={TABLE_ROW_CLASSES}>
+                <td className={`font-mono opacity-70 ${TABLE_CELL_CLASSES}`}>{item.eco ?? "—"}</td>
                 <td className={TABLE_CELL_CLASSES}>{item.opening}</td>
                 <td className={`opacity-70 ${TABLE_CELL_CLASSES}`}>
                   {item.color === "white" ? "Blancas" : "Negras"}
@@ -193,6 +247,11 @@ function StatsContent({ stats }: { stats: PlayerStats }) {
                 </td>
                 <td className={`tabular-nums opacity-70 ${TABLE_CELL_CLASSES}`}>
                   {formatAccuracy(item.average_accuracy)}
+                </td>
+                <td className={`tabular-nums opacity-70 ${TABLE_CELL_CLASSES}`}>
+                  {item.average_opening_exit_win_percent === null
+                    ? "—"
+                    : formatPercent(item.average_opening_exit_win_percent, 1)}
                 </td>
               </tr>
             ))}
@@ -276,6 +335,88 @@ function PhaseSection({ phases }: { phases: PhaseStats[] }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+/** Distribución de errores por tipo (RF-3.4).
+ *
+ * La tabla dice cuántos y de qué tipo; la explicación de cada tipo va debajo,
+ * porque "posicional" no significa nada sin la regla con la que se decidió
+ * (criterio C-6 de docs/07-coherencia-ui.md).
+ */
+function MistakeTypeSection({ mistakeTypes }: { mistakeTypes: MistakeTypeStats[] }) {
+  const totalMistakes = mistakeTypes.reduce((total, item) => total + item.mistakes, 0);
+
+  return (
+    <div className="space-y-2">
+      <DataTable headers={["Tipo", "Errores", "De ellos, blunders", "Parte del total"]}>
+        {mistakeTypes.map((item) => {
+          const style = mistakeTypeStyle(item.mistake_type);
+          return (
+            <tr key={item.mistake_type} className={TABLE_ROW_CLASSES}>
+              <td className={TABLE_CELL_CLASSES}>
+                <Badge tone={style.tone} title={style.description}>
+                  {style.label}
+                </Badge>
+              </td>
+              <td className={`tabular-nums ${TABLE_CELL_CLASSES}`}>{item.mistakes}</td>
+              <td className={`tabular-nums opacity-70 ${TABLE_CELL_CLASSES}`}>{item.blunders}</td>
+              <td className={`tabular-nums opacity-70 ${TABLE_CELL_CLASSES}`}>
+                {formatPercent((item.mistakes / totalMistakes) * 100)}
+              </td>
+            </tr>
+          );
+        })}
+      </DataTable>
+      <ul className="space-y-0.5 text-xs opacity-60">
+        {mistakeTypes.map((item) => {
+          const style = mistakeTypeStyle(item.mistake_type);
+          return (
+            <li key={item.mistake_type}>
+              <strong className="font-medium">{style.label}:</strong> {style.description}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** Calidad de juego según el reloj que quedaba (RF-3.5). */
+function TimePressureSection({
+  buckets,
+  timeTrouble,
+}: {
+  buckets: TimeBucketStats[];
+  timeTrouble: TimeTrouble | null;
+}) {
+  return (
+    <div className="space-y-2">
+      <DataTable
+        headers={["Reloj restante", "Jugadas", "Precisión", "Errores", "De ellos, blunders"]}
+      >
+        {buckets.map((bucket) => (
+          <tr key={String(bucket.max_seconds_left)} className={TABLE_ROW_CLASSES}>
+            <td className={TABLE_CELL_CLASSES}>{formatTimeLeftBucket(bucket.max_seconds_left)}</td>
+            <td className={`tabular-nums ${TABLE_CELL_CLASSES}`}>{bucket.moves}</td>
+            <td className={`tabular-nums ${TABLE_CELL_CLASSES}`}>
+              {formatAccuracy(bucket.average_accuracy)}
+            </td>
+            <td className={`tabular-nums ${TABLE_CELL_CLASSES}`}>{bucket.mistakes}</td>
+            <td className={`tabular-nums opacity-70 ${TABLE_CELL_CLASSES}`}>{bucket.blunders}</td>
+          </tr>
+        ))}
+      </DataTable>
+      {timeTrouble !== null && timeTrouble.analyzed_games_with_clocks > 0 && (
+        <p className="text-xs opacity-60">
+          Llegaste a jugar con menos de veinte segundos en{" "}
+          <strong className="font-medium">{timeTrouble.games_in_time_trouble}</strong> de las{" "}
+          {timeTrouble.analyzed_games_with_clocks} partidas analizadas con reloj (
+          {formatPercent(timeTrouble.share_of_games)}). Solo cuentan las jugadas con reloj
+          conocido: una partida sin él no dice nada de esto.
+        </p>
+      )}
     </div>
   );
 }

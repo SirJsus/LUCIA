@@ -1,4 +1,4 @@
-"""GET /stats/{username} — dashboard de estadísticas (RF-3.1 a RF-3.3)."""
+"""GET /stats/{username} — dashboard de estadísticas (RF-3.1 a RF-3.5)."""
 
 from __future__ import annotations
 
@@ -37,9 +37,42 @@ class MonthlyCountOut(BaseModel):
 
 class OpeningStatsOut(BaseModel):
     opening: str
+    eco: str | None
+    """Código ECO de la apertura ("B90"), de la tabla propia: chess.com no lo
+    da."""
     color: str
     record: RecordOut
     average_accuracy: float | None
+    average_opening_exit_win_percent: float | None
+    """Con qué posición se sale de la apertura, en probabilidad de victoria del
+    jugador (RF-3.2)."""
+
+
+class MistakeTypeStatsOut(BaseModel):
+    """Cuántos errores de cada tipo y por qué (RF-3.4)."""
+
+    mistake_type: str
+    """"time" (con el reloj encima), "tactical" (había una captura o un jaque
+    que ver), "endgame" (técnica de final) o "positional" (el plan)."""
+    mistakes: int
+    blunders: int
+
+
+class TimeBucketStatsOut(BaseModel):
+    """Calidad de juego con un reloj determinado (RF-3.5)."""
+
+    max_seconds_left: float | None
+    """Techo del tramo en segundos, o `null` para el tramo holgado."""
+    moves: int
+    average_accuracy: float
+    mistakes: int
+    blunders: int
+
+
+class TimeTroubleOut(BaseModel):
+    games_in_time_trouble: int
+    analyzed_games_with_clocks: int
+    share_of_games: float
 
 
 class PhaseStatsOut(BaseModel):
@@ -58,6 +91,9 @@ class PlayerStatsOut(BaseModel):
     by_month: list[MonthlyCountOut]
     by_opening: list[OpeningStatsOut]
     by_phase: list[PhaseStatsOut]
+    by_mistake_type: list[MistakeTypeStatsOut]
+    by_time_left: list[TimeBucketStatsOut]
+    time_trouble: TimeTroubleOut | None
     analyzed_games: int
     average_accuracy: float | None
 
@@ -94,9 +130,11 @@ def _stats_out(stats: PlayerStats) -> PlayerStatsOut:
         by_opening=[
             OpeningStatsOut(
                 opening=item.opening,
+                eco=item.eco,
                 color=item.color,
                 record=_record_out(item.record),
                 average_accuracy=item.average_accuracy,
+                average_opening_exit_win_percent=item.average_opening_exit_win_percent,
             )
             for item in stats.by_opening
         ],
@@ -110,6 +148,31 @@ def _stats_out(stats: PlayerStats) -> PlayerStatsOut:
             )
             for item in stats.by_phase
         ],
+        by_mistake_type=[
+            MistakeTypeStatsOut(
+                mistake_type=item.mistake_type, mistakes=item.mistakes, blunders=item.blunders
+            )
+            for item in stats.by_mistake_type
+        ],
+        by_time_left=[
+            TimeBucketStatsOut(
+                max_seconds_left=item.max_seconds_left,
+                moves=item.moves,
+                average_accuracy=item.average_accuracy,
+                mistakes=item.mistakes,
+                blunders=item.blunders,
+            )
+            for item in stats.by_time_left
+        ],
+        time_trouble=(
+            TimeTroubleOut(
+                games_in_time_trouble=stats.time_trouble.games_in_time_trouble,
+                analyzed_games_with_clocks=stats.time_trouble.analyzed_games_with_clocks,
+                share_of_games=stats.time_trouble.share_of_games,
+            )
+            if stats.time_trouble is not None
+            else None
+        ),
         analyzed_games=stats.analyzed_games,
         average_accuracy=stats.average_accuracy,
     )

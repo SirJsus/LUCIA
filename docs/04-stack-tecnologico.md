@@ -48,7 +48,7 @@ Elegido con el criterio: **maduro, gratuito, compatible con GPL-3.0, y con el me
 | -------- | ----- |
 | **chess.com Public API** (`api.chess.com/pub`) | Perfil, stats, archivos mensuales de partidas en PGN/JSON. Sin auth. Requiere `User-Agent`. |
 | **Lichess Opening Explorer API** | Teoría de aperturas (base de maestros y de jugadores por rating). Gratuito. |
-| **Lichess `chess-openings`** (CC0) | Tabla ECO → nombre de apertura, para clasificar partidas offline. |
+| **Lichess `chess-openings`** (CC0) | Tabla ECO → nombre de apertura. Es la única de esta tabla que **no** se consulta en tiempo de ejecución: se descarga a mano con `scripts/build-openings-table.py` y el resultado se versiona en `packages/core/lucia_core/openings/data/`, para que clasificar aperturas funcione sin red ([ADR-0009](adr/0009-tabla-de-aperturas-versionada.md)). |
 | **Redes Lc0** (lczero.org) y **Maia** | Pesos para Lc0. Maia: redes entrenadas para jugar como humanos de 1100–1900 Elo. |
 
 ## Infraestructura y tooling

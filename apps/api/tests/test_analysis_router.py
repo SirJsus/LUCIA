@@ -290,3 +290,65 @@ async def test_alternatives_are_not_recovered_from_a_different_configuration(
     move = await _get_first_move(db_session, analysis_id)
 
     assert move["alternatives"] == []
+
+
+async def test_analysis_detail_marks_the_critical_moments(db_session: AsyncSession) -> None:
+    """RF-2.8: las posiciones donde la partida se decidía salen con el análisis,
+    deducidas de lo ya guardado y sin volver a preguntarle al motor."""
+    game_id = await _create_game(db_session)
+    analysis = Analysis(game_id=game_id, engine="stockfish", depth=8, multipv=3, status="done")
+    db_session.add(analysis)
+    await db_session.flush()
+    db_session.add_all(
+        [
+            # Una jugada tranquila: ni cambia el signo ni había una sola opción.
+            AnalyzedMove(
+                analysis_id=analysis.id,
+                ply=0,
+                color="white",
+                san="f3",
+                uci="f2f3",
+                fen_before=chess.STARTING_FEN,
+                classification="good",
+                phase="opening",
+                move_accuracy=95.0,
+                win_percent_before=52.0,
+                win_percent_after=51.0,
+                alternatives_json=[
+                    {"score_cp": 20, "score_mate": None, "pv": ["e2e4"]},
+                    {"score_cp": 15, "score_mate": None, "pv": ["d2d4"]},
+                ],
+            ),
+            # Y una que da la vuelta a la partida.
+            AnalyzedMove(
+                analysis_id=analysis.id,
+                ply=2,
+                color="white",
+                san="g4",
+                uci="g2g4",
+                fen_before=chess.STARTING_FEN,
+                classification="blunder",
+                phase="opening",
+                move_accuracy=10.0,
+                win_percent_before=70.0,
+                win_percent_after=20.0,
+                alternatives_json=[{"score_cp": 200, "score_mate": None, "pv": ["e2e4"]}],
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    async def _session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app.dependency_overrides[get_session] = _session
+    try:
+        with TestClient(app) as http:
+            detail = http.get(f"/analysis/{analysis.id}").json()
+    finally:
+        app.dependency_overrides.clear()
+
+    assert [moment["ply"] for moment in detail["critical_moments"]] == [2]
+    moment = detail["critical_moments"][0]
+    assert "swing" in moment["kinds"]
+    assert moment["best_alternative_san"] == "e4"

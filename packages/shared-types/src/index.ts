@@ -26,6 +26,10 @@ export type RecordSummary = Schemas["RecordOut"];
 export type TimeClassStats = Schemas["TimeClassStatsOut"];
 export type OpeningStats = Schemas["OpeningStatsOut"];
 export type PhaseStats = Schemas["PhaseStatsOut"];
+export type MistakeTypeStats = Schemas["MistakeTypeStatsOut"];
+export type TimeBucketStats = Schemas["TimeBucketStatsOut"];
+export type TimeTrouble = Schemas["TimeTroubleOut"];
+export type CriticalMoment = Schemas["CriticalMomentOut"];
 export type MonthlyCount = Schemas["MonthlyCountOut"];
 export type BoardSummary = Schemas["BoardSummary"];
 export type BoardDetail = Schemas["BoardDetail"];
@@ -47,6 +51,16 @@ export type MoveClassification =
   | "missed_win";
 
 export type GamePhase = "opening" | "middlegame" | "endgame";
+
+/** Por qué falló una jugada (`lucia_core.insights.mistake_type`, RF-3.4). Como
+ * las clasificaciones, el OpenAPI lo expone como `string` y este tipo es la
+ * fuente de verdad para la UI. */
+export type MistakeType = "time" | "tactical" | "endgame" | "positional";
+
+/** Por qué una posición era crítica (`lucia_core.insights`, RF-2.8): solo
+ * valía una jugada, la partida cambió de manos, o había una ganada y se
+ * escapó. */
+export type CriticalMomentKind = "only_move" | "swing" | "missed_chance";
 
 /** Eventos que emite `WS /ws/analysis/{id}`. No están en el OpenAPI: el
  * esquema no describe WebSockets. */
