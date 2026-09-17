@@ -32,17 +32,8 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db.models import Analysis, AnalyzedMove, Game
+from lucia_api.services.games import is_player, outcome_of, player_color, player_side
 from lucia_api.services.insights import latest_analysis_ids, player_move_contexts
-
-#: Valores de `white_result`/`black_result` de chess.com que significan tablas.
-DRAW_RESULTS = (
-    "agreed",
-    "repetition",
-    "stalemate",
-    "insufficient",
-    "50move",
-    "timevsinsufficient",
-)
 
 
 @dataclass
@@ -147,52 +138,16 @@ class PlayerStats:
     average_accuracy: float | None = None
 
 
-def _is_white(username: str):
-    """Comparación insensible a mayúsculas.
-
-    chess.com devuelve el perfil con el nombre canónico en minúsculas
-    (`sirjsus`) pero dentro del PGN aparece como lo escribió el jugador
-    (`SirJsus`). Comparando tal cual, buscar por el nombre del perfil no
-    encontraría ninguna de sus propias partidas.
-    """
-    return func.lower(Game.white_username) == username.lower()
-
-
-def _is_black(username: str):
-    return func.lower(Game.black_username) == username.lower()
-
-
-def _outcome_for(username: str):
-    """Expresión SQL que traduce el resultado de la partida al del jugador.
-
-    chess.com guarda el resultado por bando ("win", "checkmated"...), así que
-    hay que mirar de qué color jugó el usuario en cada partida.
-    """
-    player_result = case(
-        (_is_white(username), Game.white_result),
-        else_=Game.black_result,
-    )
-    return case(
-        (player_result == "win", "win"),
-        (player_result.in_(DRAW_RESULTS), "draw"),
-        else_="loss",
-    )
-
-
-def _is_player(username: str):
-    return _is_white(username) | _is_black(username)
-
-
 async def get_player_stats(
     session: AsyncSession, username: str, limit_openings: int = 10
 ) -> PlayerStats:
-    outcome = _outcome_for(username)
+    outcome = outcome_of(username)
 
     # --- Resultados globales y por control de tiempo (RF-3.1) ---
     outcome_rows = (
         await session.execute(
             select(Game.time_class, outcome.label("outcome"), func.count())
-            .where(_is_player(username))
+            .where(is_player(username))
             .group_by(Game.time_class, "outcome")
         )
     ).all()
@@ -211,7 +166,7 @@ async def get_player_stats(
     monthly_rows = (
         await session.execute(
             select(Game.year, Game.month, func.count())
-            .where(_is_player(username))
+            .where(is_player(username))
             .group_by(Game.year, Game.month)
             .order_by(Game.year, Game.month)
         )
@@ -281,11 +236,11 @@ def _add(record: RecordSummary, outcome: str, game_count: int) -> None:
 
 async def _current_ratings(session: AsyncSession, username: str) -> dict[str, int]:
     """Rating por control de tiempo, tomado de la partida más reciente."""
-    player_rating = case((_is_white(username), Game.white_rating), else_=Game.black_rating)
+    player_rating = player_side(username, Game.white_rating, Game.black_rating)
     rating_rows = (
         await session.execute(
             select(Game.time_class, player_rating, Game.played_at)
-            .where(_is_player(username))
+            .where(is_player(username))
             .order_by(Game.played_at.desc())
         )
     ).all()
@@ -304,16 +259,13 @@ async def _accuracy_summary(session: AsyncSession, username: str) -> tuple[int, 
     toma su análisis más reciente, igual que en el reparto por fases y en los
     patrones, o la misma partida contaría dos veces y la media saldría torcida.
     """
-    player_accuracy = case(
-        (_is_white(username), Analysis.white_accuracy),
-        else_=Analysis.black_accuracy,
-    )
+    player_accuracy = player_side(username, Analysis.white_accuracy, Analysis.black_accuracy)
     accuracy_row = (
         await session.execute(
             select(func.count(), func.avg(player_accuracy))
             .select_from(Analysis)
             .join(Game, Analysis.game_id == Game.id)
-            .where(_is_player(username), Analysis.id.in_(latest_analysis_ids()))
+            .where(is_player(username), Analysis.id.in_(latest_analysis_ids()))
         )
     ).one()
     analyzed_games, average_accuracy = accuracy_row
@@ -326,8 +278,8 @@ async def _opening_stats(
     limit: int,
     move_contexts: list[tuple[int, MoveContext]],
 ) -> list[OpeningStats]:
-    color = case((_is_white(username), "white"), else_="black")
-    outcome = _outcome_for(username)
+    color = player_color(username)
+    outcome = outcome_of(username)
 
     opening_rows = (
         await session.execute(
@@ -338,7 +290,7 @@ async def _opening_stats(
                 outcome.label("outcome"),
                 func.count(),
             )
-            .where(_is_player(username), Game.opening_name.is_not(None))
+            .where(is_player(username), Game.opening_name.is_not(None))
             .group_by(Game.opening_name, Game.opening_eco, "color", "outcome")
         )
     ).all()
@@ -375,18 +327,15 @@ async def _accuracy_by_opening(
 ) -> dict[tuple[str, str], float]:
     """Precisión media del usuario en cada apertura, solo con las partidas que
     ya tienen análisis terminado."""
-    color = case((_is_white(username), "white"), else_="black")
-    player_accuracy = case(
-        (_is_white(username), Analysis.white_accuracy),
-        else_=Analysis.black_accuracy,
-    )
+    color = player_color(username)
+    player_accuracy = player_side(username, Analysis.white_accuracy, Analysis.black_accuracy)
     accuracy_rows = (
         await session.execute(
             select(Game.opening_name, color.label("color"), func.avg(player_accuracy))
             .select_from(Analysis)
             .join(Game, Analysis.game_id == Game.id)
             .where(
-                _is_player(username),
+                is_player(username),
                 Analysis.id.in_(latest_analysis_ids()),
                 Game.opening_name.is_not(None),
             )
@@ -410,9 +359,9 @@ async def _opening_exit_by_opening(
     """
     opening_rows = (
         await session.execute(
-            select(
-                Game.id, Game.opening_name, case((_is_white(username), "white"), else_="black")
-            ).where(_is_player(username), Game.opening_name.is_not(None))
+            select(Game.id, Game.opening_name, player_color(username)).where(
+                is_player(username), Game.opening_name.is_not(None)
+            )
         )
     ).all()
     opening_by_game = {
@@ -441,7 +390,7 @@ async def _phase_stats(session: AsyncSession, username: str) -> list[PhaseStats]
     Solo cuentan las jugadas *del usuario*: mezclar las del rival diría más
     sobre cómo juega el otro que sobre uno mismo.
     """
-    player_color = case((_is_white(username), "white"), else_="black")
+    color = player_color(username)
     win_percent_lost = AnalyzedMove.win_percent_before - AnalyzedMove.win_percent_after
 
     phase_rows = (
@@ -457,9 +406,9 @@ async def _phase_stats(session: AsyncSession, username: str) -> list[PhaseStats]
             .join(Analysis, AnalyzedMove.analysis_id == Analysis.id)
             .join(Game, Analysis.game_id == Game.id)
             .where(
-                _is_player(username),
+                is_player(username),
                 Analysis.id.in_(latest_analysis_ids()),
-                AnalyzedMove.color == player_color,
+                AnalyzedMove.color == color,
             )
             .group_by(AnalyzedMove.phase)
         )

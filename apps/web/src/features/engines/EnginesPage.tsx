@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
+import { FieldLabel } from "../../components/FieldLabel";
 import { ErrorBox, Spinner, SuccessBox, WarningBox } from "../../components/Feedback";
 import { FIELD_CLASSES, PANEL_CLASSES } from "../../components/styles";
 import { api } from "../../lib/api";
@@ -193,11 +194,7 @@ function NumberField({
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="text-sm">
-      {/* Mismo tono que las etiquetas de campo del resto de pantallas: aquí
-          iban a opacidad plena y el nombre del campo pesaba más que su valor
-          (criterio C-2). */}
-      <span className="block opacity-70">{label}</span>
+    <FieldLabel label={label} hint={hint}>
       <input
         type="number"
         value={value}
@@ -205,12 +202,8 @@ function NumberField({
         max={max}
         step={step}
         onChange={(event) => onChange(Number(event.target.value))}
-        className={`mt-1 w-full ${FIELD_CLASSES}`}
+        className={`w-full ${FIELD_CLASSES}`}
       />
-      {/* El texto de ayuda va en `opacity-60`, como el de las dos pantallas de
-          tablero y el del gráfico; `opacity-50` está reservado al número de
-          jugada. */}
-      <span className="mt-0.5 block text-xs opacity-60">{hint}</span>
-    </label>
+    </FieldLabel>
   );
 }

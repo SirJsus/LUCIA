@@ -7,6 +7,7 @@ import { useState } from "react";
 import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { CustomPositionBadge } from "../../components/CustomPositionBadge";
+import { FieldLabel } from "../../components/FieldLabel";
 import { EmptyState, ErrorBox, Spinner } from "../../components/Feedback";
 import { buttonClasses, FIELD_CLASSES, PANEL_CLASSES } from "../../components/styles";
 import { api } from "../../lib/api";
@@ -78,21 +79,20 @@ export function BoardsPage() {
         className={`space-y-3 p-4 ${PANEL_CLASSES}`}
       >
         <div className="flex flex-wrap gap-3">
-          <label className="text-sm">
-            <span className="mb-1 block opacity-70">Título</span>
+          <FieldLabel label="Título">
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Mi partida del club"
               className={`w-64 ${FIELD_CLASSES}`}
             />
-          </label>
+          </FieldLabel>
         </div>
 
-        <label className="block text-sm">
-          <span className="mb-1 block opacity-70">
-            FEN o PGN de partida (opcional; vacío = posición inicial)
-          </span>
+        <FieldLabel
+          label="FEN o PGN de partida"
+          hint="Opcional: vacío empieza en la posición inicial."
+        >
           <textarea
             value={source}
             onChange={(event) => setSource(event.target.value)}
@@ -100,7 +100,7 @@ export function BoardsPage() {
             placeholder="rnbqkbnr/pppppppp/... o 1. e4 e5 2. Nf3"
             className={`w-full font-mono text-xs ${FIELD_CLASSES}`}
           />
-        </label>
+        </FieldLabel>
 
         {/* El error de validación usa el mismo recuadro que el de la API:
             antes uno era un párrafo rojo suelto y el otro un `ErrorBox`, a dos

@@ -149,6 +149,39 @@ guardando como dato de origen, pero ya no se usa para agrupar. La tabla se
 versiona en el repositorio en vez de descargarse
 ([ADR-0009](adr/0009-tabla-de-aperturas-versionada.md)).
 
+**Con qué reglas se cumplió RF-3.6** (**2026-09-10**). El texto del
+requerimiento no cambia; esto es la lectura concreta que se le dio, y los
+umbrales son constantes con nombre en `lucia_api.services.repertoire`,
+ajustables sin tocar el requerimiento ni [ADR-0010](adr/0010-repertorio-con-red-y-cacheado.md).
+
+- **Hasta dónde se compara**: las primeras **8 jugadas de cada bando**. Más
+  allá, "salirse de la teoría" deja de ser una decisión de repertorio y pasa a
+  ser jugar al ajedrez.
+- **Qué cuenta como repertorio**: que la jugada aparezca en la base de maestros
+  en al menos **5 partidas**. Con una o dos no es la línea principal, es una
+  anécdota; y si la posición entera tiene menos de esas 5 partidas, ya se está
+  fuera del libro y no hay de qué salirse.
+- **Se para al salir.** De cada partida solo interesa la **primera** jugada
+  propia fuera del repertorio: a partir de ahí lo que se juegue no dice nada de
+  la preparación, ni siquiera si transpone de vuelta a una posición conocida
+  por casualidad. Es la misma regla con la que `lucia_core.openings` nombra la
+  apertura.
+- **Solo las decisiones propias**, y solo en partidas que empiezan en la
+  posición estándar: sin teoría de la que salirse no hay repertorio que
+  comparar (las mismas que quedan fuera de la tabla de aperturas de RF-3.2).
+- **Las salidas se agrupan** por color, jugada y momento, con el marcador de
+  todas las partidas que se salen por ahí: la pregunta es de hábito —"esto lo
+  hago ocho veces y saco un 25 %"—, no de una partida suelta. Salirse de la
+  teoría no es un error; lo que dice algo es la puntuación que se saca al
+  hacerlo.
+- **La fuente es la base de maestros** del Lichess Opening Explorer, no la de
+  partidas de Lichess: la comparación que pide el requerimiento es contra la
+  línea principal, no contra lo que juega todo el mundo.
+
+Cuánta teoría se sabe en cada momento es parte de la respuesta
+(`positions_missing`), y la pantalla lo dice siempre: ver la nota de RNF-1 más
+abajo.
+
 ### RF-4 · Entrenamiento
 
 | ID | Requerimiento | Prioridad |
@@ -169,6 +202,31 @@ versiona en el repositorio en vez de descargarse
 | RF-5.4 | Panel de configuración de motores (ruta, hilos, hash, profundidad, MultiPV, red de Lc0). | P0 |
 | RF-5.5 | Exportar partida analizada a PGN con comentarios y variantes. | P1 |
 | RF-5.6 | Tema oscuro/claro, responsive. | P1 |
+
+**Qué filtra el listado de partidas** (**2026-09-09**). RF-5.3 nombra seis
+criterios (fecha, color, resultado, apertura, control, rival); al implementarlos
+se decidió lo siguiente, que el texto congelado no dice:
+
+- **Color, resultado y rival necesitan saber de quién se habla, y sin
+  `username` se ignoran.** Una fila de `games` no dice quién ganó, dice qué le
+  pasó a las blancas y qué a las negras: "ganadas" o "contra fulano" no
+  significan nada hasta fijar el jugador. Aplicarlos a medias —por ejemplo,
+  entendiendo "ganadas" como "las que ganaron las blancas"— daría un resultado
+  plausible y equivocado, que es peor que no filtrar; la interfaz los deshabilita
+  y dice por qué. Las expresiones SQL de "de qué color jugó y qué le pasó" son
+  las mismas que usan las estadísticas de RF-3 y viven en un solo sitio
+  (`apps/api/lucia_api/services/games.py`).
+- **La apertura se busca por parte del nombre**, no por coincidencia exacta, para
+  que "sicilian" traiga todas las sicilianas. El nombre es el de la clasificación
+  propia (`games.opening_name`, ver la nota de RF-3.2), así que las partidas que
+  no empiezan en la posición estándar no salen con ningún filtro de apertura: no
+  tienen apertura que nombrar.
+- **Las fechas son inclusivas por los dos lados**: quien filtra "hasta el 5"
+  espera las partidas del 5 enteras, no las de hasta su medianoche.
+- La respuesta trae en la cabecera `X-Total-Count` cuántas partidas cumplen los
+  filtros sin paginar, para poder decir "25 de 324" y no solo el número de
+  página. Va en cabecera para no envolver la lista y cambiar la forma del
+  endpoint.
 
 ### RF-6 · Tablero de análisis (partidas "IRL" y posiciones libres)
 
@@ -253,6 +311,25 @@ razonada en [ADR-0007](adr/0007-alternativas-por-jugada-json-y-cache.md):
 | RNF-8 | **Calidad**: tests unitarios para clasificación de jugadas y cálculo de precisión (son el corazón del producto); CI en cada push. |
 | RNF-9 | **Extensibilidad**: cualquier motor UCI debe poder enchufarse (Komodo, Berserk, etc.) sin cambiar el núcleo. |
 | RNF-10 | **Respeto a terceros**: cumplir los términos de la API pública de chess.com (User-Agent identificable, no scraping, no paralelismo agresivo). |
+
+**RNF-1 y la única cosa que necesita red** (**2026-09-10**). El texto de RNF-1
+—"la app funciona 100 % offline tras la importación inicial"— se escribió antes
+de implementar RF-3.6, y la comparación de repertorio es el primer y único
+punto en que LUCIA necesita red **mientras se usa**, no solo al importar: la
+teoría son millones de partidas de maestros y no caben en el repositorio como
+cupo la tabla ECO ([ADR-0009](adr/0009-tabla-de-aperturas-versionada.md)). El
+requerimiento **no se reescribe** —está congelado en el alcance de v1.0—, pero
+se lee así: *todo LUCIA funciona sin conexión, incluida esta pantalla, que
+enseña la comparación con la teoría que ya se preguntó y avisa de lo que le
+falta; lo único que no se puede hacer sin red es **ampliar** el conocimiento de
+teoría*. Eso se sostiene con tres reglas, razonadas en
+[ADR-0010](adr/0010-repertorio-con-red-y-cacheado.md): consultar solo cuando el
+usuario lo pide (`POST /repertoire/refresh`), guardar todo lo consultado
+(`explorer_positions`) y calcular la comparación **siempre** sobre lo guardado
+(`GET /repertoire` no sale a internet nunca). Ninguna otra función puede añadir
+dependencias de red sin su propio ADR; la regla de RNF-10 —`User-Agent`
+identificable, peticiones secuenciales y espaciadas, sin scraping— vale igual
+para Lichess que para chess.com.
 
 **RNF-5 y los datos de terceros que viajan dentro del repositorio.** La licencia
 cubre el código, pero desde el 2026-09-09 el repositorio incluye además un dato
@@ -361,4 +438,4 @@ Notas técnicas, para cuando se retome:
 
 | ID | Requerimiento |
 | ---- | --------------- |
-| RNF-11 | La interfaz se comporta igual en todas las pantallas: paridad entre lo que se puede hacer con el teclado y lo que hay como control visible, mismo nombre y misma posición para la misma acción, estados explícitos de lo que está haciendo el sistema (en cola, trabajando con progreso, listo, vacío, error), estados de carga/error/vacío compartidos, un solo formato por dato, y ningún número del motor sin etiqueta o representación visual que lo explique. Los criterios verificables están en [docs/07-coherencia-ui.md](07-coherencia-ui.md), donde también se lleva el inventario de incumplimientos: vacío, con las 55 filas que llegó a tener cerradas. |
+| RNF-11 | La interfaz se comporta igual en todas las pantallas: paridad entre lo que se puede hacer con el teclado y lo que hay como control visible, mismo nombre y misma posición para la misma acción, estados explícitos de lo que está haciendo el sistema (en cola, trabajando con progreso, listo, vacío, error), estados de carga/error/vacío compartidos, un solo formato por dato, y ningún número del motor sin etiqueta o representación visual que lo explique. Los criterios verificables están en [docs/07-coherencia-ui.md](07-coherencia-ui.md), donde también se lleva el inventario de incumplimientos: vacío, con las 63 filas que llegó a tener cerradas. |

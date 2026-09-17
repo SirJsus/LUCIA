@@ -5,12 +5,13 @@ import { Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button } from "../../components/Button";
 import { CustomPositionBadge } from "../../components/CustomPositionBadge";
+import { FieldLabel } from "../../components/FieldLabel";
 import { EmptyState, ErrorBox, Spinner, SuccessBox } from "../../components/Feedback";
 import { DataTable } from "../../components/DataTable";
+import { FilterBar, FilterSelect, FilterText } from "../../components/FilterBar";
 import {
   buttonClasses,
   FIELD_CLASSES,
-  PANEL_CLASSES,
   TABLE_CELL_CLASSES,
   TABLE_ROW_CLASSES,
 } from "../../components/styles";
@@ -18,6 +19,18 @@ import { api, type GameFilters } from "../../lib/api";
 import { formatDate, formatTimeClass, formatTimeControl, gameResult } from "../../lib/format";
 
 const TIME_CLASSES = ["bullet", "blitz", "rapid", "daily"] as const;
+
+/** Por qué hay tres filtros deshabilitados. Se dice una vez en la barra y no
+ * en cada campo: es el mismo motivo, y repetirlo tres veces es ruido. En un
+ * `title` no valdría —con teclado no aparece nunca— y estos campos, además,
+ * no se pueden ni tabular estando deshabilitados (criterios C-1 y C-3 de
+ * docs/07-coherencia-ui.md). */
+const PLAYER_FIRST_HINT =
+  "Color, resultado y rival necesitan un jugador: la misma partida es victoria para uno y derrota para el otro.";
+
+/** Las dos fechas son inclusivas, y se dice con las mismas palabras en las
+ * dos: "desde el 1" y "hasta el 31" cubren el 1 y el 31 enteros. */
+const DATE_HINT = "Incluye el día indicado";
 const PAGE_SIZE = 25;
 
 export function GamesPage() {
@@ -42,6 +55,10 @@ export function GamesPage() {
   }
 
   const page = Math.floor((filters.offset ?? 0) / PAGE_SIZE) + 1;
+  // Todo lo que hay en `filters` menos la paginación, que no filtra nada.
+  const hasFilters = Object.entries(filters).some(
+    ([key, value]) => key !== "limit" && key !== "offset" && value !== undefined,
+  );
 
   return (
     <div className="space-y-6">
@@ -55,15 +72,14 @@ export function GamesPage() {
             syncMutation.mutate();
           }}
         >
-          <label className="text-sm">
-            <span className="mb-1 block opacity-70">Sincronizar desde chess.com</span>
+          <FieldLabel label="Sincronizar desde chess.com">
             <input
               value={syncUsername}
               onChange={(event) => setSyncUsername(event.target.value)}
               placeholder="usuario (o el de .env)"
               className={`w-56 ${FIELD_CLASSES}`}
             />
-          </label>
+          </FieldLabel>
           <Button type="submit" variant="primary" disabled={syncMutation.isPending}>
             {syncMutation.isPending ? "Sincronizando…" : "Sincronizar"}
           </Button>
@@ -78,81 +94,129 @@ export function GamesPage() {
         </SuccessBox>
       )}
 
-      <div className={`flex flex-wrap gap-3 p-3 text-sm ${PANEL_CLASSES}`}>
-        <label className="flex flex-col gap-1">
-          <span className="opacity-70">Jugador</span>
-          <input
-            value={filters.username ?? ""}
-            onChange={(event) => updateFilter({ username: event.target.value || undefined })}
-            placeholder="cualquiera"
-            className={`w-44 ${FIELD_CLASSES}`}
-          />
-        </label>
+      <FilterBar>
+        <FilterText
+          label="Jugador"
+          value={filters.username ?? ""}
+          onChange={(username) => updateFilter({ username: username || undefined })}
+          placeholder="cualquiera"
+          width="w-44"
+        />
 
-        <label className="flex flex-col gap-1">
-          <span className="opacity-70">Color</span>
-          <select
-            value={filters.color ?? ""}
-            onChange={(event) =>
-              updateFilter({ color: (event.target.value || undefined) as GameFilters["color"] })
-            }
-            disabled={!filters.username}
-            title={filters.username ? undefined : "Elige un jugador primero"}
-            className={`w-32 disabled:opacity-50 ${FIELD_CLASSES}`}
-          >
-            <option value="">Ambos</option>
-            <option value="white">Blancas</option>
-            <option value="black">Negras</option>
-          </select>
-        </label>
+        {/* Color, resultado y rival dependen de quién sea el jugador: la misma
+            partida es victoria para uno y derrota para el otro. Sin jugador la
+            API los ignora, y aquí se deshabilitan para que no parezca que
+            filtran (criterio C-3). */}
+        <FilterSelect
+          label="Color"
+          value={filters.color ?? ""}
+          onChange={(color) => updateFilter({ color: (color || undefined) as GameFilters["color"] })}
+          options={[
+            ["", "Ambos"],
+            ["white", "Blancas"],
+            ["black", "Negras"],
+          ]}
+          disabled={!filters.username}
+        />
 
-        <label className="flex flex-col gap-1">
-          <span className="opacity-70">Control</span>
-          <select
-            value={filters.time_class ?? ""}
-            onChange={(event) => updateFilter({ time_class: event.target.value || undefined })}
-            className={`w-32 ${FIELD_CLASSES}`}
-          >
-            <option value="">Todos</option>
-            {TIME_CLASSES.map((timeClass) => (
-              <option key={timeClass} value={timeClass}>
-                {formatTimeClass(timeClass)}
-              </option>
-            ))}
-          </select>
-        </label>
+        <FilterSelect
+          label="Resultado"
+          value={filters.result ?? ""}
+          onChange={(result) =>
+            updateFilter({ result: (result || undefined) as GameFilters["result"] })
+          }
+          options={[
+            ["", "Todos"],
+            ["win", "Victorias"],
+            ["draw", "Tablas"],
+            ["loss", "Derrotas"],
+          ]}
+          disabled={!filters.username}
+        />
 
-        <label className="flex flex-col gap-1">
-          <span className="opacity-70">Puntuadas</span>
-          <select
-            value={filters.rated === undefined ? "" : String(filters.rated)}
-            onChange={(event) =>
-              updateFilter({
-                rated: event.target.value === "" ? undefined : event.target.value === "true",
-              })
-            }
-            className={`w-32 ${FIELD_CLASSES}`}
-          >
-            <option value="">Todas</option>
-            <option value="true">Sí</option>
-            <option value="false">No</option>
-          </select>
-        </label>
-      </div>
+        <FilterText
+          label="Rival"
+          value={filters.opponent ?? ""}
+          onChange={(opponent) => updateFilter({ opponent: opponent || undefined })}
+          placeholder="cualquiera"
+          disabled={!filters.username}
+        />
+
+        <FilterText
+          label="Apertura"
+          value={filters.opening ?? ""}
+          onChange={(opening) => updateFilter({ opening: opening || undefined })}
+          placeholder="p. ej. siciliana"
+          hint="Busca por parte del nombre: «sicilian» trae todas las sicilianas"
+          width="w-48"
+        />
+
+        {/* Las dos fechas incluyen el día que se escribe en ellas, que es lo
+            que hace la API; sin decirlo, "hasta el 31" se lee igual de bien
+            como "hasta la medianoche del 31" (criterio C-6). */}
+        <FilterText
+          label="Desde"
+          type="date"
+          value={filters.since ?? ""}
+          onChange={(since) => updateFilter({ since: since || undefined })}
+          hint={DATE_HINT}
+        />
+
+        <FilterText
+          label="Hasta"
+          type="date"
+          value={filters.until ?? ""}
+          onChange={(until) => updateFilter({ until: until || undefined })}
+          hint={DATE_HINT}
+        />
+
+        <FilterSelect
+          label="Control"
+          value={filters.time_class ?? ""}
+          onChange={(timeClass) => updateFilter({ time_class: timeClass || undefined })}
+          options={[
+            ["", "Todos"],
+            ...TIME_CLASSES.map((timeClass) => [timeClass, formatTimeClass(timeClass)] as const),
+          ]}
+        />
+
+        <FilterSelect
+          label="Puntuadas"
+          value={filters.rated === undefined ? "" : String(filters.rated)}
+          onChange={(rated) =>
+            updateFilter({ rated: rated === "" ? undefined : rated === "true" })
+          }
+          options={[
+            ["", "Todas"],
+            ["true", "Sí"],
+            ["false", "No"],
+          ]}
+        />
+        {!filters.username && (
+          <p className="w-full text-xs opacity-60">{PLAYER_FIRST_HINT}</p>
+        )}
+      </FilterBar>
 
       {gamesQuery.isPending && <Spinner />}
       {gamesQuery.isError && <ErrorBox error={gamesQuery.error} onRetry={gamesQuery.refetch} />}
 
-      {gamesQuery.data && gamesQuery.data.length === 0 && (
-        <EmptyState title="No hay partidas con esos filtros">
-          Si es la primera vez, sincroniza tu usuario de chess.com con el formulario de arriba.
+      {gamesQuery.data && gamesQuery.data.games.length === 0 && (
+        // Con nueve filtros, un vacío casi siempre es cosa de uno de ellos, y
+        // con ninguno puesto nunca lo es: decir "con esos filtros" cuando no
+        // hay filtros manda a buscar lo que no existe (criterio C-3).
+        <EmptyState
+          title={hasFilters ? "No hay partidas con esos filtros" : "Todavía no hay partidas"}
+        >
+          {hasFilters
+            ? "Prueba a quitar alguno: el rango de fechas y la apertura son los que más recortan."
+            : "Sincroniza tu usuario de chess.com con el formulario de arriba."}
         </EmptyState>
       )}
 
-      {gamesQuery.data && gamesQuery.data.length > 0 && (
+      {gamesQuery.data && gamesQuery.data.games.length > 0 && (
         <>
           <DataTable headers={["Fecha", "Blancas", "Negras", "Resultado", "Control", ""]}>
-            {gamesQuery.data.map((game) => (
+            {gamesQuery.data.games.map((game) => (
               <tr key={game.id} className={TABLE_ROW_CLASSES}>
                 <td className={`whitespace-nowrap opacity-70 ${TABLE_CELL_CLASSES}`}>
                   {formatDate(game.played_at)}
@@ -199,10 +263,15 @@ export function GamesPage() {
             >
               ← Anterior
             </Button>
-            <span className="opacity-70">Página {page}</span>
+            {/* Cuántas se ven de cuántas cumplen el filtro: solo el número de
+                página no dice si el filtro dejó fuera media colección
+                (criterio C-3). */}
+            <span className="opacity-70">
+              Página {page} · {gamesQuery.data.games.length} de {gamesQuery.data.total} partidas
+            </span>
             <Button
               size="sm"
-              disabled={gamesQuery.data.length < PAGE_SIZE}
+              disabled={gamesQuery.data.games.length < PAGE_SIZE}
               onClick={() =>
                 setFilters((current) => ({
                   ...current,

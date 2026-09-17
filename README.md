@@ -15,6 +15,7 @@ LUCIA/
 │   ├── core/           # Python: puente UCI con Stockfish/Lc0, clasificación de jugadas, métricas,
 │   │                   #   patrones de juego y tabla ECO de aperturas (datos incluidos)
 │   ├── chesscom/       # Python: cliente de la API pública de chess.com (perfil, archivos PGN)
+│   ├── lichess/        # Python: cliente del Opening Explorer de Lichess (teoría de aperturas)
 │   └── shared-types/   # TypeScript: tipos compartidos API <-> web (generados desde OpenAPI)
 ├── engines/            # Sub-módulos git: stockfish/ y lc0/ (fuente C++, compilado a engines/bin/)
 ├── infra/docker/       # docker-compose y Docker-files
@@ -53,8 +54,14 @@ desde chess.com), **Visor** (tablero, jugadas clasificadas, gráfico de
 evaluación y análisis con progreso en vivo), **Tableros** (análisis libre desde
 FEN o PGN, con árbol de variantes y motor en vivo), **Estadísticas** (marcador,
 ratings, aperturas con su código ECO, en qué fase se pierde más ventaja, de qué
-tipo son los errores y qué pasa cuando baja el reloj) y **Motores**
-(profundidad, MultiPV, hilos y hash, editables).
+tipo son los errores, qué pasa cuando baja el reloj y dónde te sales de la
+teoría de maestros) y **Motores** (profundidad, MultiPV, hilos y hash,
+editables).
+
+Todo funciona sin conexión salvo dos cosas, y las dos las pides tú: importar
+partidas de chess.com y traer teoría de aperturas nueva del Opening Explorer de
+Lichess (RF-3.6). Lo ya traído se consulta offline como el resto — ver
+[ADR-0010](docs/adr/0010-repertorio-con-red-y-cacheado.md).
 
 Ctrl+C apaga todos los servicios. Los logs también quedan en `data/logs/<servicio>.log`.
 

@@ -13,8 +13,7 @@ SemVer para la serie `0.x`).
 
 Camino a v1.0.0 — ver progreso en [docs/05-roadmap.md](docs/05-roadmap.md) y
 alcance congelado en [docs/02-requerimientos.md](docs/02-requerimientos.md).
-De la **fase 2** quedan siete ítems: repertorio contra Lichess Explorer
-(RF-3.6), importación de PGN manual (RF-1.5), filtros de `/games` (RF-5.3),
+De la **fase 2** quedan cinco ítems: importación de PGN manual (RF-1.5),
 tendencias (RF-3.7), extras del tablero de análisis (RF-6.6 a 6.9), capa de
 ocupación (RF-7.1 a 7.7) y exportación de PGN anotado.
 Después, las fases 3 y 4.
@@ -26,10 +25,36 @@ sparring calibrado de RF-4.3, ambos alcance de 1.0), **RF-9 · Comparación de
 evaluaciones entre motores** (ampliación de RF-2.6, sin fase propia) y
 **RNF-11 · Coherencia de interfaz**, criterio permanente cuyos incumplimientos
 concretos se arreglaron dentro de 1.0: su inventario en
-[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) está vacío, con las 55
+[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) está vacío, con las 63
 filas que llegó a tener cerradas.
 
 ### Añadido
+
+- **Comparación de repertorio con la teoría de maestros** (RF-3.6), en
+  Estadísticas: dónde te sales de la línea principal, qué juegan los maestros
+  en su lugar y qué puntuación sacas cuando lo haces. Las salidas se agrupan,
+  porque lo que dice algo es el patrón, no la partida suelta.
+  - **Es lo único de LUCIA que necesita red mientras se usa**, así que va con
+    su decisión escrita ([ADR-0010](docs/adr/0010-repertorio-con-red-y-cacheado.md)):
+    `GET /repertoire` nunca sale a internet y dice cuántas posiciones le faltan
+    por saber; `POST /repertoire/refresh` es lo único que consulta, y solo
+    cuando se pulsa. Todo lo consultado se guarda en `explorer_positions`
+    (migración `b4e8c17f0a92`).
+  - Cliente propio en `packages/lichess`, con las mismas reglas de cortesía que
+    el de chess.com: `User-Agent` con contacto, una consulta por segundo,
+    backoff ante `429` y tope por llamada.
+  - **Necesita un token de Lichess** (`LICHESS_TOKEN`), gratuito y sin
+    permisos: el Opening Explorer dejó de admitir peticiones anónimas. La
+    pantalla lo dice antes de que se pulse nada, con el enlace donde se saca, y
+    sin él sigue enseñando lo que ya se consultó.
+
+- **Filtros de partidas por apertura, fechas, rival y resultado** (lo que
+  faltaba de RF-5.3). `GET /games` acepta `opening` (subcadena del nombre, así
+  que "sicilian" trae todas las sicilianas), `since` y `until` (fechas
+  inclusivas por los dos lados), `opponent` y `result`. Los tres que dependen
+  de quién sea el jugador —color, resultado y rival— se ignoran sin `username`
+  y en la pantalla salen deshabilitados diciendo por qué: la misma partida es
+  victoria para uno y derrota para el otro.
 
 - **Tabla de aperturas propia** (`lucia_core.openings`), con la clasificación
   ECO de [chess-openings de Lichess](https://github.com/lichess-org/chess-openings)

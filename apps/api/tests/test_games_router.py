@@ -207,3 +207,123 @@ async def test_list_games_flags_the_ones_from_a_custom_position(
 
     assert games[standard_id]["starts_from_custom_position"] is False
     assert games[odds_id]["starts_from_custom_position"] is True
+
+
+async def test_list_games_filters_by_result_from_the_player_side(
+    db_session: AsyncSession,
+) -> None:
+    """RF-5.3: "ganadas" depende de con qué color jugó cada uno, así que la
+    misma partida es victoria para uno y derrota para el otro."""
+    await _create_game(db_session, platform_id="won", white="ana", black="beto")
+    await _create_game(db_session, platform_id="lost", white="beto", black="ana")
+    _override(db_session)
+    try:
+        with TestClient(app) as http:
+            ana_wins = http.get("/games", params={"username": "ana", "result": "win"}).json()
+            beto_wins = http.get("/games", params={"username": "beto", "result": "win"}).json()
+            ana_losses = http.get("/games", params={"username": "ana", "result": "loss"}).json()
+    finally:
+        app.dependency_overrides.clear()
+
+    # `_create_game` deja siempre ganando a las blancas.
+    assert [game["white_username"] for game in ana_wins] == ["ana"]
+    assert [game["white_username"] for game in beto_wins] == ["beto"]
+    assert [game["black_username"] for game in ana_losses] == ["ana"]
+
+
+async def test_list_games_filters_by_opponent(db_session: AsyncSession) -> None:
+    await _create_game(db_session, platform_id="vs-beto", white="ana", black="beto")
+    await _create_game(db_session, platform_id="vs-caro", white="caro", black="ana")
+    _override(db_session)
+    try:
+        with TestClient(app) as http:
+            versus_caro = http.get("/games", params={"username": "ana", "opponent": "caro"}).json()
+    finally:
+        app.dependency_overrides.clear()
+
+    # El rival está al otro lado del tablero, juegue ana de blancas o de negras.
+    assert len(versus_caro) == 1
+    assert versus_caro[0]["white_username"] == "caro"
+
+
+async def test_a_filter_that_needs_a_player_is_ignored_without_one(
+    db_session: AsyncSession,
+) -> None:
+    """Sin `username`, "ganadas" o "contra fulano" no significan nada: se
+    ignoran en vez de devolver algo plausible y equivocado."""
+    await _create_game(db_session, platform_id="una", white="ana", black="beto")
+    _override(db_session)
+    try:
+        with TestClient(app) as http:
+            without_player = http.get("/games", params={"result": "loss"}).json()
+    finally:
+        app.dependency_overrides.clear()
+
+    assert len(without_player) == 1
+
+
+async def test_list_games_filters_by_opening_substring(db_session: AsyncSession) -> None:
+    """Buscar "sicilian" trae todas las sicilianas, no solo la variante que se
+    escriba entera."""
+    najdorf = await _create_game(db_session, platform_id="naj", white="ana", black="beto")
+    najdorf.opening_name = "Sicilian Defense: Najdorf Variation"
+    dragon = await _create_game(db_session, platform_id="dra", white="ana", black="beto")
+    dragon.opening_name = "Sicilian Defense: Dragon Variation"
+    italian = await _create_game(db_session, platform_id="ita", white="ana", black="beto")
+    italian.opening_name = "Italian Game"
+    await db_session.commit()
+
+    _override(db_session)
+    try:
+        with TestClient(app) as http:
+            sicilians = http.get("/games", params={"opening": "sicilian"}).json()
+            najdorfs = http.get("/games", params={"opening": "najdorf"}).json()
+    finally:
+        app.dependency_overrides.clear()
+
+    assert len(sicilians) == 2
+    assert len(najdorfs) == 1
+
+
+async def test_list_games_filters_by_date_range(db_session: AsyncSession) -> None:
+    """El día de `until` cuenta entero: quien filtra "hasta hoy" espera las de
+    hoy, no las de hasta su medianoche."""
+    await _create_game(db_session, platform_id="hoy", white="ana", black="beto", days_ago=0)
+    await _create_game(db_session, platform_id="ayer", white="ana", black="beto", days_ago=1)
+    await _create_game(db_session, platform_id="hace-10", white="ana", black="beto", days_ago=10)
+    today = dt.datetime.now(dt.UTC).date()
+
+    _override(db_session)
+    try:
+        with TestClient(app) as http:
+            since_yesterday = http.get(
+                "/games", params={"since": str(today - dt.timedelta(days=1))}
+            ).json()
+            until_yesterday = http.get(
+                "/games", params={"until": str(today - dt.timedelta(days=1))}
+            ).json()
+    finally:
+        app.dependency_overrides.clear()
+
+    assert len(since_yesterday) == 2  # la de hoy y la de ayer
+    assert len(until_yesterday) == 2  # la de ayer y la de hace diez días
+
+
+async def test_list_games_reports_how_many_match_the_filters(
+    db_session: AsyncSession,
+) -> None:
+    """La cabecera `X-Total-Count` cuenta las que cumplen los filtros, no las
+    de la página: es lo que permite decir "25 de 324" en vez de solo "página 2"."""
+    for index in range(5):
+        await _create_game(db_session, platform_id=f"p{index}", white="ana", black="beto")
+    _override(db_session)
+    try:
+        with TestClient(app) as http:
+            page = http.get("/games", params={"limit": 2})
+            filtered = http.get("/games", params={"username": "nadie"})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert len(page.json()) == 2
+    assert page.headers["X-Total-Count"] == "5"
+    assert filtered.headers["X-Total-Count"] == "0"

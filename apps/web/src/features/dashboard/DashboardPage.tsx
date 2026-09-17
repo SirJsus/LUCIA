@@ -8,12 +8,11 @@ import type {
   MistakeTypeStats,
   PhaseStats,
   PlayerStats,
-  RecordSummary,
   TimeBucketStats,
   TimeTrouble,
 } from "@lucia/shared-types";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   Bar,
   BarChart,
@@ -24,12 +23,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Badge, type BadgeTone } from "../../components/Badge";
+import { Badge } from "../../components/Badge";
+import { RecordBadges } from "../../components/RecordBadges";
 import { DataTable } from "../../components/DataTable";
 import { Panel } from "../../components/Panel";
+import { RepertoireSection } from "./RepertoireSection";
 import { EmptyState, ErrorBox, Spinner } from "../../components/Feedback";
+import { FilterBar, FilterText } from "../../components/FilterBar";
 import {
-  FIELD_CLASSES,
   PANEL_CLASSES,
   TABLE_CELL_CLASSES,
   TABLE_ROW_CLASSES,
@@ -65,25 +66,14 @@ const PHASE_LABELS: Record<string, string> = {
   endgame: "Final",
 };
 
-/** Espera antes de consultar con el nombre tecleado. En Partidas el filtro se
- * aplica al escribir y aquí hacía falta pulsar un botón "Ver": la misma acción
- * funcionaba de dos maneras según la pantalla (criterio C-2 de
- * docs/07-coherencia-ui.md). El retardo evita una consulta por tecla, que es
- * lo que el botón estaba resolviendo a mano. */
-const FILTER_DELAY_MS = 400;
-
 export function DashboardPage() {
+  // La espera de "deja de teclear y consulto" la hace `FilterText`, que es la
+  // misma en Partidas: aquí solo se guarda el nombre ya aplicado.
   const [username, setUsername] = useState("");
-  const [appliedUsername, setAppliedUsername] = useState<string | undefined>(undefined);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setAppliedUsername(username || undefined), FILTER_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [username]);
 
   const statsQuery = useQuery({
-    queryKey: ["stats", appliedUsername],
-    queryFn: () => api.getStats(appliedUsername),
+    queryKey: ["stats", username],
+    queryFn: () => api.getStats(username || undefined),
   });
 
   return (
@@ -93,26 +83,24 @@ export function DashboardPage() {
       {/* La barra de filtros va bajo el título y con la misma forma que la de
           Partidas: era el mismo filtro en dos sitios distintos (criterio C-2
           de docs/07-coherencia-ui.md). */}
-      <div className={`flex flex-wrap gap-3 p-3 text-sm ${PANEL_CLASSES}`}>
-        <label className="flex flex-col gap-1">
-          <span className="opacity-70">Jugador</span>
-          <input
-            value={username}
-            onChange={(event) => setUsername(event.target.value)}
-            placeholder="el de .env"
-            className={`w-52 ${FIELD_CLASSES}`}
-          />
-        </label>
-      </div>
+      <FilterBar>
+        <FilterText
+          label="Jugador"
+          value={username}
+          onChange={setUsername}
+          placeholder="el de .env"
+          width="w-52"
+        />
+      </FilterBar>
 
       {statsQuery.isPending && <Spinner />}
       {statsQuery.isError && <ErrorBox error={statsQuery.error} onRetry={statsQuery.refetch} />}
-      {statsQuery.data && <StatsContent stats={statsQuery.data} />}
+      {statsQuery.data && <StatsContent stats={statsQuery.data} username={username} />}
     </div>
   );
 }
 
-function StatsContent({ stats }: { stats: PlayerStats }) {
+function StatsContent({ stats, username }: { stats: PlayerStats; username: string }) {
   const theme = useChartTheme();
 
   if (stats.total_games === 0) {
@@ -211,6 +199,11 @@ function StatsContent({ stats }: { stats: PlayerStats }) {
         ) : (
           <TimePressureSection buckets={stats.by_time_left} timeTrouble={stats.time_trouble} />
         )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="font-semibold">Dónde te sales de la teoría</h2>
+        <RepertoireSection username={username} />
       </section>
 
       <section className="space-y-2">
@@ -430,33 +423,3 @@ function StatCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Victorias, tablas y derrotas. Cada número lleva su letra: los tres se
- * distinguían solo por el color de fondo, que no es una diferencia para quien
- * no los ve (criterio C-7 de docs/07-coherencia-ui.md). */
-function RecordBadges({ record }: { record: RecordSummary }) {
-  return (
-    <span className="flex gap-1">
-      <RecordBadge count={record.wins} letter="V" name="victorias" tone="success" />
-      <RecordBadge count={record.draws} letter="T" name="tablas" tone="neutral" />
-      <RecordBadge count={record.losses} letter="D" name="derrotas" tone="danger" />
-    </span>
-  );
-}
-
-function RecordBadge({
-  count,
-  letter,
-  name,
-  tone,
-}: {
-  count: number;
-  letter: string;
-  name: string;
-  tone: BadgeTone;
-}) {
-  return (
-    <Badge tone={tone} title={`${count} ${name}`}>
-      <span className="tabular-nums">{count}</span> {letter}
-    </Badge>
-  );
-}

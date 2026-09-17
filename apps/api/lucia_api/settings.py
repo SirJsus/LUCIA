@@ -23,6 +23,17 @@ class Settings(BaseSettings):
     búsqueda). "blas" va bien en CPU; con GPU NVIDIA, "cuda"."""
     analysis_depth: int = 18
     analysis_multipv: int = 3
+    lichess_token: str = ""
+    """Token de Lichess para el Opening Explorer (RF-3.6). Es obligatorio: el
+    explorador responde 401 a cualquier petición anónima. Es gratuito y no
+    necesita permisos: https://lichess.org/account/oauth/token"""
+    lichess_user_agent: str = ""
+    """Con qué se identifica LUCIA ante el Opening Explorer de Lichess
+    (RF-3.6). Vacío usa el mismo que chess.com, que ya lleva contacto real: son
+    dos servicios ajenos y la cortesía es la misma (RNF-10)."""
+    explorer_min_interval_seconds: float = 1.0
+    """Espera mínima entre consultas al explorador. La base de maestros es un
+    servicio gratuito y aquí se le pregunta por muchas posiciones seguidas."""
 
     @model_validator(mode="after")
     def _anchor_relative_paths_to_repo_root(self) -> "Settings":

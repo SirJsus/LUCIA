@@ -85,7 +85,7 @@
           "games"
         ],
         "summary": "List Games",
-        "description": "Filtros según RF-5.3. `color` sin `username` se ignora: \"blancas\" o\n\"negras\" no significa nada sin decir de quién.",
+        "description": "Listado filtrado de partidas (RF-5.3).\n\n**Tres de los filtros necesitan `username` y sin él se ignoran**: `color`,\n`result` y `opponent`. \"Blancas\", \"ganadas\" o \"contra fulano\" no significan\nnada sin decir de quién se habla; aplicarlos a medias daría un resultado\nplausible y equivocado, que es peor que no filtrar.\n\n`opening` busca por subcadena en el nombre de la apertura, para que\n\"sicilian\" traiga todas las sicilianas, no solo la variante exacta. El\nnombre es el de la tabla ECO propia (`lucia_core.openings`), así que las\npartidas que no empiezan en la posición estándar no salen con ningún\nfiltro de apertura: no tienen apertura que nombrar.\n\n`since` y `until` son fechas inclusivas por los dos lados: `until` cubre el\ndía entero, no hasta su medianoche.\n\nLa cabecera **`X-Total-Count`** trae cuántas partidas cumplen los filtros,\nsin la paginación. Va en cabecera y no en el cuerpo para no envolver la\nlista: con ella la pantalla puede decir \"25 de 324\" en vez de solo el\nnúmero de página, que no dice si el filtro dejó fuera media colección.",
         "operationId": "list_games_games_get",
         "parameters": [
           {
@@ -125,6 +125,59 @@
             }
           },
           {
+            "name": "result",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "win",
+                    "draw",
+                    "loss"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Result"
+            }
+          },
+          {
+            "name": "opponent",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Opponent"
+            }
+          },
+          {
+            "name": "opening",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Opening"
+            }
+          },
+          {
             "name": "time_class",
             "in": "query",
             "required": false,
@@ -154,6 +207,40 @@
                 }
               ],
               "title": "Rated"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
             }
           },
           {
@@ -857,6 +944,118 @@
           }
         }
       }
+    },
+    "/repertoire": {
+      "get": {
+        "tags": [
+          "repertoire"
+        ],
+        "summary": "Player Repertoire",
+        "description": "Dónde se sale el jugador de la teoría, con lo que ya está en la caché.",
+        "operationId": "player_repertoire_repertoire_get",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepertoireOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repertoire/refresh": {
+      "post": {
+        "tags": [
+          "repertoire"
+        ],
+        "summary": "Refresh Player Repertoire",
+        "description": "Pregunta a Lichess por las posiciones que falten, hasta `budget`.\n\nDevuelve cuántas se preguntaron y cuántas siguen faltando, que es lo que\npermite a la pantalla decir si hace falta volver a pulsar.",
+        "operationId": "refresh_player_repertoire_repertoire_refresh_post",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          },
+          {
+            "name": "budget",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 60,
+              "minimum": 1,
+              "default": 25,
+              "title": "Budget"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResultOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1473,6 +1672,63 @@
         ],
         "title": "CriticalMomentOut",
         "description": "Una posición donde la partida se decidía (RF-2.8)."
+      },
+      "DepartureOut": {
+        "properties": {
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "san": {
+            "type": "string",
+            "title": "San"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "master_moves": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Master Moves"
+          },
+          "games": {
+            "type": "integer",
+            "title": "Games"
+          },
+          "wins": {
+            "type": "integer",
+            "title": "Wins"
+          },
+          "draws": {
+            "type": "integer",
+            "title": "Draws"
+          },
+          "losses": {
+            "type": "integer",
+            "title": "Losses"
+          },
+          "score_percent": {
+            "type": "number",
+            "title": "Score Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ply",
+          "san",
+          "color",
+          "master_moves",
+          "games",
+          "wins",
+          "draws",
+          "losses",
+          "score_percent"
+        ],
+        "title": "DepartureOut",
+        "description": "Un punto donde el repertorio propio se separa del de los maestros."
       },
       "EngineConfigOut": {
         "properties": {
@@ -2247,6 +2503,70 @@
           "score_percent"
         ],
         "title": "RecordOut"
+      },
+      "RefreshResultOut": {
+        "properties": {
+          "fetched": {
+            "type": "integer",
+            "title": "Fetched"
+          },
+          "remaining": {
+            "type": "integer",
+            "title": "Remaining"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fetched",
+          "remaining"
+        ],
+        "title": "RefreshResultOut"
+      },
+      "RepertoireOut": {
+        "properties": {
+          "departures": {
+            "items": {
+              "$ref": "#/components/schemas/DepartureOut"
+            },
+            "type": "array",
+            "title": "Departures"
+          },
+          "games_compared": {
+            "type": "integer",
+            "title": "Games Compared"
+          },
+          "positions_known": {
+            "type": "integer",
+            "title": "Positions Known"
+          },
+          "positions_missing": {
+            "type": "integer",
+            "title": "Positions Missing"
+          },
+          "explorer_token_configured": {
+            "type": "boolean",
+            "title": "Explorer Token Configured"
+          },
+          "positions_per_refresh": {
+            "type": "integer",
+            "title": "Positions Per Refresh"
+          },
+          "seconds_between_positions": {
+            "type": "number",
+            "title": "Seconds Between Positions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "departures",
+          "games_compared",
+          "positions_known",
+          "positions_missing",
+          "explorer_token_configured",
+          "positions_per_refresh",
+          "seconds_between_positions"
+        ],
+        "title": "RepertoireOut"
       },
       "SyncRequest": {
         "properties": {

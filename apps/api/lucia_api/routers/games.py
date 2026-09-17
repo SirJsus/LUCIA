@@ -5,13 +5,14 @@ from __future__ import annotations
 import datetime as dt
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db import get_session
 from lucia_api.db.models import Game
+from lucia_api.services.games import is_black, is_player, is_white, outcome_of
 
 router = APIRouter(tags=["games"])
 
@@ -43,37 +44,116 @@ class GameDetail(GameSummary):
     clocks_json: list | None
 
 
+def _filter_conditions(
+    *,
+    username: str | None,
+    color: Literal["white", "black"] | None,
+    result: Literal["win", "draw", "loss"] | None,
+    opponent: str | None,
+    opening: str | None,
+    time_class: str | None,
+    rated: bool | None,
+    since: dt.date | None,
+    until: dt.date | None,
+) -> list:
+    """Las condiciones SQL de los filtros de RF-5.3.
+
+    Salen aparte porque las necesitan dos consultas —la página de resultados y
+    el total—, y si se escribieran dos veces acabarían diciendo cosas
+    distintas.
+    """
+    conditions = []
+
+    if username:
+        if color == "white":
+            conditions.append(is_white(username))
+        elif color == "black":
+            conditions.append(is_black(username))
+        else:
+            conditions.append(is_player(username))
+        if result:
+            conditions.append(outcome_of(username) == result)
+        if opponent:
+            # El rival es el del otro lado del tablero, así que depende de con
+            # qué color jugó el usuario en cada partida.
+            conditions.append(
+                (is_white(username) & is_black(opponent))
+                | (is_black(username) & is_white(opponent))
+            )
+
+    if opening:
+        conditions.append(Game.opening_name.ilike(f"%{opening}%"))
+    if time_class:
+        conditions.append(Game.time_class == time_class)
+    if rated is not None:
+        conditions.append(Game.rated == rated)
+    if since:
+        conditions.append(Game.played_at >= dt.datetime.combine(since, dt.time.min))
+    if until:
+        # El día de `until` cuenta entero: quien filtra "hasta el 5" espera las
+        # partidas del 5, no las de hasta su medianoche.
+        conditions.append(
+            Game.played_at < dt.datetime.combine(until, dt.time.min) + dt.timedelta(days=1)
+        )
+    return conditions
+
+
 @router.get("/games", response_model=list[GameSummary])
 async def list_games(
     session: Annotated[AsyncSession, Depends(get_session)],
+    response: Response,
     username: str | None = None,
     color: Literal["white", "black"] | None = None,
+    result: Literal["win", "draw", "loss"] | None = None,
+    opponent: str | None = None,
+    opening: str | None = None,
     time_class: str | None = None,
     rated: bool | None = None,
+    since: dt.date | None = None,
+    until: dt.date | None = None,
     limit: Annotated[int, Query(le=200, ge=1)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> list[GameSummary]:
-    """Filtros según RF-5.3. `color` sin `username` se ignora: "blancas" o
-    "negras" no significa nada sin decir de quién."""
-    query = select(Game).order_by(Game.played_at.desc()).limit(limit).offset(offset)
-    if username:
-        # Insensible a mayúsculas: chess.com da el perfil en minúsculas pero
-        # el PGN conserva el casing original ("sirjsus" vs "SirJsus").
-        is_white = func.lower(Game.white_username) == username.lower()
-        is_black = func.lower(Game.black_username) == username.lower()
-        if color == "white":
-            query = query.where(is_white)
-        elif color == "black":
-            query = query.where(is_black)
-        else:
-            query = query.where(is_white | is_black)
-    if time_class:
-        query = query.where(Game.time_class == time_class)
-    if rated is not None:
-        query = query.where(Game.rated == rated)
+    """Listado filtrado de partidas (RF-5.3).
 
-    result = await session.execute(query)
-    return [GameSummary.model_validate(game) for game in result.scalars().all()]
+    **Tres de los filtros necesitan `username` y sin él se ignoran**: `color`,
+    `result` y `opponent`. "Blancas", "ganadas" o "contra fulano" no significan
+    nada sin decir de quién se habla; aplicarlos a medias daría un resultado
+    plausible y equivocado, que es peor que no filtrar.
+
+    `opening` busca por subcadena en el nombre de la apertura, para que
+    "sicilian" traiga todas las sicilianas, no solo la variante exacta. El
+    nombre es el de la tabla ECO propia (`lucia_core.openings`), así que las
+    partidas que no empiezan en la posición estándar no salen con ningún
+    filtro de apertura: no tienen apertura que nombrar.
+
+    `since` y `until` son fechas inclusivas por los dos lados: `until` cubre el
+    día entero, no hasta su medianoche.
+
+    La cabecera **`X-Total-Count`** trae cuántas partidas cumplen los filtros,
+    sin la paginación. Va en cabecera y no en el cuerpo para no envolver la
+    lista: con ella la pantalla puede decir "25 de 324" en vez de solo el
+    número de página, que no dice si el filtro dejó fuera media colección.
+    """
+    conditions = _filter_conditions(
+        username=username,
+        color=color,
+        result=result,
+        opponent=opponent,
+        opening=opening,
+        time_class=time_class,
+        rated=rated,
+        since=since,
+        until=until,
+    )
+    query = (
+        select(Game).where(*conditions).order_by(Game.played_at.desc()).limit(limit).offset(offset)
+    )
+    total = await session.scalar(select(func.count()).select_from(Game).where(*conditions))
+    response.headers["X-Total-Count"] = str(total or 0)
+
+    result_rows = await session.execute(query)
+    return [GameSummary.model_validate(game) for game in result_rows.scalars().all()]
 
 
 @router.get("/games/{game_id}", response_model=GameDetail)

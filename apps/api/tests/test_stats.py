@@ -340,7 +340,7 @@ async def test_stats_endpoint_returns_the_summary(db_session: AsyncSession) -> N
 async def test_stats_endpoint_without_username_or_config_returns_422(
     db_session: AsyncSession, monkeypatch
 ) -> None:
-    monkeypatch.setattr("lucia_api.routers.stats.settings.chesscom_username", "")
+    monkeypatch.setattr("lucia_api.dependencies.settings.chesscom_username", "")
 
     async def _session() -> AsyncIterator[AsyncSession]:
         yield db_session

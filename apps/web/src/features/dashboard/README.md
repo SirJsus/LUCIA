@@ -1,10 +1,11 @@
 # `features/dashboard`
 
-Estadísticas de la práctica propia (RF-3.1 a RF-3.5): marcador y rating por
+Estadísticas de la práctica propia (RF-3.1 a RF-3.6): marcador y rating por
 control de tiempo, partidas por mes, rendimiento por apertura, pérdida de
-ventaja por fase, reparto de errores por tipo y calidad de juego según el reloj
-que quedaba. Todo se agrega en la API (`GET /stats/{username}`); aquí solo se
-presenta.
+ventaja por fase, reparto de errores por tipo, calidad de juego según el reloj
+que quedaba y comparación del repertorio con la teoría de maestros. Todo se
+agrega en la API (`GET /stats/{username}`, y `GET /repertoire` para la última);
+aquí solo se presenta.
 
 Las tablas salen de `components/DataTable` y los gráficos de **Recharts**, que
 pinta ejes y tooltip con estilos en línea y por eso necesita la paleta como
@@ -31,6 +32,29 @@ ratón (criterio C-6 de
 [`docs/07-coherencia-ui.md`](../../../../../docs/07-coherencia-ui.md))—. El
 mismo archivo lo usa el visor para los momentos críticos, para que un tipo de
 error se llame igual en las dos pantallas.
+
+## El repertorio, la única sección que sale a internet (RF-3.6)
+
+`RepertoireSection.tsx` enseña dónde se sale el jugador de la teoría de
+maestros. Se lee de lo que LUCIA **ya** preguntó al Opening Explorer de Lichess;
+preguntar por lo que falta es un botón aparte, porque es lo único de la
+aplicación que necesita conexión mientras se usa
+([ADR-0010](../../../../../docs/adr/0010-repertorio-con-red-y-cacheado.md)). De
+ahí las tres cosas que la distinguen del resto del panel:
+
+- **Dice siempre cuánto sabe y cuánto le falta.** Una comparación a medias
+  presentada como completa mentiría sobre el repertorio del usuario, así que
+  mientras falten posiciones lo avisa con el mismo `WarningBox` que el resto de
+  la aplicación (criterios C-3 y C-4 de
+  [`docs/07-coherencia-ui.md`](../../../../../docs/07-coherencia-ui.md)).
+- **Dice qué va a pasar al pulsar.** Las posiciones se preguntan de una en una y
+  espaciadas, para no abusar de un servicio gratuito ajeno, así que la primera
+  vez hacen falta varias pulsaciones; la API manda cuántas trae cada consulta y
+  cuánto espera entre ellas para poder decirlo en segundos en vez de dejar una
+  barra sin final.
+- **Sus dos vacíos no son el mismo.** "Ninguna de tus partidas se sale de la
+  teoría" y "todavía no hay comparación" se leen igual con el mismo título y
+  significan cosas opuestas (criterio C-3).
 
 ## La tabla de aperturas (RF-3.2)
 

@@ -18,8 +18,11 @@ RF-3.4, RF-3.5, RF-3.2) abrió dos más el 2026-09-09, la 52 y la 53, cerradas
 también. Ese mismo día, la tabla ECO propia (RF-3.2) puso en pantalla por
 primera vez la categoría "Teoría" de la clasificación de jugadas, que estaba
 definida desde el principio pero no se producía nunca, y con ella las filas 54
-y 55, que siguen abiertas. El inventario vacío es como debería encontrarse
-siempre que se lea este documento.
+y 55, cerradas también. La barra de filtros de Partidas (RF-5.3), que ese mismo
+2026-09-09 pasó de cuatro filtros a nueve, abrió las filas 56 a 60, cerradas
+ese mismo día. La comparación de repertorio (RF-3.6), del 2026-09-10, abrió las
+filas 61 a 63, que siguen abiertas: son las únicas. El inventario vacío es como
+debería encontrarse siempre que se lea este documento.
 
 **Qué es cada mitad de este documento.** Los criterios C-1 a C-7 son
 **RNF-11**, que vive en la sección Post 1.0 de
@@ -50,14 +53,14 @@ antes de comitear cambios de front — ver [Cómo se verifica](#cómo-se-verific
 | C-6 | **Legible sin saber de ajedrez.** Todo número del motor va acompañado de etiqueta, leyenda o representación visual. `+0.35` solo, sin más, no comunica nada a quien no lee evaluaciones. |
 | C-7 | **Accesibilidad mínima.** Foco visible, `aria-label` en los botones que son solo icono, y ningún significado transmitido únicamente por color. |
 
-## Inventario de incoherencias: vacío (al 2026-09-09)
+## Inventario de incoherencias: vacío (al 2026-09-10)
 
-**No queda ninguna abierta.** El inventario llegó a tener 55 filas y están todas
+**No queda ninguna abierta.** El inventario llegó a tener 63 filas y están todas
 cerradas. El rastro de qué se hizo está más abajo.
 
 ## Lo que se cerró
 
-Las 55 filas que llegó a tener este inventario se cerraron en siete pasadas, y
+Las 63 filas que llegó a tener este inventario se cerraron en nueve pasadas, y
 aquí queda el rastro de qué se hizo, para que un `git blame` no sea la única
 forma de averiguarlo.
 
@@ -253,6 +256,92 @@ teoría. En cuanto empezó a verse, dos cosas cantaban:
   la leyenda de hecho, con la misma forma que la tabla de tipos de error del
   panel de estadísticas.
 
+**2026-09-09 · los filtros de Partidas (RF-5.3).** La barra pasó de cuatro
+filtros a nueve y salió de ella `components/FilterBar.tsx`, que es la que usan
+ya las dos pantallas que filtran. La revisión dejó abiertas las filas 56 a 60 y
+cuatro arreglos mecánicos sin nada que decidir:
+
+- **C-7 · paridad claro/oscuro.** Los filtros de fecha son los primeros
+  controles con adorno nativo del navegador (el icono del calendario y su
+  desplegable), y sin `color-scheme` el navegador los dibuja siempre claros:
+  icono oscuro sobre fondo oscuro. `src/index.css` lo ata al tema, lo que
+  arregla de paso las flechas de los campos numéricos de Motores.
+- **C-6.** «Desde» y «Hasta» no decían si incluyen el día que se escribe en
+  ellos; ahora lo dicen los dos con las mismas palabras, como ya hacía
+  «Apertura» con su búsqueda por parte del nombre. Que la ayuda se vea solo al
+  pasar el ratón es otra cosa, y es la fila 57.
+- **C-3.** El vacío del listado decía «No hay partidas con esos filtros» y
+  mandaba a sincronizar aunque no hubiera ningún filtro puesto. Ahora distingue
+  los dos casos: sin filtros, la partida que falta es de importarla.
+- **C-2.** Un campo deshabilitado se atenuaba pero no cambiaba el cursor, y el
+  botón deshabilitado sí (`disabled:cursor-not-allowed` de `buttonClasses`).
+
+**2026-09-09 · la barra de filtros de Partidas (RF-5.3).** Pasar de cuatro
+filtros a nueve destapó cinco filas, todas de la misma familia: cosas que la
+barra decía a medias o solo con el ratón.
+
+- **El motivo de un filtro deshabilitado, a la vista** (56, C-3/C-7). "Elige un
+  jugador primero" vivía en un `title`, que con teclado no aparece nunca —y un
+  control deshabilitado ni se tabula—. Ahora la barra lo dice una sola vez, en
+  una línea, y explica el porqué: la misma partida es victoria para uno y
+  derrota para el otro.
+- **Las ayudas de los campos, también** (57, C-6): que Apertura busca por parte
+  del nombre y que las fechas incluyen el día escrito. `FieldLabel` las pinta
+  bajo el control, como ya hacía la pantalla de motores.
+- **Una sola temporización para el mismo filtro** (58, C-2). Estadísticas
+  esperaba 400 ms y Partidas consultaba en cada tecla: escribir "sicilian" eran
+  ocho peticiones. La espera vive ahora en el campo compartido, así que es la
+  misma en las dos pantallas.
+- **El listado dice cuántas enseña de cuántas** (59, C-3). Antes solo "Página
+  N", y que no hubiera más se descubría cuando "Siguiente" se apagaba. `GET
+  /games` devuelve el total en la cabecera `X-Total-Count`, sin envolver la
+  lista.
+- **Una sola receta de etiqueta de campo** (60, C-2): `components/FieldLabel.tsx`
+  reemplaza las dos que convivían —la de la barra de filtros y la `mb-1 block`
+  de los formularios de sincronizar, crear tablero y configurar motores—, que
+  se veían igual por casualidad.
+
+**2026-09-10 · la comparación de repertorio (RF-3.6).** La primera pantalla que
+necesita red mientras se usa (ADR-0010) y la primera cuyo dato puede estar a
+medias sin que sea un error. La revisión dejó abiertas las filas 61 a 63 y
+cinco arreglos mecánicos sin nada que decidir:
+
+- **C-3 / C-4.** Que la comparación esté incompleta vivía en la misma línea
+  gris de `text-xs` que el resumen, y es justo lo que C-3 llama letra pequeña:
+  cambia lo que significa la tabla de abajo. Ahora es un `WarningBox`, como las
+  limitaciones de la pantalla de Motores, y dice cuántas posiciones faltan y
+  por qué hace falta pulsar varias veces.
+- **C-2 / C-3.** La consulta no decía qué había conseguido: `fetched` y
+  `remaining` llegaban de la API y se tiraban. Ahora terminar deja un
+  `SuccessBox` con las dos cifras, como ya hacía sincronizar en Partidas, que
+  es la otra acción que sale a internet.
+- **C-3.** El vacío tenía un solo título, «Todavía no hay comparación», para
+  dos situaciones opuestas: una comparación completa en la que no te sales de
+  la teoría contradecía a su propio título. Se distinguen, como ya distingue
+  las suyas el listado de Partidas.
+- **C-6.** La línea de resumen enseñaba las partidas comparadas solo cuando no
+  faltaba ninguna posición, así que el mismo dato aparecía o no según el
+  estado; y el aviso hablaba de «salidas del libro», que es jerga que la
+  pantalla no explica en ninguna parte. Al pie de la tabla se dice además que
+  las jugadas de los maestros van de la más jugada a la menos.
+- **C-2.** La columna «Partidas» iba a opacidad plena, y en las otras dos
+  tablas del panel el recuento de partidas va atenuado.
+
+Y las tres filas que la revisión de esa misma pantalla dejó abiertas, cerradas
+el mismo día:
+
+- **La única acción de la pantalla va en primario** (61, C-2). "Consultar a
+  Lichess" era el único botón de Estadísticas y salía secundario, mientras que
+  en las otras cuatro pantallas con acción la única de cada una es primaria. Es
+  la regla que ya estaba escrita en `components/Button.tsx`.
+- **La puntuación va con su marcador** (62, C-2/C-6), como en las otras dos
+  tablas del panel: `RecordBadges` sube a `components/`, que es donde debía
+  estar desde que lo usan tres tablas.
+- **El botón dice qué va a hacer** (63, C-3): cuántas posiciones trae una
+  pulsación y cuánto tarda. Los dos números los sabía el servidor y ahora
+  viajan en `GET /repertoire`, así que la barra de progreso deja de ser una
+  barra sin final.
+
 **Decidido el 2026-09-07, no es incoherencia.** Dos cosas que este inventario
 llegó a listar y el autor resolvió por criterio, no por descuido:
 
@@ -290,6 +379,6 @@ Antes de comitear cualquier cambio que toque `apps/web`:
    igual — o cambiar las dos a la vez.
 3. Si aparece una incoherencia que no se arregla en el mismo commit, añadirla
    al inventario de arriba —`# · Incoherencia · Dónde · Criterio`, numerando
-   desde el 56— en vez de dejarla suelta. Una fila se borra cuando se arregla,
+   desde el 64— en vez de dejarla suelta. Una fila se borra cuando se arregla,
    y las demás no se renumeran: el número es la referencia con la que se habla
    de ella en un commit o en una revisión.

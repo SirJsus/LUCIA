@@ -197,6 +197,31 @@ class AnalyzedMove(Base):
     analysis: Mapped[Analysis] = relationship(back_populates="moves")
 
 
+class ExplorerPositionCache(Base):
+    """Lo que la base de maestros de Lichess dice de una posición (RF-3.6).
+
+    Es una caché, no una fuente: se guarda para no volver a preguntar por la
+    misma posición —y para que comparar el repertorio siga funcionando sin
+    conexión, que es la única concesión que LUCIA hace a RNF-1 (ver ADR-0010)—.
+
+    La clave es el **EPD**, el FEN sin los contadores de jugada, por lo mismo
+    que en `lucia_core.openings`: la misma posición alcanzada por otro orden de
+    jugadas tiene la misma teoría detrás.
+    """
+
+    __tablename__ = "explorer_positions"
+
+    epd: Mapped[str] = mapped_column(primary_key=True)
+    masters_json: Mapped[dict] = mapped_column(JSON)
+    """Respuesta del explorador, ya recortada a lo que se usa: totales de la
+    posición y qué se juega en ella (`lucia_lichess.ExplorerPosition`)."""
+    fetched_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
+    )
+    """Cuándo se preguntó. La base de maestros cambia despacio, así que no
+    caduca sola; sirve para poder decidirlo más adelante sin migrar nada."""
+
+
 class EngineSettings(Base):
     """Parámetros de análisis por motor, editables desde la UI (RF-5.4).
 

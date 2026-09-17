@@ -47,8 +47,26 @@ export interface paths {
         };
         /**
          * List Games
-         * @description Filtros según RF-5.3. `color` sin `username` se ignora: "blancas" o
-         *     "negras" no significa nada sin decir de quién.
+         * @description Listado filtrado de partidas (RF-5.3).
+         *
+         *     **Tres de los filtros necesitan `username` y sin él se ignoran**: `color`,
+         *     `result` y `opponent`. "Blancas", "ganadas" o "contra fulano" no significan
+         *     nada sin decir de quién se habla; aplicarlos a medias daría un resultado
+         *     plausible y equivocado, que es peor que no filtrar.
+         *
+         *     `opening` busca por subcadena en el nombre de la apertura, para que
+         *     "sicilian" traiga todas las sicilianas, no solo la variante exacta. El
+         *     nombre es el de la tabla ECO propia (`lucia_core.openings`), así que las
+         *     partidas que no empiezan en la posición estándar no salen con ningún
+         *     filtro de apertura: no tienen apertura que nombrar.
+         *
+         *     `since` y `until` son fechas inclusivas por los dos lados: `until` cubre el
+         *     día entero, no hasta su medianoche.
+         *
+         *     La cabecera **`X-Total-Count`** trae cuántas partidas cumplen los filtros,
+         *     sin la paginación. Va en cabecera y no en el cuerpo para no envolver la
+         *     lista: con ella la pantalla puede decir "25 de 324" en vez de solo el
+         *     número de página, que no dice si el filtro dejó fuera media colección.
          */
         get: operations["list_games_games_get"];
         put?: never;
@@ -245,6 +263,49 @@ export interface paths {
         post?: never;
         /** Delete Board */
         delete: operations["delete_board_boards__board_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/repertoire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Player Repertoire
+         * @description Dónde se sale el jugador de la teoría, con lo que ya está en la caché.
+         */
+        get: operations["player_repertoire_repertoire_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/repertoire/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Player Repertoire
+         * @description Pregunta a Lichess por las posiciones que falten, hasta `budget`.
+         *
+         *     Devuelve cuántas se preguntaron y cuántas siguen faltando, que es lo que
+         *     permite a la pantalla decir si hace falta volver a pulsar.
+         */
+        post: operations["refresh_player_repertoire_repertoire_refresh_post"];
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -478,6 +539,30 @@ export interface components {
             win_percent_after: number;
             /** Best Alternative San */
             best_alternative_san: string | null;
+        };
+        /**
+         * DepartureOut
+         * @description Un punto donde el repertorio propio se separa del de los maestros.
+         */
+        DepartureOut: {
+            /** Ply */
+            ply: number;
+            /** San */
+            san: string;
+            /** Color */
+            color: string;
+            /** Master Moves */
+            master_moves: string[];
+            /** Games */
+            games: number;
+            /** Wins */
+            wins: number;
+            /** Draws */
+            draws: number;
+            /** Losses */
+            losses: number;
+            /** Score Percent */
+            score_percent: number;
         };
         /** EngineConfigOut */
         EngineConfigOut: {
@@ -742,6 +827,30 @@ export interface components {
             /** Score Percent */
             score_percent: number;
         };
+        /** RefreshResultOut */
+        RefreshResultOut: {
+            /** Fetched */
+            fetched: number;
+            /** Remaining */
+            remaining: number;
+        };
+        /** RepertoireOut */
+        RepertoireOut: {
+            /** Departures */
+            departures: components["schemas"]["DepartureOut"][];
+            /** Games Compared */
+            games_compared: number;
+            /** Positions Known */
+            positions_known: number;
+            /** Positions Missing */
+            positions_missing: number;
+            /** Explorer Token Configured */
+            explorer_token_configured: boolean;
+            /** Positions Per Refresh */
+            positions_per_refresh: number;
+            /** Seconds Between Positions */
+            seconds_between_positions: number;
+        };
         /** SyncRequest */
         SyncRequest: {
             /** Username */
@@ -874,8 +983,13 @@ export interface operations {
             query?: {
                 username?: string | null;
                 color?: ("white" | "black") | null;
+                result?: ("win" | "draw" | "loss") | null;
+                opponent?: string | null;
+                opening?: string | null;
                 time_class?: string | null;
                 rated?: boolean | null;
+                since?: string | null;
+                until?: string | null;
                 limit?: number;
                 offset?: number;
             };
@@ -1332,6 +1446,69 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    player_repertoire_repertoire_get: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepertoireOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_player_repertoire_repertoire_refresh_post: {
+        parameters: {
+            query?: {
+                username?: string | null;
+                budget?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefreshResultOut"];
+                };
             };
             /** @description Validation Error */
             422: {

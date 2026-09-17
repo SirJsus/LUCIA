@@ -44,8 +44,8 @@
       incluido el flujo completo POST → WebSocket → GET contra Stockfish
       real. Encontrado y corregido en el camino: un bug de aislamiento entre
       tests por compartir el `AnalysisWorker` (y su cola de asyncio) entre
-      tests con distinto event loop. Pendiente: filtros de `/games` por
-      apertura, rango de fechas y rival específico.
+      tests con distinto event loop. Los filtros por apertura, rango de fechas,
+      rival y resultado llegaron el 2026-09-09 (ver su ítem en la fase 2).
 - [x] Web: lista de partidas con filtros y paginación, visor con tablero
       (chessground), jugadas clasificadas, gráfico de evaluación (en
       probabilidad de victoria) y navegación con teclado; análisis en vivo con
@@ -189,7 +189,7 @@
       que es P2 y vive en la fase 3 con el resto de entrenamiento.
 - [x] Coherencia de la interfaz entre pantallas (RF-5.1 y RNF-6; criterios en
       [docs/07-coherencia-ui.md](07-coherencia-ui.md), cuyo inventario de
-      incumplimientos está **vacío**: las 55 filas que llegó a tener, cerradas
+      incumplimientos está **vacío**: las 63 filas que llegó a tener, cerradas
       —las dos últimas, las que abrieron los extractores de patrones el
       2026-09-09—). El tablero de análisis se
       navegaba solo con el teclado y su pantalla era siempre la misma, mientras
@@ -287,10 +287,66 @@
          exactamente las que no empiezan en la posición estándar, donde no hay
          apertura que nombrar. Las estadísticas por apertura (RF-3.2) usan ya
          esta clasificación, con su código ECO a la vista.
-- [ ] Comparación de repertorio con Lichess Explorer (RF-3.6).
+- [x] Comparación de repertorio con Lichess Explorer (RF-3.6). Hecho el
+      2026-09-10.
+
+      Responde a "dónde me salgo de la línea principal y con qué resultado":
+      recorre cada partida desde el principio y, en cada posición en la que le
+      toca mover al jugador, mira qué juegan los maestros en esa misma
+      posición. La primera jugada propia que no está en ese repertorio es la
+      salida de la teoría; a partir de ahí esa partida ya no dice nada del
+      repertorio y se deja de mirar. Las salidas se agrupan: lo que interesa es
+      "esto lo hago ocho veces y saco un 25 %", no ocho partidas sueltas.
+
+      - **Es la primera vez que LUCIA necesita red mientras se usa**, y eso
+        choca con RNF-1 (local-first). Decisión en
+        [ADR-0010](adr/0010-repertorio-con-red-y-cacheado.md): `GET /repertoire`
+        no sale a internet nunca —compara con lo que hay en la caché y dice
+        cuánto le falta por saber—, y `POST /repertoire/refresh` es lo único
+        que consulta, solo cuando el usuario lo pide. Todo lo consultado se
+        guarda en `explorer_positions` (migración `b4e8c17f0a92`), indexado por
+        posición, así que sirve para todas las partidas que pasen por ahí.
+      - **Cliente propio en `packages/lichess`**, con las mismas reglas de
+        cortesía que el de chess.com (RNF-10): `User-Agent` con contacto,
+        peticiones espaciadas una por segundo, backoff ante `429` y un tope por
+        llamada para no dejar la petición HTTP colgada minutos.
+      - **Se pregunta lo mínimo**: solo las posiciones donde decide el jugador,
+        solo hasta la jugada 8 de cada bando y solo hasta salirse del libro.
+        Medido sobre las 324 partidas del autor: el tope teórico serían 1.058
+        posiciones, pero como se para al salir de la teoría, la frontera real
+        es mucho menor y se reaprovecha entre partidas.
+      - **Hace falta un token de Lichess**, y no es opcional: el explorador
+        dejó de admitir peticiones anónimas y responde `401` a todo, incluido
+        el ejemplo de su propia documentación (comprobado el 2026-09-10; su
+        especificación declara `security: OAuth2`). Es gratuito y sin permisos,
+        se saca en <https://lichess.org/account/oauth/token> y va en
+        `LICHESS_TOKEN`. La pantalla lo dice antes de que se pulse nada, y sin
+        él sigue enseñando lo que ya esté consultado.
+      - Lo que **no** se pudo probar: una consulta real con token válido, por
+        no tener uno. El cliente está probado con la respuesta simulada
+        (`respx`) y con la forma documentada de la API, y el servicio con un
+        explorador falso; los dos caminos de error —sin token y sin red— sí se
+        comprobaron de verdad contra el servicio real.
 - [ ] Importar PGN manual de otras fuentes —OTB, lichess— al historial (RF-1.5).
-- [ ] Filtros de `/games` por apertura, rango de fechas y rival (lo que falta
-      de RF-5.3; con cientos de partidas ya se nota).
+- [x] Filtros de `/games` por apertura, rango de fechas, rival y resultado (lo
+      que faltaba de RF-5.3). Hecho el 2026-09-09; con 324 partidas ya se
+      notaba.
+
+      - **Resultado, color y rival dependen de quién sea el jugador** y sin
+        `username` se ignoran: la misma partida es victoria para uno y derrota
+        para el otro, así que aplicarlos a medias daría un resultado plausible
+        y equivocado. En la pantalla salen deshabilitados con el motivo, en vez
+        de fingir que filtran.
+      - **Apertura por subcadena**: "sicilian" trae todas las sicilianas. Usa
+        el nombre de la tabla ECO propia, así que las partidas que no empiezan
+        en la posición estándar no salen con ningún filtro de apertura: no
+        tienen apertura que nombrar.
+      - **Fechas inclusivas por los dos lados**: `until` cubre el día entero.
+      - De paso, las cuatro expresiones SQL de "de qué color jugó y qué le
+        pasó" dejaron de estar duplicadas entre el listado y las estadísticas y
+        viven en `services/games.py`. Comprobado contra las 324 partidas
+        reales: los filtros por resultado dan 193/14/117, exactamente el
+        marcador que enseña el dashboard.
 - [ ] Tendencias temporales (RF-3.7).
 - [ ] Tablero de análisis, extras (RF-6.6 a 6.9): abrir partida importada como
       copia desacoplada (esto también cubre "explorar variantes desde el

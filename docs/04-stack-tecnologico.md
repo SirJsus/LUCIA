@@ -20,7 +20,7 @@ Elegido con el criterio: **maduro, gratuito, compatible con GPL-3.0, y con el me
 | **Pydantic v2** | Modelos y config | Tipado fuerte, settings desde `.env`. |
 | **SQLAlchemy 2 (async)** + **aiosqlite** | ORM sobre SQLite | Local-first (RNF-7). Migrar a PostgreSQL sería cambiar la URL. |
 | **Alembic** | Migraciones | Estándar con SQLAlchemy. |
-| **httpx** | Cliente HTTP async para chess.com | Async, HTTP/2, fácil de testear con `respx`. |
+| **httpx** | Cliente HTTP async para chess.com (`packages/chesscom`) y para el Opening Explorer de Lichess (`packages/lichess`) | Async, HTTP/2, fácil de testear con `respx`. |
 | **polars** | Agregaciones estadísticas | Más rápido y con menos memoria que pandas para cruzar miles de partidas. |
 | **uv** | Gestión de paquetes y workspaces Python | Rápido, lockfile único para el monorepo. *(Pendiente instalar: `curl -LsSf https://astral.sh/uv/install.sh \| sh`)* |
 | **ruff** | Lint + format | Un solo binario para todo. |
@@ -47,7 +47,7 @@ Elegido con el criterio: **maduro, gratuito, compatible con GPL-3.0, y con el me
 | Fuente | Uso |
 | -------- | ----- |
 | **chess.com Public API** (`api.chess.com/pub`) | Perfil, stats, archivos mensuales de partidas en PGN/JSON. Sin auth. Requiere `User-Agent`. |
-| **Lichess Opening Explorer API** | Teoría de aperturas (base de maestros y de jugadores por rating). Gratuito. |
+| **Lichess Opening Explorer API** (`explorer.lichess.org`) | Teoría de aperturas para la comparación de repertorio (RF-3.6). Gratuito, pero **requiere token**: desde 2026 el explorador responde `401` a toda petición anónima, incluido el ejemplo de su propia documentación, y su especificación declara `security: OAuth2`. El token se saca en <https://lichess.org/account/oauth/token>, no necesita permisos y va en `LICHESS_TOKEN`. También requiere `User-Agent` identificable. Se usa **solo la base de maestros** (`/masters`): la de jugadores responde a otra pregunta —qué juega todo el mundo, no qué es teoría—. Es la única fuente que LUCIA consulta **mientras se usa la aplicación**, y por eso se consulta solo cuando el usuario lo pide, de una en una y espaciadas, y todo lo consultado se guarda en `explorer_positions` para que la comparación siga funcionando sin red ([ADR-0010](adr/0010-repertorio-con-red-y-cacheado.md)). |
 | **Lichess `chess-openings`** (CC0) | Tabla ECO → nombre de apertura. Es la única de esta tabla que **no** se consulta en tiempo de ejecución: se descarga a mano con `scripts/build-openings-table.py` y el resultado se versiona en `packages/core/lucia_core/openings/data/`, para que clasificar aperturas funcione sin red ([ADR-0009](adr/0009-tabla-de-aperturas-versionada.md)). |
 | **Redes Lc0** (lczero.org) y **Maia** | Pesos para Lc0. Maia: redes entrenadas para jugar como humanos de 1100–1900 Elo. |
 

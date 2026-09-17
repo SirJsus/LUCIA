@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db import get_session
+from lucia_api.dependencies import resolved_username
 from lucia_api.services.stats import PlayerStats, RecordSummary, get_player_stats
-from lucia_api.settings import settings
 
 router = APIRouter(tags=["stats"])
 
@@ -187,10 +187,4 @@ async def player_stats(
     """Estadísticas del jugador indicado, o del de `CHESSCOM_USERNAME` si se
     omite. Se pide el nombre porque la base guarda partidas de ambos bandos:
     sin saber quién es "yo", un marcador de victorias no significa nada."""
-    resolved_username = username or settings.chesscom_username
-    if not resolved_username:
-        raise HTTPException(
-            status_code=422,
-            detail="indica un username, o configura CHESSCOM_USERNAME en .env",
-        )
-    return _stats_out(await get_player_stats(session, resolved_username, limit_openings))
+    return _stats_out(await get_player_stats(session, resolved_username(username), limit_openings))

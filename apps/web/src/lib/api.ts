@@ -19,6 +19,8 @@ import type {
   GameDetail,
   GameSummary,
   PlayerStats,
+  RepertoireComparison,
+  RepertoireRefresh,
   SyncSummary,
 } from "@lucia/shared-types";
 
@@ -35,6 +37,16 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  return (await requestWithResponse<T>(path, init)).body;
+}
+
+/** Como `request`, pero devuelve también la respuesta HTTP: hace falta cuando
+ * el dato no viene solo en el cuerpo, como el total de partidas que cumplen un
+ * filtro (`X-Total-Count` en `GET /games`). */
+async function requestWithResponse<T>(
+  path: string,
+  init?: RequestInit,
+): Promise<{ body: T; response: Response }> {
   const response = await fetch(`${BASE_URL}${path}`, {
     headers: { "Content-Type": "application/json" },
     ...init,
@@ -43,7 +55,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   if (!response.ok) {
     throw new ApiError(response.status, await extractErrorMessage(response));
   }
-  return (await response.json()) as T;
+  return { body: (await response.json()) as T, response };
 }
 
 /** FastAPI responde `{detail: string}` o, en errores de validación,
@@ -62,11 +74,28 @@ async function extractErrorMessage(response: Response): Promise<string> {
   return `${response.status} ${response.statusText}`;
 }
 
+export interface GamePage {
+  games: GameSummary[];
+  /** Cuántas cumplen los filtros, sin contar la paginación. */
+  total: number;
+}
+
 export interface GameFilters {
   username?: string;
   color?: "white" | "black";
+  /** Resultado desde el punto de vista de `username`; sin él, la API lo
+   * ignora, porque la misma partida es victoria para uno y derrota para el
+   * otro. Lo mismo vale para `color` y `opponent`. */
+  result?: "win" | "draw" | "loss";
+  opponent?: string;
+  /** Subcadena del nombre de la apertura: "sicilian" trae todas las
+   * sicilianas. */
+  opening?: string;
   time_class?: string;
   rated?: boolean;
+  /** Fechas inclusivas por los dos lados, en formato `YYYY-MM-DD`. */
+  since?: string;
+  until?: string;
   limit?: number;
   offset?: number;
 }
@@ -83,8 +112,15 @@ function toQueryString(filters: object): string {
 }
 
 export const api = {
-  listGames: (filters: GameFilters = {}) =>
-    request<GameSummary[]>(`/games${toQueryString(filters)}`),
+  /** Las partidas de una página y **cuántas cumplen los filtros en total**,
+   * que es lo que permite decir "25 de 324" en vez de solo el número de
+   * página. */
+  listGames: async (filters: GameFilters = {}): Promise<GamePage> => {
+    const { body, response } = await requestWithResponse<GameSummary[]>(
+      `/games${toQueryString(filters)}`,
+    );
+    return { games: body, total: Number(response.headers.get("X-Total-Count") ?? body.length) };
+  },
 
   getGame: (gameId: number) => request<GameDetail>(`/games/${gameId}`),
 
@@ -142,8 +178,19 @@ export const api = {
     if (!response.ok) throw new ApiError(response.status, await extractErrorMessage(response));
   },
 
-  getStats: (username?: string) =>
-    request<PlayerStats>(`/stats${username ? `?username=${encodeURIComponent(username)}` : ""}`),
+  getStats: (username?: string) => request<PlayerStats>(`/stats${toQueryString({ username })}`),
+
+  /** Dónde se sale el jugador de la teoría, con lo que ya está en la caché
+   * (RF-3.6). No sale a internet: eso lo hace `refreshRepertoire`. */
+  getRepertoire: (username?: string) =>
+    request<RepertoireComparison>(`/repertoire${toQueryString({ username })}`),
+
+  /** Pregunta a Lichess por las posiciones que falten, hasta `budget`. Es la
+   * única llamada de LUCIA que necesita red mientras se usa (ADR-0010). */
+  refreshRepertoire: (username?: string) =>
+    request<RepertoireRefresh>(`/repertoire/refresh${toQueryString({ username })}`, {
+      method: "POST",
+    }),
 
   getEnginesConfig: () => request<EnginesConfigOut>("/engines/config"),
 
