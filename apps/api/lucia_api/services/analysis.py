@@ -190,8 +190,18 @@ async def analyze_position(
     (que se encola), aquí se espera una respuesta inmediata para el tablero de
     análisis. Por eso conviene una profundidad moderada, y por eso el router
     la acota.
+
+    En una posición terminal devuelve la lista vacía **sin abrir el motor**,
+    por la misma razón que `lucia_core.analysis.evaluate_positions` no le
+    pregunta ahí: no hay jugada que buscar, y preguntar rompe. Lc0 contesta
+    `bestmove a1a1` —que no es UCI válido, así que `python-chess` aborta la
+    conexión— o directamente se queda colgado. Se veía al llegar al final de
+    una partida terminada en jaque mate en el tablero de análisis.
     """
     board = chess.Board(fen)  # lanza ValueError si el FEN es inválido
+    if board.is_game_over():
+        return []
+
     effective_config = await get_effective_config(session, engine_name)
     config = EngineConfig(
         name=engine_name,

@@ -19,15 +19,17 @@ import { Panel } from "../../components/Panel";
 import {
   BOARD_HINT_CLASSES,
   BOARD_SIDEBAR_GRID_CLASS,
+  buttonClasses,
   MOVE_LIST_HEIGHT_CLASS,
 } from "../../components/styles";
-import { api } from "../../lib/api";
+import { analysisPgnUrl, api } from "../../lib/api";
 import { classificationStyle, MISTAKE_CLASSIFICATIONS } from "../../lib/classification";
 import {
   formatAccuracy,
   formatDate,
   formatDuration,
   formatEngineName,
+  formatRating,
   formatTimeClass,
   gameResult,
   type EngineId,
@@ -203,9 +205,10 @@ export function GameViewerPage() {
             ← Volver a partidas
           </Link>
           <h1 className="mt-1 text-2xl font-bold">
-            {game.white_username} <span className="opacity-60">({game.white_rating})</span>{" "}
+            {game.white_username}{" "}
+            <span className="opacity-60">({formatRating(game.white_rating)})</span>{" "}
             <span className="font-mono">{gameResult(game)}</span> {game.black_username}{" "}
-            <span className="opacity-60">({game.black_rating})</span>
+            <span className="opacity-60">({formatRating(game.black_rating)})</span>
           </h1>
           <p className="flex flex-wrap items-center gap-2 text-sm opacity-60">
             <span>
@@ -218,10 +221,29 @@ export function GameViewerPage() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* `flex-wrap` como en la cabecera del tablero de análisis: con cuatro
+            controles en la fila, sin él se desbordan en una ventana estrecha. */}
+        <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => setOrientation(orientation === "white" ? "black" : "white")}>
             Girar tablero
           </Button>
+          {/* Un enlace y no un botón: descarga un archivo, así que el
+              navegador hace el trabajo y respeta el nombre que manda el
+              servidor. Solo sale con el análisis terminado, que es lo único
+              que la API exporta: uno a medias daría una partida comentada
+              hasta la mitad y muda después (criterio C-3). */}
+          {analysis?.status === "done" && (
+            <a
+              href={analysisPgnUrl(analysis.id)}
+              download
+              className={buttonClasses("secondary")}
+              // Qué lleva el archivo, con la misma forma que "Copiar PGN" del
+              // tablero de análisis, que es la otra acción que saca el PGN.
+              title="Descarga la partida con los comentarios del análisis y las variantes, para abrirla en lichess o ChessBase"
+            >
+              Exportar PGN anotado
+            </a>
+          )}
           <EngineSelect value={engine} onChange={setEngine} />
           <Button
             variant="primary"

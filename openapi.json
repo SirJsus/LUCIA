@@ -3,7 +3,7 @@
   "info": {
     "title": "L.U.C.I.A. API",
     "description": "Logic & Ultimate Chess Insight Algorithm",
-    "version": "0.2.1"
+    "version": "0.2.2"
   },
   "paths": {
     "/health": {
@@ -337,6 +337,48 @@
         }
       }
     },
+    "/import/pgn": {
+      "post": {
+        "tags": [
+          "import"
+        ],
+        "summary": "Import Pgn File",
+        "description": "Guarda en el historial las partidas del archivo (RF-1.5).\n\n- `username`: a quién se le atribuyen; si se omite, `CHESSCOM_USERNAME`.\n- `player_name_in_pgn`: **cómo aparece ese jugador dentro del PGN**. Un archivo de\n  torneo lo nombra \"Durán, Jesús\" y no con su usuario, así que sin esto la\n  partida se guarda pero no cuenta en el dashboard ni en los filtros por\n  color, resultado o rival, que casan por nombre. El PGN se guarda entero,\n  de modo que el nombre original no se pierde.\n\nLas partidas repetidas no se duplican: se identifican por el contenido del\nPGN, así que reimportar el mismo archivo reescribe las mismas filas.",
+        "operationId": "import_pgn_file_import_pgn_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_pgn_file_import_pgn_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PgnImportSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/analysis": {
       "post": {
         "tags": [
@@ -569,6 +611,49 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/AnalysisDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis/{analysis_id}/pgn": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Get Analysis Pgn",
+        "description": "El PGN de la partida con las anotaciones del análisis (RF-5.5).\n\nSe descarga como archivo —de ahí el `Content-Disposition`— porque lo que\nse quiere hacer con él es abrirlo en lichess, ChessBase o SCID, no leerlo\nen el navegador.\n\nSolo se exporta un análisis **terminado**: uno a medias daría una partida\ncomentada hasta la jugada 20 y muda a partir de ahí, que se lee como un\narchivo roto y no como un análisis en curso.",
+        "operationId": "get_analysis_pgn_analysis__analysis_id__pgn_get",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Analysis Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
                 }
               }
             }
@@ -1619,6 +1704,43 @@
         "title": "BoardUpdate",
         "description": "Todos los campos son opcionales: la UI autoguarda solo lo que cambió."
       },
+      "Body_import_pgn_file_import_pgn_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "Archivo .pgn con una o varias partidas"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "player_name_in_pgn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Player Name In Pgn"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_pgn_file_import_pgn_post"
+      },
       "CriticalMomentOut": {
         "properties": {
           "ply": {
@@ -2291,6 +2413,38 @@
           "average_opening_exit_win_percent"
         ],
         "title": "OpeningStatsOut"
+      },
+      "PgnImportSummary": {
+        "properties": {
+          "games_imported": {
+            "type": "integer",
+            "title": "Games Imported"
+          },
+          "games_already_present": {
+            "type": "integer",
+            "title": "Games Already Present"
+          },
+          "skipped_game_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped Game Reasons"
+          },
+          "games_matched_to_player": {
+            "type": "integer",
+            "title": "Games Matched To Player"
+          }
+        },
+        "type": "object",
+        "required": [
+          "games_imported",
+          "games_already_present",
+          "skipped_game_reasons",
+          "games_matched_to_player"
+        ],
+        "title": "PgnImportSummary",
+        "description": "Qué pasó con cada partida del archivo."
       },
       "PhaseStatsOut": {
         "properties": {

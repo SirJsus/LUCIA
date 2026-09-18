@@ -1,8 +1,31 @@
 # `features/games`
 
-Lista de partidas importadas con filtros y paginación (RF-5.3) y disparo de la
-sincronización con chess.com (RF-1). Desde aquí se entra al visor
+Lista de partidas importadas con filtros y paginación (RF-5.3) y las dos formas
+de traer partidas: sincronizar con chess.com (RF-1.2) e importar un archivo PGN
+de otra fuente —OTB, lichess— (RF-1.5). Desde aquí se entra al visor
 ([`features/viewer`](../viewer/README.md)).
+
+Los dos formularios viven juntos en la cabecera porque hacen lo mismo, llenar
+este listado, y quien busca uno busca el otro (criterio C-2). La acción
+principal sigue siendo "Sincronizar"; "Importar" es secundaria.
+
+**Importar PGN.** El archivo no cabe en el estado de React —un `<input
+type="file">` no admite `value`—, así que se lee de una ref al enviar y se
+vacía por la misma vía al terminar. El campo "Mi nombre en el PGN" es lo que
+hace que la partida cuente: un archivo de torneo nombra al jugador "Durán,
+Jesús" y no con su usuario, y el dashboard y tres de los filtros de esta misma
+pantalla casan por nombre. De ahí los tres avisos posibles tras importar:
+cuántas de las que traía el archivo se guardaron, que no se reconoció al
+usuario en ninguna (guardadas, pero sin contar en ningún marcador) y qué
+partidas se quedaron fuera y por qué. El total del archivo se compone aquí
+—guardadas más ya presentes más saltadas— y no es un campo de la API: es la
+suma de lo que ya devuelve. El porqué de cada decisión está en
+[ADR-0011](../../../../../docs/adr/0011-pgn-manual-en-la-misma-tabla.md).
+
+Una partida importada llega con huecos donde el PGN no decía nada —los dos
+ratings, el control de tiempo y el ritmo—, y la tabla los enseña como "—" con
+`formatRating`, `formatTimeControl` y `formatTimeClass` de `lib/format.ts`, el
+mismo hueco que la precisión sin analizar (criterio C-5).
 
 La tabla sale de `components/DataTable`, y se entra a una partida por el enlace
 "Ver partida" del final de la fila: es la misma forma que el listado de

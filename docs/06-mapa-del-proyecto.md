@@ -28,10 +28,13 @@ flowchart TB
     end
 
     subgraph Servidor["apps/api (FastAPI)"]
-        ROUTERS["routers/<br/>sync · games · analysis · stats<br/>engines · boards · repertoire"]
+        ROUTERS["routers/<br/>sync · pgn_import · games · analysis<br/>stats · engines · boards · repertoire"]
         WORKER["worker/<br/>cola de análisis en background"]
+        SVC_ANALYSIS["services/analysis.py<br/>run_analysis · analyze_position<br/>+ lectura de alternativas guardadas"]
         SVC_INSIGHTS["services/insights.py<br/>lee el análisis guardado"]
         SVC_SYNC["services/chesscom_sync.py<br/>importa partidas y les pone apertura"]
+        SVC_PGN["services/pgn_import.py<br/>archivo PGN → las mismas filas<br/>(platform=manual, RF-1.5)"]
+        SVC_EXPORT["services/pgn_export.py<br/>análisis guardado → PGN anotado<br/>(comentarios y variantes, RF-5.5)"]
         SVC_GAMES["services/games.py<br/>de qué color jugó el usuario<br/>y qué le pasó (expresiones SQL)"]
         SVC_REP["services/repertoire.py<br/>compara con la caché ·<br/>refresh_repertoire (la red)"]
     end
@@ -60,23 +63,30 @@ flowchart TB
     ROUTERS -- "GET /stats · GET /analysis/{id}" --> SVC_INSIGHTS
     SVC_INSIGHTS --> DB
     SVC_INSIGHTS -- "sin motor (ADR-0008)" --> INSIGHTS
-    ROUTERS -- "POST /analysis/position<br/>(síncrono, sin cola)" --> BRIDGE
-    WORKER --> BRIDGE
-    WORKER --> ANALYSIS
+    ROUTERS -- "POST /analysis/position<br/>(síncrono, sin cola)" --> SVC_ANALYSIS
+    WORKER -- "run_analysis" --> SVC_ANALYSIS
+    SVC_ANALYSIS --> BRIDGE
+    SVC_ANALYSIS --> ANALYSIS
     ANALYSIS --> CLASS
     ANALYSIS --> ACC
     ANALYSIS -- "hasta dónde llega la teoría<br/>(clasificación book, RF-2.2)" --> OPENINGS
     BRIDGE -- "UCI (stdin/stdout)" --> ENGINES
-    ROUTERS --> SVC_SYNC
+    ROUTERS -- "POST /sync" --> SVC_SYNC
     SVC_SYNC --> CHESSCOM
     SVC_SYNC -- "opening_of_pgn → games.opening_eco/name" --> OPENINGS
     SVC_SYNC --> DB
+    ROUTERS -- "POST /import/pgn (multipart)" --> SVC_PGN
+    SVC_PGN -- "parse_move_clocks (sin red)" --> CHESSCOM
+    SVC_PGN -- "opening_of_pgn → games.opening_eco/name" --> OPENINGS
+    SVC_PGN -- "mismas tablas games/players<br/>(ADR-0011)" --> DB
+    ROUTERS -- "GET /analysis/{id}/pgn<br/>(solo status=done; descarga)" --> SVC_EXPORT
+    SVC_EXPORT -- "engine_lines_from_serialized · alternatives_of<br/>(sin motor: todo sale de analyzed_moves)" --> SVC_ANALYSIS
     CHESSCOM -- "HTTPS" --> API_CHESSCOM
     ROUTERS -- "GET /repertoire (sin red)<br/>POST /repertoire/refresh (con red)" --> SVC_REP
     SVC_REP -- "lee partidas y caché;<br/>GET /repertoire se queda aquí" --> DB
     SVC_REP -- "solo refresh_repertoire<br/>(tope por llamada, ADR-0010)" --> LICHESS
     LICHESS -- "HTTPS masters(fen)" --> API_LICHESS
-    ANALYSIS --> DB
+    SVC_ANALYSIS -- "analyzed_moves · position_cache" --> DB
 ```
 
 Detalle narrativo y modelo de datos completo: [03-arquitectura.md](03-arquitectura.md).
@@ -100,7 +110,9 @@ graph LR
     subgraph PY["Workspace uv"]
         subgraph API["lucia_api"]
             api_sync["services/chesscom_sync.py"]
+            api_pgn["services/pgn_import.py"]
             api_analysis["services/analysis.py"]
+            api_pgn_export["services/pgn_export.py<br/>PGN anotado (RF-5.5)"]
             api_stats["services/stats.py"]
             api_games["services/games.py<br/>color y resultado del jugador"]
             api_insights["services/insights.py"]
@@ -130,7 +142,10 @@ graph LR
     lib --> types
     api_sync --> chesscom
     api_sync --> core_openings
+    api_pgn --> chesscom
+    api_pgn --> core_openings
     api_analysis --> core_analysis
+    api_pgn_export --> api_analysis
     core_analysis --> core_openings
     api_stats --> api_games
     api_stats --> api_insights
@@ -171,6 +186,30 @@ resolución del jugador por defecto, que estaba repetida en `routers/stats.py` y
 `routers/repertoire.py`, vive ahora en `lucia_api/dependencies.py`
 (`resolved_username`).
 
+Con la importación de PGN (RF-1.5) hay un segundo servicio que llena el
+historial, `services/pgn_import.py`, y mira hacia los mismos dos sitios que
+`services/chesscom_sync.py`: `lucia_core.openings` (`opening_of_pgn`) y
+`lucia_chesscom` (`parse_move_clocks`, que es lectura de PGN, no red). Sigue
+siendo una sola vía: `lucia_chesscom` no sabe nada de `lucia_api`, y del
+importador no cuelga cliente externo alguno —el archivo lo sube el usuario—.
+Que las dos vías escriban en las mismas tablas `games`/`players`, con
+`platform="manual"` y huecos declarados donde el PGN no dice nada, es
+[ADR-0011](adr/0011-pgn-manual-en-la-misma-tabla.md); por eso el visor, el
+análisis y las estadísticas no tienen una rama por origen de la partida. El
+único punto donde el origen se nota es el vocabulario de resultados: `"draw"`
+a secas entró en `DRAW_RESULTS`, que `services/games.py` y `lib/format.ts`
+mantienen en paralelo.
+
+Con la exportación a PGN anotado (RF-5.5) hay un servicio más dentro de
+`lucia_api`, `services/pgn_export.py`, y su única dependencia interna es
+`services/analysis.py` (`engine_lines_from_serialized`, `alternatives_of`):
+sigue la dirección que ya existía, no la invierte y no toca el motor ni la
+base —recibe el análisis, las jugadas y las alternativas ya cargadas por
+`routers/analysis.py::_load_analysis_with_moves`, el mismo cargador que sirve
+`GET /analysis/{id}`—. Es simétrico de `services/pgn_import.py` en el nombre y
+opuesto en el sentido: uno convierte un archivo en filas, el otro convierte
+filas en un archivo.
+
 Dentro de `@lucia/web` la dirección también es de una sola vía: las pantallas
 (`features/*`) importan de `components/` —lo compartido entre dos o más de
 ellas—, nunca al revés. Las piezas de tablero que usan el visor y el tablero de
@@ -188,6 +227,20 @@ sin pantalla: `EngineSelect` usa `format.ts`, `ClassificationBadge` usa
 [apps/web/src/components/README.md](../apps/web/src/components/README.md).
 
 ## 3 · Flujos principales
+
+Son nueve secuencias, agrupadas aquí por lo que hacen —el índice es
+la agrupación: cada flujo sigue teniendo su diagrama, porque juntar dos en uno
+solo haría un diagrama ilegible—:
+
+- **Llenar el historial**: sincronizar con chess.com (RF-1) · importar un
+  archivo PGN (RF-1.5). Dos vías, las mismas tablas.
+- **Consultar lo guardado**: listar partidas con filtros (RF-5.3).
+- **Llamar al motor**: analizar una partida (RF-2, con cola) · analizar una
+  posición en vivo (RF-5.2 / RF-6.2, síncrono).
+- **Leer el análisis ya guardado, sin motor**: alternativas por jugada
+  (RF-10) · exportar a PGN anotado (RF-5.5) · patrones (RF-2.8 · RF-3.2 ·
+  RF-3.4 · RF-3.5).
+- **Contrastar con teoría externa**: repertorio contra maestros (RF-3.6).
 
 ### Sincronizar con chess.com (RF-1, implementado)
 
@@ -222,6 +275,54 @@ sequenceDiagram
     S->>DB: upsert sync_state (último mes)
     S-->>A: SyncSummary
     A-->>U: resumen de sincronización
+```
+
+### Importar un archivo PGN (RF-1.5, implementado)
+
+La segunda vía de llenar el historial, junto a `POST /sync`: partidas de otra
+fuente —sobre el tablero, lichess, un archivo de torneo— que acaban en las
+mismas tablas y de ahí en el visor, el análisis y las estadísticas. El porqué
+de cada regla está en el flujo 6 de
+[03-arquitectura.md § Flujos principales](03-arquitectura.md) y en
+[ADR-0011](adr/0011-pgn-manual-en-la-misma-tabla.md); aquí solo el recorrido.
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant P as GamesPage (features/games)
+    participant AP as lib/api.ts (importPgn, FormData)
+    participant R as apps/api (routers/pgn_import.py)
+    participant S as services/pgn_import.py
+    participant C as lucia_chesscom
+    participant O as lucia_core.openings
+    participant DB as SQLite
+
+    U->>P: elegir archivo .pgn + "Mi nombre en el PGN"
+    P->>AP: importPgn(file, {playerNameInPgn})
+    Note over AP: sin Content-Type propio: lo pone el navegador<br/>con el separador de partes (multipart)
+    AP->>R: POST /import/pgn
+    R->>R: tamaño > MAX_PGN_BYTES → 413 (antes de leerlo)
+    R->>R: decode utf-8-sig, con respaldo latin-1
+    R->>S: import_pgn(session, pgn_text, username, player_name_in_pgn)
+    S->>DB: players: la fila que ya existe o una nueva (platform=manual)
+    loop cada partida del archivo
+        alt sin jugadas o partida sin terminar
+            S->>S: skipped_game_reasons += motivo
+        else
+            S->>S: platform_id = sha256(pgn), no hay uuid
+            S->>O: opening_of_pgn(pgn) [RF-3.2]
+            S->>C: parse_move_clocks(pgn)
+            S->>DB: upsert games (platform=manual, idempotente)<br/>huecos: rating 0 · ritmo unknown · rated false
+        end
+    end
+    S-->>R: PgnImportSummary (guardadas · ya presentes ·<br/>saltadas con motivo · reconocidas como del usuario)
+    alt ninguna guardada ni ya presente
+        R-->>AP: 422 con los motivos
+    else
+        R-->>AP: 200: resumen
+    end
+    AP-->>P: PgnImportSummary
+    P-->>U: N de M importadas y, si no se reconoció al<br/>usuario en ninguna, aviso de que no contarán<br/>en el dashboard ni en los filtros por nombre
 ```
 
 ### Listar partidas con filtros (RF-5.3, implementado)
@@ -399,6 +500,55 @@ sequenceDiagram
 A diferencia del tablero de análisis, aquí pulsar una jugada de una línea solo
 la dibuja: no hay `onPlayLine`, porque una partida terminada no se continúa.
 
+### Exportar el análisis a PGN anotado (RF-5.5, implementado)
+
+La otra salida del mismo material que pinta el visor: en vez de dibujarlo,
+lo escribe en un archivo que se abre en lichess, ChessBase o SCID. Tampoco
+llama al motor. Qué se escribe y por qué está en el flujo 7 de
+[03-arquitectura.md § Flujos principales](03-arquitectura.md); aquí solo el
+recorrido.
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant G as GameViewerPage (features/viewer)
+    participant AP as lib/api.ts (analysisPgnUrl)
+    participant B as Navegador
+    participant R as apps/api (routers/analysis.py)
+    participant S as services/analysis.py
+    participant X as services/pgn_export.py
+    participant DB as SQLite
+
+    Note over G: el enlace solo sale con status=done,<br/>que es lo único que la API exporta
+    U->>G: "Exportar PGN anotado"
+    G->>AP: analysisPgnUrl(analysis.id)
+    AP-->>B: href de un enlace con download, no un fetch
+    B->>R: GET /analysis/{id}/pgn
+    R->>R: _load_analysis_with_moves(...) [el mismo que GET /analysis/{id}]
+    R->>DB: analyses + analyzed_moves en orden de ply
+    R->>S: alternatives_from_cache(analysis, moves)
+    Note over R,S: solo para los análisis anteriores a RF-10.1,<br/>que no guardaron alternatives_json (ADR-0007)
+    alt status != done
+        R-->>B: 409 (un PGN comentado a medias se lee como archivo roto)
+    else
+        R->>DB: games (el PGN original de la partida)
+        R->>X: export_annotated_pgn(game, analysis, moves, cached_alternatives)
+        X->>X: cabeceras Annotator · White/BlackAccuracy
+        loop cada jugada del PGN original, por ply
+            X->>X: NAG solo si falló (?! · ? · ??)
+            X->>X: comentario: clasificación + prob. victoria blancas
+            opt el motor prefería otra jugada
+                X->>S: alternatives_of + engine_lines_from_serialized(fen_before)
+                S-->>X: EngineLine[] (sin motor: ya estaban guardadas)
+                X->>X: línea 1 como variante del nodo padre,<br/>recortada a MAX_VARIATION_PLIES
+            end
+        end
+        X-->>R: texto PGN anotado
+        R-->>B: 200 application/x-chess-pgn<br/>Content-Disposition attachment, filename lucia-...pgn
+    end
+    B-->>U: archivo descargado con el nombre del servidor
+```
+
 ### Comparar el repertorio con la teoría de maestros (RF-3.6, implementado)
 
 Dos recorridos separados a propósito ([ADR-0010](adr/0010-repertorio-con-red-y-cacheado.md)):
@@ -503,6 +653,7 @@ amplía a medida que se implementa cada RF (ver [05-roadmap.md](05-roadmap.md)).
 | Requerimiento | Módulo / archivo | Doc detallada |
 | --- | --- | --- |
 | RF-1 · Importación chess.com | `packages/chesscom/lucia_chesscom/` (cliente, PGN, sync incremental), `apps/api/lucia_api/services/chesscom_sync.py` (que además fija `opening_eco`/`opening_name` con `lucia_core.openings.opening_of_pgn`), `db/models.py`, `routers/sync.py` | [03-arquitectura.md § chesscom](03-arquitectura.md) |
+| RF-1.5 · Importar un PGN de otra fuente (OTB, lichess) | `apps/api/lucia_api/routers/pgn_import.py` (`POST /import/pgn`, multipart con `python-multipart`, tope `MAX_PGN_BYTES`), `apps/api/lucia_api/services/pgn_import.py` (`import_pgn`, `PgnImportSummary`; reutiliza `lucia_core.openings.opening_of_pgn` y `lucia_chesscom.parse_move_clocks`, y escribe en `games`/`players` con `platform="manual"`, sin columna ni migración nuevas), `services/games.py` (`"draw"` en `DRAW_RESULTS`), `apps/web/src/lib/api.ts` (`api.importPgn`), `apps/web/src/features/games/GamesPage.tsx` (formulario "Importar PGN", junto a Sincronizar), `apps/web/src/lib/format.ts` (`formatRating`, y los huecos de `formatTimeClass`/`formatTimeControl`) | [ADR-0011](adr/0011-pgn-manual-en-la-misma-tabla.md), [02-requerimientos.md § RF-1](02-requerimientos.md), [03-arquitectura.md § flujo 6](03-arquitectura.md) |
 | RF-2 · Análisis con motores | `packages/core/lucia_core/` (engine, `analysis/` con `EngineLine` y el MultiPV completo en `PositionEval.lines`, classification, accuracy), `apps/api/lucia_api/services/analysis.py`, `worker/`, `routers/analysis.py` | [03-arquitectura.md § core / api](03-arquitectura.md) |
 | RF-2.2 · Categoría "Libro" | `packages/core/lucia_core/openings/__init__.py` (`Opening`, `default_book`, `GameOpening`, `identify_opening`, `opening_of_pgn`) con la tabla `openings/data/openings.tsv` generada por `scripts/build-openings-table.py`, `packages/core/lucia_core/classification/__init__.py` (`classify_move(..., in_opening_book=...)` → `"book"`), `packages/core/lucia_core/analysis/__init__.py` (`book_plies`), `apps/web/src/lib/classification.ts` (etiqueta "Teoría" y su `description`, que usa el resumen de jugadas del visor) | [ADR-0009](adr/0009-tabla-de-aperturas-versionada.md), [02-requerimientos.md § RF-2](02-requerimientos.md) |
 | RF-2.6 · Lc0 y discrepancias | `apps/api/lucia_api/services/comparison.py`, `apps/web/src/features/viewer/EngineComparison.tsx` | [05-roadmap.md § fase 2](05-roadmap.md) |
@@ -518,6 +669,7 @@ amplía a medida que se implementa cada RF (ver [05-roadmap.md](05-roadmap.md)).
 | RF-5.2 · Análisis en vivo y flechas del motor | entregado en el tablero de análisis y, desde RF-10.2, con flechas múltiples y previsualización también en el visor (sobre el análisis guardado, sin llamar al motor); queda RF-6.6 (fase 2). `apps/api/lucia_api/routers/analysis.py` (`POST /analysis/position`) + `services/analysis.py::analyze_position`; `apps/web/src/components/board/` (`boardConfig.ts` con `arrowsFromEngineLines` y `arrowsFromPreviewLine`, `EvalBar.tsx`, `Chessboard.tsx` con la prop `engineArrows`, `BoardWithEvalBar.tsx`); con qué motor se pide lo elige `apps/web/src/components/EngineSelect.tsx` en las dos pantallas | [03-arquitectura.md § flujo 3](03-arquitectura.md) |
 | RF-5.3 · Listado de partidas con filtros | `apps/api/lucia_api/routers/games.py` (nueve filtros: `username`, `color`, `result`, `opponent`, `opening`, `since`, `until`, `time_class`, `rated`, con `_filter_conditions` compartido entre la página y el conteo, y la cabecera `X-Total-Count`), `apps/api/lucia_api/services/games.py` (el lado del jugador en SQL, compartido con `services/stats.py`), `apps/web/src/features/games/GamesPage.tsx` (tabla con `components/DataTable.tsx`, campos con `components/FilterBar.tsx` y `components/FieldLabel.tsx`, total en `lib/api.ts::GamePage`) | [02-requerimientos.md § RF-5](02-requerimientos.md) (reglas de los filtros), [03-arquitectura.md](03-arquitectura.md) |
 | RF-5.4 · Config. de motores | `apps/api/lucia_api/routers/engines.py` + `services/engines.py`, `apps/web/src/features/engines/` | [03-arquitectura.md](03-arquitectura.md) |
+| RF-5.5 · Exportar una partida analizada a PGN anotado | `apps/api/lucia_api/services/pgn_export.py` (`export_annotated_pgn`, `CLASSIFICATION_COMMENT_LABELS`, `CLASSIFICATION_NAGS`, `MAX_VARIATION_PLIES`; reutiliza `services/analysis.py::engine_lines_from_serialized` y `alternatives_of`, sin llamar al motor), `apps/api/lucia_api/routers/analysis.py` (`GET /analysis/{analysis_id}/pgn`: 409 si el análisis no está en `done`, `application/x-chess-pgn` como descarga con `_pgn_download_filename`, y el cargador `_load_analysis_with_moves` que comparte con `GET /analysis/{id}`), `apps/web/src/lib/api.ts` (`analysisPgnUrl`), `apps/web/src/features/viewer/GameViewerPage.tsx` (enlace "Exportar PGN anotado", un `<a download>` y no un `fetch`) | [03-arquitectura.md § flujo 7](03-arquitectura.md), [02-requerimientos.md § RF-5](02-requerimientos.md), [ADR-0007](adr/0007-alternativas-por-jugada-json-y-cache.md) (de dónde salen las variantes) |
 | RF-5.6 · Tema claro/oscuro | `apps/web/src/components/ThemeToggle.tsx` | [02-requerimientos.md § RF-5](02-requerimientos.md) |
 | Contrato API ↔ front | `scripts/export-openapi.py`, `openapi.json`, `packages/shared-types/` | [03-arquitectura.md § api](03-arquitectura.md) |
 | RF-6 · Tablero de análisis | `apps/api/lucia_api/routers/boards.py`, `apps/web/src/features/board/` (`tree.ts` = árbol de variantes, numerado desde la raíz real del tablero con `plyFromFen` de `apps/web/src/lib/moves.ts`, RF-6.3; `EngineLines.tsx` = los estados del motor en vivo, con las líneas de `components/board/EngineLineList.tsx`, previsualización de línea y `playLine` de `BoardPage.tsx` para jugarla hasta la jugada pulsada, RF-6.2); tablero, barra, flechas, botón de jugada y navegación se importan de `apps/web/src/components/board/` | [03-arquitectura.md § web](03-arquitectura.md) |

@@ -18,6 +18,7 @@ import type {
   EnginesConfigOut,
   GameDetail,
   GameSummary,
+  PgnImportSummary,
   PlayerStats,
   RepertoireComparison,
   RepertoireRefresh,
@@ -205,7 +206,36 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ username: username ?? null }),
     }),
+
+  /** Sube un archivo PGN al historial (RF-1.5).
+   *
+   * `playerNameInPgn` es cómo aparece el usuario dentro de ese PGN: un archivo de
+   * torneo lo nombra "Durán, Jesús" y no con su usuario de chess.com.
+   *
+   * Va como `FormData` y no como JSON, así que **anula la cabecera
+   * `Content-Type`** de `request`: el navegador tiene que poner la suya con el
+   * separador de partes, o el servidor no sabe dónde empieza el archivo. */
+  importPgn: (file: File, options: { username?: string; playerNameInPgn?: string } = {}) => {
+    const form = new FormData();
+    form.append("file", file);
+    if (options.username) form.append("username", options.username);
+    if (options.playerNameInPgn) form.append("player_name_in_pgn", options.playerNameInPgn);
+    return request<PgnImportSummary>("/import/pgn", {
+      method: "POST",
+      headers: {},
+      body: form,
+    });
+  },
 };
+
+/** URL de descarga del PGN anotado de un análisis (RF-5.5).
+ *
+ * Es un enlace y no una llamada `fetch`: el navegador descarga el archivo y le
+ * pone el nombre que manda el servidor en `Content-Disposition`, que es
+ * justamente lo que se perdería al pasarlo por JavaScript. */
+export function analysisPgnUrl(analysisId: number): string {
+  return `${BASE_URL}/analysis/${analysisId}/pgn`;
+}
 
 /** URL del WebSocket de progreso. Vite proxea `/ws` al backend. */
 export function analysisProgressUrl(analysisId: number): string {

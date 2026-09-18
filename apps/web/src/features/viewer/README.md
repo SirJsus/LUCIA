@@ -2,7 +2,8 @@
 
 La pantalla del visor (RF-5.1): revivir una partida ya analizada jugada a
 jugada, con su clasificación, su gráfico de evaluación, los momentos en que se
-decidió (RF-2.8) y el disparo del análisis con progreso en vivo (RF-2.4).
+decidió (RF-2.8), el disparo del análisis con progreso en vivo (RF-2.4) y la
+descarga de la partida como PGN anotado (RF-5.5).
 
 Las piezas de tablero que comparte con el tablero de análisis (`Chessboard`,
 `EvalBar`, `BoardWithEvalBar`, `MoveNavigator`, `MoveButton`, `EngineLineList`,
@@ -56,6 +57,27 @@ se lee sale de sumarle el ply de esa posición de partida (`lib/moves.ts`), y lo
 hacen igual la lista de jugadas, el gráfico y la comparación de motores. La
 cabecera avisa además de esas partidas, con el campo
 `starts_from_custom_position` que trae la API.
+
+## Exportar el PGN anotado
+
+"Exportar PGN anotado" (RF-5.5) es un `<a download>` a
+`GET /analysis/{id}/pgn` y no una llamada por `fetch`: así el navegador
+descarga el archivo con el nombre que manda el servidor en
+`Content-Disposition`, que es justo lo que se perdería al pasar el contenido
+por JavaScript. Por eso `lib/api.ts` expone `analysisPgnUrl()` —una URL— y no
+un método más del cliente.
+
+El archivo lo compone el servidor entero (`services/pgn_export.py`): el visor
+no arma nada. Eso obliga a que las etiquetas de clasificación estén escritas
+también allí, duplicadas a propósito de las de `lib/classification.ts`; si
+cambian aquí, hay que cambiarlas allá (criterio C-5 de
+[`docs/07-coherencia-ui.md`](../../../../../docs/07-coherencia-ui.md)).
+
+El enlace solo aparece con el análisis en `done`, que es lo único que la API
+exporta: un análisis a medias daría una partida comentada hasta la jugada 20 y
+muda a partir de ahí. Qué lleva exactamente el archivo está en la nota de
+RF-5.5 de
+[`docs/02-requerimientos.md`](../../../../../docs/02-requerimientos.md).
 
 ## Momentos críticos
 

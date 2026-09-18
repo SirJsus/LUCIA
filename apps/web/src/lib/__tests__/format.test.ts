@@ -4,6 +4,7 @@ import {
   formatDuration,
   formatEngineName,
   formatPercent,
+  formatRating,
   formatTimeClass,
   formatTimeControl,
   formatYearMonth,
@@ -27,6 +28,20 @@ describe("gameResult", () => {
     expect(gameResult({ white_result: "repetition" })).toBe("½-½");
     expect(gameResult({ white_result: "insufficient" })).toBe("½-½");
   });
+
+  it("reconoce las tablas del PGN importado a mano, que no dicen cómo acabó", () => {
+    expect(gameResult({ white_result: "draw" })).toBe("½-½");
+  });
+});
+
+describe("formatRating", () => {
+  it("enseña el rating cuando se sabe", () => {
+    expect(formatRating(1832)).toBe("1832");
+  });
+
+  it("enseña un hueco cuando el PGN no traía rating, en vez de un 0", () => {
+    expect(formatRating(0)).toBe("—");
+  });
 });
 
 describe("formatTimeControl", () => {
@@ -41,6 +56,10 @@ describe("formatTimeControl", () => {
 
   it("no rompe con controles que no son numéricos (correspondencia)", () => {
     expect(formatTimeControl("1/86400")).toBe("1/86400");
+  });
+
+  it("enseña un hueco cuando el PGN importado no decía el control", () => {
+    expect(formatTimeControl("-")).toBe("—");
   });
 });
 
@@ -104,6 +123,10 @@ describe("formatTimeClass", () => {
 
   it("uno desconocido se capitaliza en vez de desaparecer", () => {
     expect(formatTimeClass("classical")).toBe("Classical");
+  });
+
+  it("el ritmo que el PGN importado no trae es un hueco, no un «Unknown»", () => {
+    expect(formatTimeClass("unknown")).toBe("—");
   });
 });
 

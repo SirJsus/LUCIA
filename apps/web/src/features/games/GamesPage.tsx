@@ -1,12 +1,13 @@
-/** Lista de partidas importadas, con filtros (RF-5.3) y disparo de
- * sincronización con chess.com (RF-1). */
+/** Lista de partidas importadas, con filtros (RF-5.3) y las dos formas de
+ * traer partidas: sincronizar con chess.com (RF-1.2) e importar un archivo
+ * PGN de otra fuente —OTB, lichess— (RF-1.5). */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "../../components/Button";
 import { CustomPositionBadge } from "../../components/CustomPositionBadge";
 import { FieldLabel } from "../../components/FieldLabel";
-import { EmptyState, ErrorBox, Spinner, SuccessBox } from "../../components/Feedback";
+import { EmptyState, ErrorBox, Spinner, SuccessBox, WarningBox } from "../../components/Feedback";
 import { DataTable } from "../../components/DataTable";
 import { FilterBar, FilterSelect, FilterText } from "../../components/FilterBar";
 import {
@@ -15,8 +16,15 @@ import {
   TABLE_CELL_CLASSES,
   TABLE_ROW_CLASSES,
 } from "../../components/styles";
+import type { PgnImportSummary } from "@lucia/shared-types";
 import { api, type GameFilters } from "../../lib/api";
-import { formatDate, formatTimeClass, formatTimeControl, gameResult } from "../../lib/format";
+import {
+  formatDate,
+  formatRating,
+  formatTimeClass,
+  formatTimeControl,
+  gameResult,
+} from "../../lib/format";
 
 const TIME_CLASSES = ["bullet", "blitz", "rapid", "daily"] as const;
 
@@ -31,11 +39,32 @@ const PLAYER_FIRST_HINT =
 /** Las dos fechas son inclusivas, y se dice con las mismas palabras en las
  * dos: "desde el 1" y "hasta el 31" cubren el 1 y el 31 enteros. */
 const DATE_HINT = "Incluye el día indicado";
+
+/** Por qué se pregunta el nombre al importar un PGN. Un archivo de torneo
+ * nombra al jugador "Durán, Jesús" y no con su usuario de chess.com, y el
+ * dashboard y los filtros de esta misma pantalla casan por nombre: sin
+ * decirlo, la partida se guarda pero no cuenta en ningún marcador. */
+const PLAYER_NAME_IN_PGN_HINT =
+  "Como apareces en ese archivo; si no, la partida no cuenta en tus estadísticas.";
 const PAGE_SIZE = 25;
+
+/** Cuántas partidas traía el archivo importado: las guardadas más las que se
+ * saltaron. La API no lo manda como tal porque es la suma de lo que ya
+ * devuelve, y tenerlo dos veces daría dos sitios donde descuadrar. */
+function countGamesInFile(summary: PgnImportSummary): number {
+  return (
+    summary.games_imported + summary.games_already_present + summary.skipped_game_reasons.length
+  );
+}
 
 export function GamesPage() {
   const [filters, setFilters] = useState<GameFilters>({ limit: PAGE_SIZE, offset: 0 });
   const [syncUsername, setSyncUsername] = useState("");
+  const [playerNameInPgn, setPlayerNameInPgn] = useState("");
+  // El archivo no puede vivir en el estado de React como los demás campos: un
+  // `<input type="file">` no admite `value`, así que se lee del elemento al
+  // enviar y se vacía por la misma vía al terminar.
+  const pgnFileInput = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
   const gamesQuery = useQuery({
@@ -46,6 +75,19 @@ export function GamesPage() {
   const syncMutation = useMutation({
     mutationFn: () => api.sync(syncUsername || undefined),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["games"] }),
+  });
+
+  const importPgnMutation = useMutation({
+    mutationFn: (file: File) =>
+      // Sin `username`: las partidas se atribuyen a CHESSCOM_USERNAME, el
+      // mismo jugador del que habla el dashboard. El campo de al lado es el
+      // usuario **al que se sincroniza**, y gobernar con él a quién pertenece
+      // un PGN importado sería un acoplamiento que no se ve en pantalla.
+      api.importPgn(file, { playerNameInPgn }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["games"] });
+      if (pgnFileInput.current) pgnFileInput.current.value = "";
+    },
   });
 
   function updateFilter(patch: Partial<GameFilters>) {
@@ -84,14 +126,96 @@ export function GamesPage() {
             {syncMutation.isPending ? "Sincronizando…" : "Sincronizar"}
           </Button>
         </form>
+
+        {/* Segunda vía para traer partidas: un archivo PGN de otra fuente
+            (RF-1.5). Va junto a "Sincronizar" y no en otra pantalla porque las
+            dos hacen lo mismo —llenar este listado— y se esperan en el mismo
+            sitio (criterio C-2 de docs/07-coherencia-ui.md). */}
+        <form
+          className="flex items-end gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const file = pgnFileInput.current?.files?.[0];
+            if (file) importPgnMutation.mutate(file);
+          }}
+        >
+          <FieldLabel label="Importar PGN (OTB, lichess)">
+            <input
+              ref={pgnFileInput}
+              type="file"
+              // Sin `required`, pulsar "Importar" sin archivo no hacía nada ni
+              // decía por qué; con él, el navegador lo pide (criterio C-3).
+              required
+              accept=".pgn,application/x-chess-pgn,text/plain"
+              className={`w-64 ${FIELD_CLASSES} file:mr-2 file:rounded file:border-0 file:bg-slate-200 file:px-2 file:py-0.5 file:text-xs dark:file:bg-slate-700 dark:file:text-slate-100`}
+            />
+          </FieldLabel>
+          <FieldLabel label="Mi nombre en el PGN" hint={PLAYER_NAME_IN_PGN_HINT}>
+            <input
+              value={playerNameInPgn}
+              onChange={(event) => setPlayerNameInPgn(event.target.value)}
+              placeholder="Durán, Jesús"
+              className={`w-44 ${FIELD_CLASSES}`}
+            />
+          </FieldLabel>
+          {/* Secundario: la acción principal de la pantalla es
+              "Sincronizar", y solo hay una por pantalla
+              (components/Button.tsx). */}
+          <Button type="submit" disabled={importPgnMutation.isPending}>
+            {importPgnMutation.isPending ? "Importando…" : "Importar"}
+          </Button>
+        </form>
       </div>
 
       {syncMutation.isError && <ErrorBox error={syncMutation.error} />}
       {syncMutation.isSuccess && (
         <SuccessBox>
-          {syncMutation.data.games_upserted} partidas importadas en{" "}
+          {syncMutation.data.games_upserted} partidas sincronizadas en{" "}
           {syncMutation.data.months_synced.length} mes(es).
         </SuccessBox>
+      )}
+
+      {importPgnMutation.isError && <ErrorBox error={importPgnMutation.error} />}
+      {importPgnMutation.isSuccess && (
+        // "3 de 13": el total del archivo va en la misma frase que lo guardado,
+        // porque una importación parcial contada en dos recuadros —el verde y
+        // el ámbar de abajo— obliga a sumar para saber si salió bien (C-3).
+        <SuccessBox>
+          {importPgnMutation.data.games_imported} de {countGamesInFile(importPgnMutation.data)}{" "}
+          partidas del archivo importadas
+          {importPgnMutation.data.games_already_present > 0 &&
+            `; ${importPgnMutation.data.games_already_present} ya estaban en el historial`}
+          .
+        </SuccessBox>
+      )}
+      {/* Reconocer al jugador es lo que hace que la partida cuente en el
+          dashboard y en los filtros por color, resultado y rival. Si no se
+          reconoció en ninguna, el recuadro verde de arriba sería un éxito
+          engañoso: la partida está guardada y no sale en ningún marcador, y
+          sin decirlo aquí se descubre días después (C-3). */}
+      {importPgnMutation.isSuccess &&
+        importPgnMutation.data.games_matched_to_player === 0 &&
+        importPgnMutation.data.games_imported + importPgnMutation.data.games_already_present > 0 && (
+          <WarningBox>
+            No te reconocí en ninguna: revisa «Mi nombre en el PGN», tiene que estar escrito igual
+            que en el archivo. Las partidas están guardadas, pero no cuentan en tus estadísticas.
+          </WarningBox>
+        )}
+      {/* Las partidas que el archivo traía y no se pudieron guardar se
+          enumeran con su motivo: un recuento de "importadas" que no cuadra con
+          lo que tenía el archivo, sin decir por qué, se lee como un fallo
+          (criterio C-3). */}
+      {importPgnMutation.isSuccess && importPgnMutation.data.skipped_game_reasons.length > 0 && (
+        <WarningBox>
+          <p className="font-medium">
+            {importPgnMutation.data.skipped_game_reasons.length} partidas del archivo no se importaron:
+          </p>
+          <ul className="mt-1 list-inside list-disc opacity-90">
+            {importPgnMutation.data.skipped_game_reasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        </WarningBox>
       )}
 
       <FilterBar>
@@ -209,7 +333,7 @@ export function GamesPage() {
         >
           {hasFilters
             ? "Prueba a quitar alguno: el rango de fechas y la apertura son los que más recortan."
-            : "Sincroniza tu usuario de chess.com con el formulario de arriba."}
+            : "Sincroniza tu usuario de chess.com o importa un archivo PGN con los formularios de arriba."}
         </EmptyState>
       )}
 
@@ -222,7 +346,8 @@ export function GamesPage() {
                   {formatDate(game.played_at)}
                 </td>
                 <td className={TABLE_CELL_CLASSES}>
-                  {game.white_username} <span className="opacity-60">({game.white_rating})</span>
+                  {game.white_username}{" "}
+                  <span className="opacity-60">({formatRating(game.white_rating)})</span>
                   {game.starts_from_custom_position && (
                     <span className="ml-1.5">
                       <CustomPositionBadge />
@@ -230,7 +355,8 @@ export function GamesPage() {
                   )}
                 </td>
                 <td className={TABLE_CELL_CLASSES}>
-                  {game.black_username} <span className="opacity-60">({game.black_rating})</span>
+                  {game.black_username}{" "}
+                  <span className="opacity-60">({formatRating(game.black_rating)})</span>
                 </td>
                 <td className={`font-mono ${TABLE_CELL_CLASSES}`}>{gameResult(game)}</td>
                 <td className={`whitespace-nowrap opacity-70 ${TABLE_CELL_CLASSES}`}>

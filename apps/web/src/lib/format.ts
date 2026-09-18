@@ -11,8 +11,19 @@ export function formatDate(isoDate: string): string {
   });
 }
 
+/** Lo que se enseña donde debería haber un dato y no lo hay. Es uno solo para
+ * que un hueco se reconozca como tal en cualquier pantalla (criterio C-5). */
+const MISSING_VALUE = "—";
+
+/** Ritmo con el que se guarda una partida cuyo PGN no dice a qué se jugó
+ * (RF-1.5); la API lo escribe así en `games.time_class`. */
+const UNKNOWN_TIME_CLASS = "unknown";
+
+/** Control de tiempo con el que se guarda esa misma partida. */
+const UNKNOWN_TIME_CONTROL = "-";
+
 export function formatAccuracy(accuracy: number | null | undefined): string {
-  return accuracy == null ? "—" : formatPercent(accuracy, 1);
+  return accuracy == null ? MISSING_VALUE : formatPercent(accuracy, 1);
 }
 
 /** Porcentaje con la unidad puesta: "54.3 %".
@@ -71,6 +82,11 @@ export function formatEngineName(engine: string): string {
  * chess.com, que es de donde vienen los datos.
  */
 export function formatTimeClass(timeClass: string): string {
+  // Un PGN importado a mano (RF-1.5) no dice a qué ritmo se jugó y la columna
+  // se guarda como "unknown": es el hueco de la columna, y se enseña como el
+  // resto de huecos de la aplicación —"—", igual que el rating y la
+  // precisión— en vez de un "Unknown" en inglés entre "Blitz" y "Rapid".
+  if (timeClass === UNKNOWN_TIME_CLASS) return MISSING_VALUE;
   return capitalize(timeClass);
 }
 
@@ -102,9 +118,21 @@ export function formatDuration(totalSeconds: number): string {
     : `${minutes}:${padTwoDigits(seconds % 60)}`;
 }
 
-/** Resultados que chess.com reporta para AMBOS jugadores cuando es tablas;
- * cualquier otro valor distinto de "win" significa que ese bando perdió. */
+/** El rating de un bando: "1832", o "—" cuando no se sabe.
+ *
+ * Las partidas importadas de un PGN manual (RF-1.5) rara vez traen `WhiteElo`
+ * y se guardan con 0, que es el hueco de la columna. Enseñar "(0)" haría
+ * pasar el hueco por un dato, y por uno malísimo. */
+export function formatRating(rating: number): string {
+  return rating > 0 ? String(rating) : MISSING_VALUE;
+}
+
+/** Resultados que significan tablas para AMBOS jugadores: los de chess.com,
+ * que dicen además cómo se llegó a ellas, más el "draw" a secas del PGN
+ * importado a mano (RF-1.5), donde el archivo solo dice "1/2-1/2".
+ * Cualquier otro valor distinto de "win" significa que ese bando perdió. */
 const DRAW_RESULTS = new Set([
+  "draw",
   "agreed",
   "repetition",
   "stalemate",
@@ -122,6 +150,7 @@ export function gameResult(game: Pick<GameSummary, "white_result">): string {
 
 /** "180" -> "3+0", "600+5" -> "10+5" (chess.com da el control en segundos). */
 export function formatTimeControl(timeControl: string): string {
+  if (timeControl === UNKNOWN_TIME_CONTROL) return MISSING_VALUE;
   const [base, increment] = timeControl.split("+");
   const baseSeconds = Number(base);
   if (Number.isNaN(baseSeconds)) return timeControl;

@@ -1,11 +1,15 @@
-"""POST /analysis, GET /analysis/{id}, WS /ws/analysis/{id} — analizar
-partidas con motor (RF-2) usando `lucia-core` como librería."""
+"""POST /analysis, GET /analysis/{id}, GET /analysis/{id}/pgn,
+WS /ws/analysis/{id} — analizar partidas con motor (RF-2) usando
+`lucia-core` como librería, y exportar el análisis a PGN anotado (RF-5.5)."""
 
 from __future__ import annotations
 
+import re
+import unicodedata
 from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,6 +30,7 @@ from lucia_api.services.comparison import (
 )
 from lucia_api.services.engines import get_effective_config
 from lucia_api.services.insights import analysis_critical_moments
+from lucia_api.services.pgn_export import export_annotated_pgn
 from lucia_api.worker import AnalysisWorker
 
 router = APIRouter(tags=["analysis"])
@@ -261,10 +266,17 @@ async def compare(
     )
 
 
-@router.get("/analysis/{analysis_id}", response_model=AnalysisDetail)
-async def get_analysis(
-    analysis_id: int, session: Annotated[AsyncSession, Depends(get_session)]
-) -> AnalysisDetail:
+async def _load_analysis_with_moves(
+    session: AsyncSession, analysis_id: int
+) -> tuple[Analysis, list[AnalyzedMove], dict[int, list[dict]]]:
+    """El análisis, sus jugadas en orden y las alternativas que haya que
+    rescatar de la caché, que es lo que necesitan tanto el detalle como la
+    exportación a PGN.
+
+    Los análisis anteriores a RF-10.1 no guardaron alternativas, pero sus
+    posiciones pueden seguir en la caché: se recuperan de ahí en vez de
+    obligar a re-analizar la partida (ADR-0007).
+    """
     analysis = await session.get(Analysis, analysis_id)
     if analysis is None:
         raise HTTPException(status_code=404, detail="no existe ese análisis")
@@ -273,12 +285,15 @@ async def get_analysis(
         .where(AnalyzedMove.analysis_id == analysis_id)
         .order_by(AnalyzedMove.ply)
     )
-    moves = result.scalars().all()
+    moves = list(result.scalars().all())
+    return analysis, moves, await alternatives_from_cache(session, analysis, moves)
 
-    # Los análisis anteriores a RF-10.1 no guardaron alternativas, pero sus
-    # posiciones pueden seguir en la caché: se recuperan de ahí en vez de
-    # obligar a re-analizar la partida (ADR-0007).
-    cached_alternatives = await alternatives_from_cache(session, analysis, moves)
+
+@router.get("/analysis/{analysis_id}", response_model=AnalysisDetail)
+async def get_analysis(
+    analysis_id: int, session: Annotated[AsyncSession, Depends(get_session)]
+) -> AnalysisDetail:
+    analysis, moves, cached_alternatives = await _load_analysis_with_moves(session, analysis_id)
 
     moves_out: list[AnalyzedMoveOut] = []
     for move in moves:
@@ -309,6 +324,55 @@ async def get_analysis(
             for moment in analysis_critical_moments(moves, cached_alternatives)
         ],
     )
+
+
+@router.get("/analysis/{analysis_id}/pgn", response_class=PlainTextResponse)
+async def get_analysis_pgn(
+    analysis_id: int, session: Annotated[AsyncSession, Depends(get_session)]
+) -> PlainTextResponse:
+    """El PGN de la partida con las anotaciones del análisis (RF-5.5).
+
+    Se descarga como archivo —de ahí el `Content-Disposition`— porque lo que
+    se quiere hacer con él es abrirlo en lichess, ChessBase o SCID, no leerlo
+    en el navegador.
+
+    Solo se exporta un análisis **terminado**: uno a medias daría una partida
+    comentada hasta la jugada 20 y muda a partir de ahí, que se lee como un
+    archivo roto y no como un análisis en curso.
+    """
+    analysis, moves, cached_alternatives = await _load_analysis_with_moves(session, analysis_id)
+    if analysis.status != "done":
+        raise HTTPException(
+            status_code=409,
+            detail=f"el análisis todavía no está terminado (está «{analysis.status}»)",
+        )
+    game = await session.get(Game, analysis.game_id)
+    if game is None:
+        raise HTTPException(status_code=404, detail="no existe la partida de ese análisis")
+
+    annotated_pgn = export_annotated_pgn(game, analysis, moves, cached_alternatives)
+    filename = _pgn_download_filename(game)
+    return PlainTextResponse(
+        annotated_pgn,
+        media_type="application/x-chess-pgn",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def _pgn_download_filename(game: Game) -> str:
+    """Nombre del archivo descargado: "lucia-blancas-negras-2026-03-14.pgn".
+
+    Se reduce a ASCII y se limpia de todo lo que no sea letra, cifra o guion:
+    el nombre viaja en una cabecera HTTP y acaba en el sistema de archivos del
+    usuario, y los nombres de los jugadores traen acentos, comas y espacios.
+    """
+
+    def slugify(text: str) -> str:
+        ascii_text = unicodedata.normalize("NFKD", text).encode("ascii", "ignore").decode()
+        return re.sub(r"[^A-Za-z0-9]+", "-", ascii_text).strip("-").lower() or "partida"
+
+    played_on = game.played_at.date().isoformat()
+    return f"lucia-{slugify(game.white_username)}-{slugify(game.black_username)}-{played_on}.pgn"
 
 
 @router.websocket("/ws/analysis/{analysis_id}")

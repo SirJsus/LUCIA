@@ -150,6 +150,32 @@ async def test_detects_mate_in_a_forced_position(db_session: AsyncSession) -> No
     assert response.json()[0]["score_mate"] == 1
 
 
+async def test_a_finished_position_is_not_sent_to_the_engine(db_session: AsyncSession) -> None:
+    """Jaque mate y ahogado devuelven la lista vacía **sin abrir el motor**.
+
+    No lleva `@requires_stockfish` a propósito: que pase sin motor compilado es
+    justo la prueba de que no se abre ninguno. Preguntarle a Lc0 en una
+    posición sin jugadas legales devuelve `bestmove a1a1`, que no es UCI
+    válido y aborta la conexión; antes de la guarda, llegar al final de una
+    partida terminada en mate en el tablero de análisis rompía el motor.
+    """
+    _override(db_session)
+    checkmate = "rnb1kbnr/pppp1ppp/8/4p3/6Pq/5P2/PPPPP2P/RNBQKBNR w KQkq - 1 3"
+    stalemate = "7k/5Q2/6K1/8/8/8/8/8 b - - 0 1"
+    try:
+        with TestClient(app) as http:
+            responses = [
+                http.post("/analysis/position", json={"fen": fen})
+                for fen in (checkmate, stalemate)
+            ]
+    finally:
+        app.dependency_overrides.clear()
+
+    for response in responses:
+        assert response.status_code == 200, response.text
+        assert response.json() == []
+
+
 async def test_excessive_depth_is_rejected(db_session: AsyncSession) -> None:
     """El análisis en vivo es síncrono: sin tope, la petición quedaría colgada."""
     _override(db_session)

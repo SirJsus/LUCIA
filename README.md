@@ -49,9 +49,12 @@ make up S=api  # solo un servicio (api | web)
 make types     # regenera los tipos TS del front desde el OpenAPI de la API
 ```
 
-La web tiene cinco pantallas: **Partidas** (lista con filtros y sincronización
-desde chess.com), **Visor** (tablero, jugadas clasificadas, gráfico de
-evaluación y análisis con progreso en vivo), **Tableros** (análisis libre desde
+La web tiene cinco pantallas: **Partidas** (lista con filtros, sincronización
+desde chess.com e importación de un archivo PGN de otra fuente —OTB, lichess—),
+**Visor** (tablero, jugadas clasificadas, gráfico de
+evaluación, análisis con progreso en vivo y exportación de la partida a PGN
+anotado, con comentarios y variantes, para abrirla en lichess o ChessBase),
+**Tableros** (análisis libre desde
 FEN o PGN, con árbol de variantes y motor en vivo), **Estadísticas** (marcador,
 ratings, aperturas con su código ECO, en qué fase se pierde más ventaja, de qué
 tipo son los errores, qué pasa cuando baja el reloj y dónde te sales de la

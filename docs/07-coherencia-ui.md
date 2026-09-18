@@ -21,8 +21,13 @@ definida desde el principio pero no se producía nunca, y con ella las filas 54
 y 55, cerradas también. La barra de filtros de Partidas (RF-5.3), que ese mismo
 2026-09-09 pasó de cuatro filtros a nueve, abrió las filas 56 a 60, cerradas
 ese mismo día. La comparación de repertorio (RF-3.6), del 2026-09-10, abrió las
-filas 61 a 63, que siguen abiertas: son las únicas. El inventario vacío es como
-debería encontrarse siempre que se lea este documento.
+filas 61 a 63, cerradas también. La importación de un PGN de otra fuente
+(RF-1.5), del 2026-09-17, abrió las filas 64 a 67: la 64 y la 66 se cerraron ese
+mismo día y quedan abiertas la 65 y la 67. La exportación del análisis a PGN
+anotado (RF-5.5), del mismo día, abrió las filas 68 a 70, las tres sobre el
+mismo control del visor. Vacío es como debería encontrarse este documento
+siempre que se lea, así que cinco filas abiertas son cinco cosas que arreglar,
+no un estado estable.
 
 **Qué es cada mitad de este documento.** Los criterios C-1 a C-7 son
 **RNF-11**, que vive en la sección Post 1.0 de
@@ -53,16 +58,26 @@ antes de comitear cambios de front — ver [Cómo se verifica](#cómo-se-verific
 | C-6 | **Legible sin saber de ajedrez.** Todo número del motor va acompañado de etiqueta, leyenda o representación visual. `+0.35` solo, sin más, no comunica nada a quien no lee evaluaciones. |
 | C-7 | **Accesibilidad mínima.** Foco visible, `aria-label` en los botones que son solo icono, y ningún significado transmitido únicamente por color. |
 
-## Inventario de incoherencias: vacío (al 2026-09-10)
+## Inventario de incoherencias abiertas (al 2026-09-17)
 
-**No queda ninguna abierta.** El inventario llegó a tener 63 filas y están todas
-cerradas. El rastro de qué se hizo está más abajo.
+Quedan cinco, todas de presentación: qué enseñar y dónde, no cómo escribirlo.
+Dos son de la pantalla de Partidas y tres del control de exportar del visor.
+Los números no se renumeran al cerrar una fila —son la referencia con la que se
+habla de ella en un commit—, así que faltan la 64 y la 66.
+
+| # | Incoherencia | Dónde | Criterio |
+| --- | --- | --- | --- |
+| 65 | La cabecera de Partidas reparte con `justify-between` el título y **dos** formularios, y el de importar tiene tres controles: al envolverse, el título se queda solo en una fila y las dos formas de traer partidas quedan a distinta altura. Ninguna otra pantalla tiene dos formularios en la cabecera. | `apps/web/src/features/games/GamesPage.tsx` (la fila de la cabecera, `flex flex-wrap items-end justify-between`) | C-2 |
+| 67 | El listado no dice de dónde vino una partida. Una importada de un PGN enseña hueco en los dos ratings, en el control de tiempo y en el ritmo, y nada explica por qué le faltan cuatro datos que sus vecinas sí tienen; las partidas que no empiezan en la posición estándar sí llevan insignia (`CustomPositionBadge`). | `apps/web/src/features/games/GamesPage.tsx` (tabla), `apps/web/src/features/viewer/GameViewerPage.tsx` (cabecera) | C-6 |
+| 68 | "Exportar PGN anotado" no existe hasta que hay un análisis terminado: quien abre una partida sin analizar no ve el control en ninguna parte y no puede saber que existe, ni que analizar es lo que lo trae. La aplicación ya resuelve esto al revés en la barra de filtros de Partidas (fila 56): el control se enseña deshabilitado y se dice por qué. | `apps/web/src/features/viewer/GameViewerPage.tsx` (cabecera, `analysis?.status === "done" && …`) | C-3 |
+| 69 | La acción que saca el PGN de la partida ocupa sitios distintos en las dos pantallas con tablero: en el tablero de análisis "Copiar PGN" es la última de la fila, y en el visor "Exportar PGN anotado" es la segunda, entre "Girar tablero" y el desplegable de motor, partiendo el grupo de controles del motor del orden acordado (girar tablero · motor · acción principal). | `apps/web/src/features/viewer/GameViewerPage.tsx` (cabecera), `apps/web/src/features/board/BoardPage.tsx` (cabecera) | C-2 |
+| 70 | La descarga no tiene desenlace en pantalla: la hace el navegador, así que si `GET /analysis/{id}/pgn` responde 409 (análisis no terminado) o 404 (partida borrada desde otra pestaña), el navegador guarda el cuerpo del error como si fuera el archivo y la pantalla no dice nada. El resto de acciones del visor sí tienen `ErrorBox`. | `apps/web/src/features/viewer/GameViewerPage.tsx` (el `<a download>`), `apps/api/lucia_api/routers/analysis.py` (`get_analysis_pgn`) | C-3 |
 
 ## Lo que se cerró
 
-Las 63 filas que llegó a tener este inventario se cerraron en nueve pasadas, y
-aquí queda el rastro de qué se hizo, para que un `git blame` no sea la única
-forma de averiguarlo.
+Las 65 filas cerradas de este inventario —todas menos las cinco de arriba— se
+cerraron en diez pasadas, y aquí queda el rastro de qué se hizo, para que un
+`git blame` no sea la única forma de averiguarlo.
 
 **2026-09-06 · legibilidad del análisis.** Apareció la barra de evaluación, el
 tablero de análisis empezó a dibujar las flechas del motor, los vacíos del
@@ -342,6 +357,72 @@ el mismo día:
   viajan en `GET /repertoire`, así que la barra de progreso deja de ser una
   barra sin final.
 
+**2026-09-17 · la importación de un PGN (RF-1.5).** La segunda forma de llenar
+el listado de Partidas, junto a la sincronización con chess.com. La revisión
+abrió las filas 64 a 67 —la 64 y la 66, cerradas el mismo día, están al final de
+esta entrada— y destapó además seis arreglos mecánicos, sin nada que decidir:
+
+- **C-2 · una acción primaria por pantalla.** "Importar" salía primaria al lado
+  de "Sincronizar", que también lo era: dos acciones principales en la misma
+  cabecera, contra la regla escrita en `components/Button.tsx` y la misma que
+  cerró la fila 61. La principal sigue siendo sincronizar.
+- **C-2 · "importadas" era el nombre de la otra acción.** El recuadro de éxito
+  de sincronizar decía "N partidas importadas en M mes(es)" desde antes de que
+  existiera un botón llamado "Importar"; ahora dice "sincronizadas".
+- **C-3 · el vacío mandaba a una sola de las dos vías.** "Todavía no hay
+  partidas" seguía diciendo solo "Sincroniza tu usuario de chess.com"; nombra
+  las dos formas, que es lo que hay arriba.
+- **C-3 · el aviso de partidas saltadas sobrevivía a la importación siguiente.**
+  Colgaba de `importPgnMutation.data`, que react-query conserva mientras corre la
+  petición nueva, mientras que el recuadro verde de al lado sí desaparecía: a
+  media importación se veía el amarillo del archivo anterior.
+- **C-3 · "Importar" sin archivo no hacía nada ni decía por qué.** El `<input
+  type="file">` es `required`, así que lo pide el navegador.
+- **C-5 · el hueco tiene una sola forma.** Un PGN manual no dice a qué ritmo se
+  jugó y la API lo guarda como `unknown` / `-`, así que el listado y el visor
+  enseñaban "Unknown" —en inglés, y un ritmo que no existe— junto a "Blitz" y
+  "Rapid", y "-" en la columna de control. Los dos pasan por `lib/format.ts` y
+  salen como "—", el mismo hueco del rating que falta y de la precisión sin
+  analizar.
+
+Y las dos filas que esa misma revisión abrió y cerró el mismo día, las dos sobre
+lo que una importación cuenta de sí misma:
+
+- **La importación dice si reconoció al jugador** (64, C-3). Guardar una partida
+  y que no cuente en el dashboard era un desenlace silencioso: el recuadro verde
+  decía "N partidas importadas" tanto si "Mi nombre en el PGN" casó con un bando
+  como si no casó con ninguno, y la diferencia se descubría días después, al
+  echar en falta las partidas en las estadísticas. `PgnImportSummary` trae ahora
+  `games_matched_to_player` —en cuántas de las guardadas se reconoció al usuario en
+  uno de los dos bandos— y, cuando es cero habiendo guardado algo, la pantalla lo
+  dice con un `WarningBox`: las partidas están, pero no cuentan, y el campo que
+  hay que revisar tiene nombre.
+- **El recuadro verde dice cuántas traía el archivo** (66, C-3/C-6). "3 de 13
+  partidas del archivo importadas", en vez de dejar la resta a cargo de quien
+  sumara el recuadro verde y el ámbar. El total se compone en el front
+  —guardadas más ya presentes más saltadas— y no como campo nuevo de la API: es
+  la suma de lo que ya devuelve, y tenerlo dos veces daría dos sitios donde
+  descuadrar.
+
+**2026-09-17 · la exportación a PGN anotado (RF-5.5).** El visor gana un
+`<a download>` con aspecto de botón en la cabecera. La revisión dejó abiertas
+las filas 68 a 70 y dos arreglos mecánicos, sin nada que decidir:
+
+- **C-2 · la fila de acciones de la cabecera no envolvía.** Era `flex
+  items-center gap-2` mientras que la del tablero de análisis, con el mismo
+  contenido, lleva `flex-wrap`. Con el cuarto control, en una ventana estrecha
+  se desbordaba.
+- **C-6 · qué lleva el archivo.** "Exportar PGN anotado" no decía qué se
+  descarga; lo dice ahora con la misma forma que "Copiar PGN" del tablero de
+  análisis, que es la otra acción que saca el PGN de una partida.
+
+**Y un nombre que se revisó y se deja como está.** Que la acción se llame
+"Exportar PGN anotado" y no "Exportar PGN", teniendo Partidas un "Importar
+PGN", no es asimetría gratuita: lo que sale no es el PGN que entró, sino el
+PGN con los comentarios del análisis y sus variantes, y "Copiar PGN" del
+tablero de análisis ya usa el nombre corto para lo otro. Tres verbos distintos
+—importar, copiar, exportar— para tres acciones distintas cumplen C-2.
+
 **Decidido el 2026-09-07, no es incoherencia.** Dos cosas que este inventario
 llegó a listar y el autor resolvió por criterio, no por descuido:
 
@@ -379,6 +460,6 @@ Antes de comitear cualquier cambio que toque `apps/web`:
    igual — o cambiar las dos a la vez.
 3. Si aparece una incoherencia que no se arregla en el mismo commit, añadirla
    al inventario de arriba —`# · Incoherencia · Dónde · Criterio`, numerando
-   desde el 64— en vez de dejarla suelta. Una fila se borra cuando se arregla,
+   desde el 71— en vez de dejarla suelta. Una fila se borra cuando se arregla,
    y las demás no se renumeran: el número es la referencia con la que se habla
    de ella en un commit o en una revisión.

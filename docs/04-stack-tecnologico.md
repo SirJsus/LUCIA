@@ -17,6 +17,7 @@ Elegido con el criterio: **maduro, gratuito, compatible con GPL-3.0, y con el me
 | **Python 3.12+** | Orquestación, análisis, API | Ecosistema de ajedrez y datos inmejorable. El trabajo pesado lo hacen los motores en C++, Python solo coordina (ver ADR-0003). |
 | **python-chess** | PGN, FEN, generación de jugadas, wrapper UCI (`chess.engine`) | Librería de referencia, async, madura. Nos ahorra escribir un parser UCI. |
 | **FastAPI** + **uvicorn** | API REST + WebSocket | Async nativo, OpenAPI automático (del que generamos tipos TS), validación con Pydantic. |
+| **python-multipart** (BSD-3) | Leer la subida del archivo PGN (RF-1.5) | Es lo que FastAPI exige para aceptar `multipart/form-data`; no hay alternativa ni decisión que tomar. Único punto del proyecto que recibe un archivo del usuario. |
 | **Pydantic v2** | Modelos y config | Tipado fuerte, settings desde `.env`. |
 | **SQLAlchemy 2 (async)** + **aiosqlite** | ORM sobre SQLite | Local-first (RNF-7). Migrar a PostgreSQL sería cambiar la URL. |
 | **Alembic** | Migraciones | Estándar con SQLAlchemy. |

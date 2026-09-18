@@ -94,6 +94,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/import/pgn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Pgn File
+         * @description Guarda en el historial las partidas del archivo (RF-1.5).
+         *
+         *     - `username`: a quién se le atribuyen; si se omite, `CHESSCOM_USERNAME`.
+         *     - `player_name_in_pgn`: **cómo aparece ese jugador dentro del PGN**. Un archivo de
+         *       torneo lo nombra "Durán, Jesús" y no con su usuario, así que sin esto la
+         *       partida se guarda pero no cuenta en el dashboard ni en los filtros por
+         *       color, resultado o rival, que casan por nombre. El PGN se guarda entero,
+         *       de modo que el nombre original no se pierde.
+         *
+         *     Las partidas repetidas no se duplican: se identifican por el contenido del
+         *     PGN, así que reimportar el mismo archivo reescribe las mismas filas.
+         */
+        post: operations["import_pgn_file_import_pgn_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/analysis": {
         parameters: {
             query?: never;
@@ -167,6 +197,34 @@ export interface paths {
         };
         /** Get Analysis */
         get: operations["get_analysis_analysis__analysis_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/analysis/{analysis_id}/pgn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Analysis Pgn
+         * @description El PGN de la partida con las anotaciones del análisis (RF-5.5).
+         *
+         *     Se descarga como archivo —de ahí el `Content-Disposition`— porque lo que
+         *     se quiere hacer con él es abrirlo en lichess, ChessBase o SCID, no leerlo
+         *     en el navegador.
+         *
+         *     Solo se exporta un análisis **terminado**: uno a medias daría una partida
+         *     comentada hasta la jugada 20 y muda a partir de ahí, que se lee como un
+         *     archivo roto y no como un análisis en curso.
+         */
+        get: operations["get_analysis_pgn_analysis__analysis_id__pgn_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -520,6 +578,18 @@ export interface components {
             /** Is Own Game */
             is_own_game?: boolean | null;
         };
+        /** Body_import_pgn_file_import_pgn_post */
+        Body_import_pgn_file_import_pgn_post: {
+            /**
+             * File
+             * @description Archivo .pgn con una o varias partidas
+             */
+            file: string;
+            /** Username */
+            username?: string | null;
+            /** Player Name In Pgn */
+            player_name_in_pgn?: string | null;
+        };
         /**
          * CriticalMomentOut
          * @description Una posición donde la partida se decidía (RF-2.8).
@@ -760,6 +830,20 @@ export interface components {
             average_accuracy: number | null;
             /** Average Opening Exit Win Percent */
             average_opening_exit_win_percent: number | null;
+        };
+        /**
+         * PgnImportSummary
+         * @description Qué pasó con cada partida del archivo.
+         */
+        PgnImportSummary: {
+            /** Games Imported */
+            games_imported: number;
+            /** Games Already Present */
+            games_already_present: number;
+            /** Skipped Game Reasons */
+            skipped_game_reasons: string[];
+            /** Games Matched To Player */
+            games_matched_to_player: number;
         };
         /** PhaseStatsOut */
         PhaseStatsOut: {
@@ -1050,6 +1134,39 @@ export interface operations {
             };
         };
     };
+    import_pgn_file_import_pgn_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_pgn_file_import_pgn_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PgnImportSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_analyses_analysis_get: {
         parameters: {
             query?: {
@@ -1198,6 +1315,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalysisDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_analysis_pgn_analysis__analysis_id__pgn_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                analysis_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
                 };
             };
             /** @description Validation Error */

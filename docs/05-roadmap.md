@@ -22,7 +22,7 @@
       `sync_state`). Sync incremental (RF-1.3) e idempotente (upsert por
       `uuid`), con backoff en 429 (RF-1.4). Probado con `respx` y en vivo
       contra la API real de chess.com. Endpoint `POST /sync` expuesto.
-      Pendiente de este bloque: RF-1.5 (importar PGN manual, P1).
+      RF-1.5 (importar PGN manual, P1) se cerró después, en la fase 2.
 - [x] `lucia-core`: `EngineBridge` con Stockfish vía UCI (RF-2.1), MultiPV
       configurable; `evaluate_positions`/`analyze_game` recorren la partida
       ply a ply con una evaluación por posición. `classify_move` (RF-2.2:
@@ -55,8 +55,9 @@
       HTTP sería ejecución arbitraria de comandos). Tema claro/oscuro.
       Tipos TS generados desde el OpenAPI real (`make types`), con
       verificación en CI de que no se desincronizan. 10 tests de front.
-      Pendiente: reordenar/explorar variantes desde el visor (RF-5.2),
-      exportar PGN anotado (RF-5.5).
+      Pendiente: reordenar/explorar variantes desde el visor (RF-5.2).
+      Exportar PGN anotado (RF-5.5) llegó el 2026-09-17 (ver su ítem en la
+      fase 2).
 - [x] Dashboard (RF-3.1 a 3.3): marcador y rating por control de tiempo,
       partidas por mes, rendimiento por apertura separando blancas de negras,
       y pérdida de ventaja por fase, resaltando la peor. Necesitó implementar
@@ -327,7 +328,28 @@
         (`respx`) y con la forma documentada de la API, y el servicio con un
         explorador falso; los dos caminos de error —sin token y sin red— sí se
         comprobaron de verdad contra el servicio real.
-- [ ] Importar PGN manual de otras fuentes —OTB, lichess— al historial (RF-1.5).
+- [x] Importar PGN manual de otras fuentes —OTB, lichess— al historial (RF-1.5).
+      Hecho el 2026-09-17: `POST /import/pgn` (multipart, tope de 5 MB) y el
+      formulario "Importar PGN" junto al de sincronizar, en Partidas.
+
+      - **Las partidas manuales son filas normales de `games`**, con
+        `platform="manual"`, para que el visor, el análisis y las estadísticas
+        no tengan que saber de dónde vino cada una. Lo que un PGN no dice
+        —rating, ritmo, si era puntuada— se guarda como hueco y se enseña como
+        "—", en vez de inventarlo o hacer las columnas opcionales
+        ([ADR-0011](adr/0011-pgn-manual-en-la-misma-tabla.md)).
+      - **Identidad por el SHA-256 del PGN**: no hay `uuid` que usar, así que
+        reimportar el mismo archivo reescribe las filas en vez de duplicarlas,
+        igual de idempotente que el sync.
+      - **Hay que decir cómo apareces en el archivo.** Un PGN de torneo nombra
+        al jugador "Durán, Jesús" y no con su usuario, y las estadísticas y
+        tres de los filtros casan por nombre. La respuesta dice en cuántas
+        partidas se reconoció al usuario y la pantalla avisa cuando fue en
+        ninguna: guardadas, pero sin contar en ningún marcador.
+      - **Lo que no entra**: partidas sin terminar ("\*") y sin jugadas; la
+        respuesta las enumera con el motivo, para que un recuento que no cuadra
+        con el archivo no se lea como un fallo.
+      - Dependencia nueva: `python-multipart` (BSD-3, compatible con GPL-3.0).
 - [x] Filtros de `/games` por apertura, rango de fechas, rival y resultado (lo
       que faltaba de RF-5.3). Hecho el 2026-09-09; con 324 partidas ya se
       notaba.
@@ -355,7 +377,31 @@
       bajo demanda, y editor de posición pieza a pieza (lo que falta de
       RF-6.1; hoy se puede partir de un FEN, que cubre el caso).
 - [ ] Capa de ocupación del tablero (RF-7.1 a 7.7): sub-modo mapa de calor, sub-modo cobertura directa del turno, inspección por casilla, piezas colgadas, rayos X aparte y clavadas marcadas, reglas de conteo (rey, peones en diagonal, al paso). Cálculo en cliente con chess.js, activable en visor, tablero de análisis y entrenamiento.
-- [ ] Exportar PGN anotado.
+- [x] Exportar PGN anotado (RF-5.5). Hecho el 2026-09-17:
+      `GET /analysis/{id}/pgn` y el enlace "Exportar PGN anotado" en la
+      cabecera del visor. El archivo se abre en lichess, ChessBase o SCID como
+      cualquier otro PGN comentado.
+
+      - **Se comentan todas las jugadas**, no solo las falladas como hace
+        lichess: cada una lleva su clasificación y la probabilidad de victoria
+        en que dejó la partida, desde el punto de vista de las blancas. El
+        símbolo (`?!`, `?`, `??`) sí es solo para lo fallado; poner `!` donde
+        se coincidió con el motor sería un mérito que el análisis no mide.
+      - **La línea del motor cuelga del padre de la jugada** —la posición desde
+        la que se eligió— y solo cuando lo jugado no era lo que el motor
+        prefería, recortada a 6 medias jugadas.
+      - **No se vuelve a llamar al motor**: todo sale de `analyzed_moves`
+        (RF-2.2, RF-10.1), con el mismo rescate desde `position_cache` que usa
+        el detalle para los análisis anteriores a RF-10, que si no se puede
+        hacer deja el PGN comentado pero sin variantes.
+      - **Solo se exportan análisis terminados** (409 si no): uno a medias
+        daría una partida comentada hasta la jugada 20 y muda después.
+      - **Se conservan las cabeceras del PGN original** y no las columnas
+        normalizadas de `games`, que en una partida importada por RF-1.5 pueden
+        no coincidir.
+      - De paso, el bloque que carga análisis + jugadas + alternativas de caché
+        dejó de estar duplicado entre el detalle y la exportación
+        (`_load_analysis_with_moves`).
 
 ## Fase 3 · Entrenamiento (P1/P2)
 

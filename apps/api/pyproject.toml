@@ -1,6 +1,6 @@
 [project]
 name = "lucia-api"
-version = "0.2.1"
+version = "0.2.2"
 description = "API FastAPI de LUCIA: orquesta motores, sincroniza chess.com y expone analisis."
 requires-python = ">=3.12"
 license = "GPL-3.0-or-later"
@@ -9,6 +9,7 @@ dependencies = [
     "lucia-chesscom",
     "lucia-lichess",
     "fastapi>=0.115",
+    "python-multipart>=0.0.9",  # subida del archivo PGN (RF-1.5)
     "uvicorn[standard]>=0.30",
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",

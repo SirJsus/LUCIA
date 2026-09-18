@@ -47,6 +47,34 @@ Prioridad: **P0** = MVP imprescindible · **P1** = siguiente iteración · **P2*
 | RF-1.5 | Importar PGN manual (archivo) para partidas de otras fuentes (OTB, lichess). | P1 |
 | RF-1.6 | Importar historial de rating y estadísticas (`/pub/player/{user}/stats`). | P1 |
 
+**RF-1.5, PGN de otra fuente** (**2026-09-17**). `POST /import/pgn` sube un
+archivo con una o varias partidas y las deja en `games` como si vinieran del
+sincronizador: misma tabla, misma apertura deducida, mismos relojes. A partir
+de ahí el visor, el análisis y las estadísticas no distinguen de dónde salió
+una partida. Lo que un PGN manual no trae y chess.com sí, y cómo se resuelve:
+
+- **Quién es el usuario.** Un PGN de torneo lo nombra "Durán, Jesús" y no con
+  su usuario, así que el dashboard y los filtros de RF-5.3 —que casan por
+  nombre— no lo reconocerían. El formulario pregunta cómo aparece en el archivo
+  (`player_name_in_pgn`) y ese bando se guarda con el `username` de LUCIA; el
+  nombre original no se pierde, porque el PGN se guarda entero. La respuesta
+  dice en cuántas se reconoció (`games_matched_to_player`) y la pantalla avisa
+  cuando no fue en ninguna: guardadas pero sin contar en ningún marcador.
+- **Rating, ritmo y si era puntuada.** Casi ningún PGN los trae y las columnas
+  son obligatorias. Se rellenan con huecos —rating 0, `time_class` "unknown",
+  `time_control` "-", `rated` false— en vez de inventarlos, y el front los
+  enseña como "—". Deducir el ritmo de un "40/7200:1800" de torneo sería
+  adivinar: no es ninguna de las categorías de chess.com.
+- **Cómo acabaron unas tablas.** El archivo solo dice "1/2-1/2", así que se
+  guarda `"draw"` a secas, junto a los valores de chess.com que sí dicen si
+  fue por acuerdo, ahogado o repetición.
+- **Partidas sin terminar** ("\*") **y sin jugadas**: no se importan, y la
+  respuesta dice cuáles y por qué (`skipped_game_reasons`).
+- **Reimportar el mismo archivo no duplica.** Un PGN manual no trae
+  identificador de partida, así que cada una se identifica por el SHA-256 de
+  su propio PGN: volver a subirlo reescribe las mismas filas
+  ([ADR-0011](adr/0011-pgn-manual-en-la-misma-tabla.md)).
+
 ### RF-2 · Análisis con motores
 
 | ID | Requerimiento | Prioridad |
@@ -227,6 +255,41 @@ se decidió lo siguiente, que el texto congelado no dice:
   filtros sin paginar, para poder decir "25 de 324" y no solo el número de
   página. Va en cabecera para no envolver la lista y cambiar la forma del
   endpoint.
+
+**Qué lleva el PGN anotado** (**2026-09-17**). RF-5.5 pide "comentarios y
+variantes"; al implementarlo se decidió lo siguiente:
+
+- **Se comentan todas las jugadas, no solo las falladas.** Lichess y la mayoría
+  de los anotadores automáticos solo dicen algo donde hubo error; aquí cada
+  jugada lleva su clasificación y la probabilidad de victoria en que dejó la
+  partida, porque lo que se quiere al releer el archivo es seguir la evaluación
+  entera y no solo los tres momentos malos. El **símbolo** de notación (NAG) sí
+  es solo para lo fallado: `?!`, `?` y `??`. Marcar con `!` una jugada que
+  coincidió con el motor le atribuiría un mérito que el análisis no mide, y
+  "perdió el mate" comparte el `??` de blunder porque el estándar no tiene NAG
+  para "tenía una ganada y la soltó".
+- **La probabilidad de victoria va desde el punto de vista de las blancas**,
+  como en el resto de la aplicación, aunque en `analyzed_moves` esté guardada
+  desde el de quien movió; y el comentario lo dice, porque un "45 %" a secas no
+  se puede leer.
+- **La variante del motor cuelga del padre de la jugada** —la posición desde la
+  que se eligió— y solo aparece cuando lo jugado no fue lo que el motor
+  prefería: una variante es otra forma de seguir desde ahí, no una continuación
+  de lo que se jugó. Se recorta a 6 medias jugadas: lo que interesa es qué se
+  debía haber jugado y cómo seguía la idea, no la predicción de veinte jugadas.
+- **Se conservan las cabeceras del PGN original**, no las columnas normalizadas
+  de `games`. Importa para las partidas traídas por RF-1.5: ahí
+  `white_username` puede ser el usuario de LUCIA mientras que la cabecera
+  `White` trae el nombre del torneo o el del jugador tal como lo escribió el
+  árbitro, y el archivo que sale debe parecerse al que entró. Encima se añaden
+  `Annotator` (motor y profundidad) y `WhiteAccuracy`/`BlackAccuracy`.
+- **Solo se exporta un análisis terminado.** Uno a medias daría una partida
+  comentada hasta la jugada 20 y muda a partir de ahí, que se lee como archivo
+  roto y no como análisis en curso: la API responde 409 y la acción no aparece
+  en pantalla.
+- **No se vuelve a llamar al motor**: todo lo que el archivo dice ya está en
+  `analyzed_moves` (RF-2.2, RF-10.1). Un análisis anterior a RF-10 cuyas líneas
+  no se puedan rescatar de `position_cache` sale comentado pero sin variantes.
 
 ### RF-6 · Tablero de análisis (partidas "IRL" y posiciones libres)
 

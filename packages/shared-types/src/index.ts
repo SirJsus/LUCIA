@@ -13,6 +13,7 @@ type Schemas = components["schemas"];
 
 export type GameSummary = Schemas["GameSummary"];
 export type GameDetail = Schemas["GameDetail"];
+export type PgnImportSummary = Schemas["PgnImportSummary"];
 export type AnalysisSummary = Schemas["AnalysisSummary"];
 export type AnalysisDetail = Schemas["AnalysisDetail"];
 export type AnalyzedMoveOut = Schemas["AnalyzedMoveOut"];

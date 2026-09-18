@@ -13,10 +13,9 @@ SemVer para la serie `0.x`).
 
 Camino a v1.0.0 — ver progreso en [docs/05-roadmap.md](docs/05-roadmap.md) y
 alcance congelado en [docs/02-requerimientos.md](docs/02-requerimientos.md).
-De la **fase 2** quedan cinco ítems: importación de PGN manual (RF-1.5),
-tendencias (RF-3.7), extras del tablero de análisis (RF-6.6 a 6.9), capa de
-ocupación (RF-7.1 a 7.7) y exportación de PGN anotado.
-Después, las fases 3 y 4.
+De la **fase 2** quedan tres ítems: tendencias (RF-3.7), extras del tablero
+de análisis (RF-6.6 a 6.9) y capa de ocupación (RF-7.1 a 7.7). Cerrarlos
+cierra la fase y toca subir el minor a `0.3.0`. Después, las fases 3 y 4.
 
 Fuera de ese camino, en Post 1.0: **RF-8 · Personalización de interfaz**
 (Fase 5), **RF-11 · Partidas con ventaja (odds) contra el motor** (Fase 6,
@@ -24,11 +23,74 @@ planteado el 2026-09-07: necesita antes el editor de posición de RF-6.1 y el
 sparring calibrado de RF-4.3, ambos alcance de 1.0), **RF-9 · Comparación de
 evaluaciones entre motores** (ampliación de RF-2.6, sin fase propia) y
 **RNF-11 · Coherencia de interfaz**, criterio permanente cuyos incumplimientos
-concretos se arreglaron dentro de 1.0: su inventario en
-[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) está vacío, con las 63
-filas que llegó a tener cerradas.
+concretos se arreglan dentro de 1.0: de las 70 filas que su inventario en
+[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) lleva abiertas, 65 están
+cerradas y quedan **cinco** —la 65 y la 67, de la importación de PGN (RF-1.5),
+y las 68 a 70, del enlace de exportación (RF-5.5)—, pendientes para el próximo
+corte.
+
+## [0.2.2] - 2026-09-17
+
+El historial deja de depender de chess.com: se puede **subir un PGN** de un
+torneo presencial o de otro sitio y esas partidas se ven, se analizan y cuentan
+igual que las sincronizadas (RF-1.5); y lo analizado **sale de LUCIA** como PGN
+anotado, legible en lichess, ChessBase o SCID (RF-5.5). Acompañan el trabajo
+acumulado desde `0.2.1`: repertorio contra la teoría de maestros, tabla de
+aperturas propia, extractores de patrones, filtros de partidas y coherencia de
+interfaz.
+
+No cierra la fase 2, que sigue abierta con tres ítems, así que sube el
+patch y no el minor — mismo criterio que en `0.2.1`.
 
 ### Añadido
+
+- **Importar un PGN de otra fuente al historial** (RF-1.5), con `POST
+  /import/pgn` (multipart, tope de 5 MB) y el formulario "Importar PGN" junto
+  al de sincronizar, en Partidas. Cierra el último ítem que arrastraba la
+  fase 1.
+  - **Las partidas manuales son filas normales de `games`**, con
+    `platform="manual"`, para que el visor, el análisis y las estadísticas no
+    tengan que saber de dónde vino cada una
+    ([ADR-0011](docs/adr/0011-pgn-manual-en-la-misma-tabla.md)). Lo que un PGN
+    no trae y las columnas exigen —rating, ritmo, si era puntuada— se guarda
+    como hueco y se enseña como "—", en vez de inventarlo: deducir el ritmo de
+    un "40/7200:1800" de torneo sería adivinar.
+  - **Identidad por el SHA-256 del PGN de cada partida**: no hay `uuid` que
+    usar, así que reimportar el mismo archivo reescribe las filas en vez de
+    duplicarlas, igual de idempotente que el sync (RF-1.3).
+  - **Hay que decir cómo apareces en el archivo** (`player_name_in_pgn`). Un
+    PGN de torneo nombra al jugador "Durán, Jesús" y no con su usuario, y las
+    estadísticas y tres de los filtros de RF-5.3 casan por nombre: ese bando se
+    guarda con el `username` de LUCIA y el nombre original no se pierde, porque
+    el PGN se guarda entero. La respuesta dice en cuántas se reconoció y la
+    pantalla avisa cuando no fue en ninguna —guardadas, pero sin contar en
+    ningún marcador.
+  - **Lo que no entra**: partidas sin terminar ("\*") y sin jugadas. La
+    respuesta las enumera con el motivo, para que un recuento que no cuadra con
+    el archivo no se lea como un fallo.
+  - Dependencia nueva: `python-multipart` (BSD-3, compatible con GPL-3.0).
+
+- **Exportar una partida analizada a PGN anotado** (RF-5.5), con `GET
+  /analysis/{id}/pgn` y el enlace "Exportar PGN anotado" en el visor. El
+  archivo se abre como cualquier PGN comentado.
+  - **Se comentan todas las jugadas**, no solo las falladas: cada una lleva su
+    clasificación (RF-2.2) y la probabilidad de victoria en que dejó la
+    partida, siempre desde el punto de vista de las blancas para que el número
+    no cambie de signo a mitad del archivo. El NAG (`?!`, `?`, `??`) sí es solo
+    para lo fallado: poner `!` donde se coincidió con el motor sería un mérito
+    que el análisis no mide.
+  - **La línea del motor cuelga del padre de la jugada** —la posición desde la
+    que se eligió, que es donde una variante tiene sentido— y solo cuando lo
+    jugado no era lo que el motor prefería, recortada a 6 medias jugadas.
+  - **No se vuelve a llamar al motor**: todo sale de lo que el análisis ya
+    guardó (RF-2.2, RF-10.1), así que exportar es inmediato y no gasta CPU.
+  - **Solo se exportan análisis terminados** (409 si no): uno a medias daría
+    una partida comentada hasta la jugada 20 y muda después.
+  - **El PGN conserva las cabeceras del archivo original**, no las columnas
+    normalizadas de `games`, que en una partida importada por RF-1.5 pueden
+    estar vacías.
+  - Sin dependencias nuevas: lo escribe `python-chess`, que ya estaba en el
+    stack.
 
 - **Comparación de repertorio con la teoría de maestros** (RF-3.6), en
   Estadísticas: dónde te sales de la línea principal, qué juegan los maestros
@@ -125,8 +187,8 @@ filas que llegó a tener cerradas.
 
 - **La interfaz es coherente entre pantallas** (RF-5.1, RF-5.2, RF-6.2,
   RNF-6/RNF-11): el inventario de
-  [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) queda **vacío**, con las
-  51 filas que llegó a tener cerradas: las 38 que lo motivaron, las nueve que
+  [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) quedó **vacío** ese día,
+  con las 51 filas que llevaba cerradas: las 38 que lo motivaron, las nueve que
   destapó después el barrido de comprobación de las seis pantallas contra los
   siete criterios, y las cuatro de revisar las alternativas por jugada del
   visor. Cierra el ítem de coherencia de la fase 2. Lo más visible:

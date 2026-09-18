@@ -18,9 +18,13 @@ from sqlalchemy import case, func
 
 from lucia_api.db.models import Game
 
-#: Valores de `white_result`/`black_result` de chess.com que significan tablas.
+#: Valores de `white_result`/`black_result` que significan tablas: los de
+#: chess.com, que dicen además cómo se llegó a ellas, más el "draw" a secas que
+#: guarda el importador de PGN manual (RF-1.5), donde el archivo solo dice
+#: "1/2-1/2" y no cómo acabó.
 #: Cualquier otro valor distinto de "win" significa que ese bando perdió.
 DRAW_RESULTS = (
+    "draw",
     "agreed",
     "repetition",
     "stalemate",

@@ -4,7 +4,17 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from . import __version__
-from .routers import analysis, boards, engines, games, health, repertoire, stats, sync
+from .routers import (
+    analysis,
+    boards,
+    engines,
+    games,
+    health,
+    pgn_import,
+    repertoire,
+    stats,
+    sync,
+)
 from .worker import AnalysisWorker
 
 
@@ -30,6 +40,7 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(sync.router)
 app.include_router(games.router)
+app.include_router(pgn_import.router)
 app.include_router(analysis.router)
 app.include_router(engines.router)
 app.include_router(stats.router)
