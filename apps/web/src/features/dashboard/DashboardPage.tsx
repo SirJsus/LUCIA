@@ -1,4 +1,4 @@
-/** Dashboard de estadísticas (RF-3.1 a RF-3.5).
+/** Dashboard de estadísticas (RF-3.1 a RF-3.7).
  *
  * Todo se calcula en la API sobre lo ya guardado; aquí solo se presenta. Las
  * secciones que dependen de un análisis terminado avisan cuando no hay
@@ -10,14 +10,20 @@ import type {
   PlayerStats,
   TimeBucketStats,
   TimeTrouble,
+  Trends,
 } from "@lucia/shared-types";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import {
+  Area,
+  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
   Cell,
+  Legend,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -40,10 +46,12 @@ import { useChartTheme } from "../../lib/chartTheme";
 import {
   formatAccuracy,
   formatPercent,
+  formatPerHundredMoves,
+  formatRating,
   formatTimeClass,
   formatYearMonth,
 } from "../../lib/format";
-import { formatTimeLeftBucket, mistakeTypeStyle } from "../../lib/insights";
+import { formatTimeLeftBucket, formatTrendSentence, mistakeTypeStyle } from "../../lib/insights";
 
 /** El encabezado de la columna de marcador, en las dos tablas que lo tienen:
  * la abreviatura sola no se entiende sin desarrollarla (criterio C-6). */
@@ -58,6 +66,23 @@ const ECO_HEADER = <abbr title="Código de la Enciclopedia de Aperturas de Ajedr
  * victoria, no puntuación. */
 const OPENING_EXIT_HEADER = (
   <abbr title="Tu probabilidad de victoria media al terminar la apertura">Al salir</abbr>
+);
+
+/** Las dos columnas de tasa de la tabla de tendencias (RF-3.7). "/ 100" sin
+ * desarrollar no dice de qué son cien, y el número no se puede comparar con
+ * el "Errores" en recuento de las otras dos tablas del panel: la explicación
+ * va en el encabezado, como en las demás columnas que no se leen solas
+ * (criterio C-6). */
+const MISTAKE_RATE_HEADER = (
+  <abbr title="Errores por cada cien jugadas tuyas, para poder comparar meses con distinto número de partidas">
+    Errores / 100
+  </abbr>
+);
+
+const BLUNDER_RATE_HEADER = (
+  <abbr title="De esos errores, los graves, también por cada cien jugadas tuyas">
+    De ellos, blunders / 100
+  </abbr>
 );
 
 const PHASE_LABELS: Record<string, string> = {
@@ -127,7 +152,9 @@ function StatsContent({ stats, username }: { stats: PlayerStats; username: strin
           {stats.by_time_class.map((item) => (
             <tr key={item.time_class} className={TABLE_ROW_CLASSES}>
               <td className={TABLE_CELL_CLASSES}>{formatTimeClass(item.time_class)}</td>
-              <td className={`tabular-nums ${TABLE_CELL_CLASSES}`}>{item.current_rating ?? "—"}</td>
+              <td className={`tabular-nums ${TABLE_CELL_CLASSES}`}>
+                {formatRating(item.current_rating)}
+              </td>
               <td className={TABLE_CELL_CLASSES}>
                 <RecordBadges record={item.record} />
               </td>
@@ -186,6 +213,18 @@ function StatsContent({ stats, username }: { stats: PlayerStats; username: strin
           </EmptyState>
         ) : (
           <MistakeTypeSection mistakeTypes={stats.by_mistake_type} />
+        )}
+      </section>
+
+      <section className="space-y-2">
+        <h2 className="font-semibold">Cómo evolucionas</h2>
+        {stats.trends.by_month.length === 0 ? (
+          <EmptyState title="Aún no hay análisis que comparar">
+            La evolución se calcula sobre las partidas analizadas: analiza algunas desde su visor
+            para ver si mejoras.
+          </EmptyState>
+        ) : (
+          <TrendsSection trends={stats.trends} />
         )}
       </section>
 
@@ -251,6 +290,191 @@ function StatsContent({ stats, username }: { stats: PlayerStats; username: strin
           </DataTable>
         )}
       </section>
+    </div>
+  );
+}
+
+/** Evolución de la precisión y del tipo de errores, mes a mes (RF-3.7).
+ *
+ * Dos gráficos sobre el mismo eje de meses, que es a propósito el de
+ * "Partidas por mes": la precisión (con el rating al lado, para ver si suben
+ * juntos) y los errores por tipo. Los errores van **por cada cien jugadas** y
+ * no en recuento, porque un mes de cuarenta partidas y otro de cinco no se
+ * comparan contando: la línea subiría al jugar más, no al jugar peor.
+ */
+function TrendsSection({ trends }: { trends: Trends }) {
+  const theme = useChartTheme();
+  const monthlyChartData = trends.by_month.map((month) => ({
+    label: formatYearMonth(month.year, month.month),
+    accuracy: month.average_accuracy,
+    rating: month.rating,
+    ...Object.fromEntries(
+      month.mistakes_per_hundred_moves.map((rate) => [rate.mistake_type, rate.per_hundred_moves]),
+    ),
+  }));
+  // Sin un control de tiempo del que hablar no hay serie de rating: dibujarla
+  // daría una leyenda "Rating (—)" sobre una línea vacía.
+  const ratingLabel = trends.rating_time_class
+    ? `Rating (${formatTimeClass(trends.rating_time_class)})`
+    : null;
+  const axisTickStyle = { fontSize: 11, fill: theme.axisColor };
+  const legendStyle = { fontSize: 11, color: theme.axisColor };
+
+  return (
+    <div className="space-y-3">
+      {/* Con un mes analizado no hay comparación posible y los gráficos salen
+          con un punto suelto: se dice, en vez de dejar la sección muda. */}
+      <p className={`p-2 text-sm ${PANEL_CLASSES}`}>
+        {trends.change === null
+          ? "Solo hay un mes con partidas analizadas: la comparación aparece en cuanto haya un segundo."
+          : formatTrendSentence(trends.change)}
+      </p>
+
+      <div className="space-y-1">
+        <Panel bodyClassName="h-56 p-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={monthlyChartData}>
+              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <XAxis dataKey="label" tick={axisTickStyle} stroke={theme.axisColor} />
+              {/* Dos escalas distintas: la precisión es un porcentaje y el
+                  rating son puntos Elo. Compartir eje aplastaría una de las
+                  dos contra el borde. */}
+              <YAxis
+                yAxisId="accuracy"
+                domain={[0, 100]}
+                tick={axisTickStyle}
+                stroke={theme.axisColor}
+                width={36}
+                unit="%"
+              />
+              {ratingLabel !== null && (
+                <YAxis
+                  yAxisId="rating"
+                  orientation="right"
+                  domain={["dataMin - 50", "dataMax + 50"]}
+                  tick={axisTickStyle}
+                  stroke={theme.axisColor}
+                  width={44}
+                />
+              )}
+              <Tooltip
+                contentStyle={theme.tooltipStyle}
+                formatter={(value: number, name: string) => [
+                  name === ratingLabel ? formatRating(value) : formatPercent(value, 1),
+                  name,
+                ]}
+              />
+              <Legend wrapperStyle={legendStyle} />
+              <Line
+                yAxisId="accuracy"
+                type="monotone"
+                dataKey="accuracy"
+                name="Precisión"
+                stroke={theme.seriesColor}
+                strokeWidth={2}
+                isAnimationActive={false}
+              />
+              {/* Sin `connectNulls`: un mes sin partidas de ese control deja
+                  hueco en vez de inventar una recta entre dos ratings que no
+                  se tocaron. */}
+              {ratingLabel !== null && (
+                <Line
+                  yAxisId="rating"
+                  type="monotone"
+                  dataKey="rating"
+                  name={ratingLabel}
+                  stroke={theme.ratingColor}
+                  strokeWidth={2}
+                  strokeDasharray="4 3"
+                  isAnimationActive={false}
+                />
+              )}
+            </LineChart>
+          </ResponsiveContainer>
+        </Panel>
+        <p className="text-xs opacity-60">
+          Precisión media de tus jugadas cada mes
+          {ratingLabel !== null && ", con el rating al lado para ver si suben juntos"}. Solo cuentan
+          los meses con alguna partida analizada.
+        </p>
+      </div>
+
+      <div className="space-y-1">
+        <Panel bodyClassName="h-56 p-2">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={monthlyChartData}>
+              <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+              <XAxis dataKey="label" tick={axisTickStyle} stroke={theme.axisColor} />
+              <YAxis tick={axisTickStyle} stroke={theme.axisColor} width={36} />
+              <Tooltip
+                contentStyle={theme.tooltipStyle}
+                formatter={(value: number, name: string) => [formatPerHundredMoves(value), name]}
+              />
+              <Legend wrapperStyle={legendStyle} />
+              {/* Apiladas y en orden fijo: la altura total es la tasa de error
+                  del mes y cada franja dice de qué tipo. El orden lo fija la
+                  API (`MISTAKE_TYPES`), no el reparto del mes. */}
+              {trends.by_month[0].mistakes_per_hundred_moves.map((rate) => {
+                const style = mistakeTypeStyle(rate.mistake_type);
+                return (
+                  <Area
+                    key={rate.mistake_type}
+                    type="monotone"
+                    dataKey={rate.mistake_type}
+                    name={style.label}
+                    stackId="mistakes"
+                    stroke={theme.toneColors[style.tone]}
+                    fill={theme.toneColors[style.tone]}
+                    fillOpacity={0.5}
+                    isAnimationActive={false}
+                  />
+                );
+              })}
+            </AreaChart>
+          </ResponsiveContainer>
+        </Panel>
+        <p className="text-xs opacity-60">
+          Errores por cada cien jugadas tuyas, repartidos por tipo. Normalizado a propósito: en
+          recuento crudo la línea subiría al jugar más partidas, no al jugar peor.
+        </p>
+      </div>
+
+      <DataTable
+        headers={[
+          "Mes",
+          "Partidas",
+          "Jugadas",
+          "Precisión",
+          MISTAKE_RATE_HEADER,
+          BLUNDER_RATE_HEADER,
+          "Rating",
+        ]}
+      >
+        {trends.by_month.map((month) => (
+          <tr key={`${month.year}-${month.month}`} className={TABLE_ROW_CLASSES}>
+            <td className={TABLE_CELL_CLASSES}>{formatYearMonth(month.year, month.month)}</td>
+            <td className={`tabular-nums ${TABLE_CELL_CLASSES}`}>{month.analyzed_games}</td>
+            <td className={`tabular-nums opacity-70 ${TABLE_CELL_CLASSES}`}>{month.moves}</td>
+            <td className={`tabular-nums ${TABLE_CELL_CLASSES}`}>
+              {formatAccuracy(month.average_accuracy)}
+            </td>
+            <td className={`tabular-nums ${TABLE_CELL_CLASSES}`}>
+              {formatPerHundredMoves(
+                month.mistakes_per_hundred_moves.reduce(
+                  (total, rate) => total + rate.per_hundred_moves,
+                  0,
+                ),
+              )}
+            </td>
+            <td className={`tabular-nums opacity-70 ${TABLE_CELL_CLASSES}`}>
+              {formatPerHundredMoves(month.blunders_per_hundred_moves)}
+            </td>
+            <td className={`tabular-nums opacity-70 ${TABLE_CELL_CLASSES}`}>
+              {formatRating(month.rating)}
+            </td>
+          </tr>
+        ))}
+      </DataTable>
     </div>
   );
 }

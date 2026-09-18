@@ -1,6 +1,6 @@
 [project]
 name = "lucia-lichess"
-version = "0.2.2"
+version = "0.2.3"
 description = "Cliente asincrono del Opening Explorer de Lichess para LUCIA."
 requires-python = ">=3.12"
 license = "GPL-3.0-or-later"

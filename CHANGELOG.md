@@ -13,9 +13,9 @@ SemVer para la serie `0.x`).
 
 Camino a v1.0.0 — ver progreso en [docs/05-roadmap.md](docs/05-roadmap.md) y
 alcance congelado en [docs/02-requerimientos.md](docs/02-requerimientos.md).
-De la **fase 2** quedan tres ítems: tendencias (RF-3.7), extras del tablero
-de análisis (RF-6.6 a 6.9) y capa de ocupación (RF-7.1 a 7.7). Cerrarlos
-cierra la fase y toca subir el minor a `0.3.0`. Después, las fases 3 y 4.
+De la **fase 2** quedan dos ítems: extras del tablero de análisis (RF-6.6 a
+6.9) y capa de ocupación (RF-7.1 a 7.7). Cerrarlos cierra la fase y toca subir
+el minor a `0.3.0`. Después, las fases 3 y 4.
 
 Fuera de ese camino, en Post 1.0: **RF-8 · Personalización de interfaz**
 (Fase 5), **RF-11 · Partidas con ventaja (odds) contra el motor** (Fase 6,
@@ -23,11 +23,65 @@ planteado el 2026-09-07: necesita antes el editor de posición de RF-6.1 y el
 sparring calibrado de RF-4.3, ambos alcance de 1.0), **RF-9 · Comparación de
 evaluaciones entre motores** (ampliación de RF-2.6, sin fase propia) y
 **RNF-11 · Coherencia de interfaz**, criterio permanente cuyos incumplimientos
-concretos se arreglan dentro de 1.0: de las 70 filas que su inventario en
-[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) lleva abiertas, 65 están
+concretos se arreglan dentro de 1.0: de las 73 filas que su inventario en
+[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) lleva abiertas, 68 están
 cerradas y quedan **cinco** —la 65 y la 67, de la importación de PGN (RF-1.5),
 y las 68 a 70, del enlace de exportación (RF-5.5)—, pendientes para el próximo
 corte.
+
+## [0.2.3] - 2026-09-18
+
+El dashboard deja de ser una foto del total y pasa a contar una historia: la
+sección **"Cómo evolucionas"** enseña la precisión y los errores mes a mes, y
+dice con palabras si el último mes va mejor o peor que los anteriores
+(RF-3.7). No cierra la fase 2, que sigue abierta con dos ítems, así que sube
+el patch y no el minor — mismo criterio que en `0.2.1` y `0.2.2`.
+
+### Añadido
+
+- **Tendencias temporales** (RF-3.7), con `GET /stats/trends` y la sección
+  "Cómo evolucionas" en el dashboard: una serie mensual de precisión, otra de
+  errores por tipo y una tabla mes a mes. Las reglas de lectura que el texto
+  del requerimiento no fija están escritas en la nota "Con qué reglas se
+  cumplió RF-3.7" de [docs/02-requerimientos.md](docs/02-requerimientos.md);
+  en resumen:
+  - **El tramo es el mes natural**, el mismo eje que usa "Partidas por mes"
+    (RF-3.1), para que las dos series se lean juntas.
+  - **Los errores van por cada cien jugadas**, no en recuento crudo: con 324
+    partidas repartidas muy desigualmente por mes, contar dibujaba cuánto
+    ajedrez se jugó y no cómo se jugó. El reparto por tipo usa las mismas
+    reglas que RF-3.4, así que la suma de los meses coincide con la
+    distribución global.
+  - **Solo entran los meses con alguna partida analizada**: uno jugado pero
+    sin analizar aparecería como precisión cero, que se lee como un desastre.
+  - **Frase de tendencia**, comparando el último mes con hasta tres
+    anteriores y ponderando por jugadas (`TREND_BASELINE_PERIODS` en
+    `lucia_core.insights`, constante con nombre y no número suelto). Tres y no
+    uno porque contra el mes pasado cualquier racha mala de dos semanas diría
+    "estás empeorando"; ponderado porque un mes de dos partidas no pesa como
+    uno de cuarenta. Dice el sentido con palabras: en precisión subir es
+    mejorar, en errores es empeorar.
+  - **Línea de rating superpuesta a la de precisión**, para ver si calidad y
+    resultado suben juntos. Es la del **control de tiempo más jugado** y la
+    pantalla dice cuál: promediar bullet con rapid convertiría un mes de mucho
+    bullet en una caída de rating inventada.
+  - Frase de tendencia y línea de rating van **más allá del texto literal de
+    RF-3.7** ("evolución de precisión y tipo de errores en el tiempo") y se
+    añadieron a petición explícita del usuario. No son requerimientos nuevos:
+    la frase es otra lectura de los mismos datos del propio RF-3.7 y el rating
+    por control de tiempo ya es alcance de RF-3.1. Por eso quedan recogidos en
+    la nota de RF-3.7 y no en `Post 1.0 (futuro)`.
+
+### Cambiado
+
+- **"Cómo evolucionas" va detrás de "Por qué fallas"** en el panel de
+  estadísticas (C-6): los cuatro tipos de error se estrenaban en el gráfico de
+  áreas, dos secciones por encima de donde está escrita la regla que los
+  define.
+- **Un solo formateador para la tasa por cada cien jugadas y para el rating**
+  (C-5, RNF-11): `formatPerHundredMoves` y un `formatRating` que acepta el
+  `null` de la serie mensual, en `apps/web/src/lib/format.ts`, en vez del
+  `.toFixed(1)` y el `?? "—"` sueltos que se repetían por pantalla.
 
 ## [0.2.2] - 2026-09-17
 

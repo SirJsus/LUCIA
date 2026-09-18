@@ -11,8 +11,10 @@ from lucia_core.insights import (
     is_time_trouble,
     mistake_type,
     mistakes_by_type,
+    move_quality,
     opening_exit_win_percent,
     time_pressure,
+    trend_change,
 )
 
 
@@ -154,3 +156,86 @@ class TestOpeningExit:
 
     def test_a_game_without_opening_moves_has_no_exit_evaluation(self) -> None:
         assert opening_exit_win_percent([_move(phase="middlegame")]) is None
+
+
+class TestMoveQuality:
+    def test_an_empty_period_has_no_quality(self) -> None:
+        # Un mes sin jugadas analizadas no es un mes con precisión cero.
+        assert move_quality([]) is None
+
+    def test_errors_are_reported_per_hundred_moves(self) -> None:
+        # Cuatro errores tácticos en doscientas jugadas son dos por cada cien.
+        moves = [_move(classification="mistake", best_alternative_san="Qxf7+")] * 4
+        moves += [_move()] * 196
+        quality = move_quality(moves)
+        assert quality is not None
+        assert quality.moves == 200
+        rates = {
+            rate.mistake_type: rate.per_hundred_moves for rate in quality.mistakes_per_hundred_moves
+        }
+        assert rates["tactical"] == 2.0
+        assert quality.total_mistakes_per_hundred_moves == 2.0
+
+    def test_every_type_is_always_present_and_in_the_same_order(self) -> None:
+        # La serie temporal no puede cambiar de categorías de un mes a otro.
+        quality = move_quality([_move()])
+        assert quality is not None
+        assert [rate.mistake_type for rate in quality.mistakes_per_hundred_moves] == [
+            "tactical",
+            "positional",
+            "time",
+            "endgame",
+        ]
+        assert all(rate.per_hundred_moves == 0.0 for rate in quality.mistakes_per_hundred_moves)
+
+    def test_blunders_are_counted_apart_from_the_rest(self) -> None:
+        # Fallar menos y fallar menos grave son dos preguntas distintas.
+        moves = [_move(classification="blunder", best_alternative_san="Rd1")]
+        moves += [_move(classification="inaccuracy", best_alternative_san="Rd1")]
+        moves += [_move()] * 98
+        quality = move_quality(moves)
+        assert quality is not None
+        assert quality.blunders_per_hundred_moves == 1.0
+        assert quality.total_mistakes_per_hundred_moves == 2.0
+
+
+def _quality(accuracy: float, moves: int, mistakes: int = 0):
+    """Un tramo con la precisión y el número de errores posicionales pedidos."""
+    period_moves = [_move(classification="mistake", best_alternative_san="Rd1", accuracy=accuracy)]
+    period_moves *= mistakes
+    period_moves += [_move(accuracy=accuracy)] * (moves - mistakes)
+    quality = move_quality(period_moves)
+    assert quality is not None
+    return quality
+
+
+class TestTrendChange:
+    def test_a_single_period_has_nothing_to_compare_against(self) -> None:
+        assert trend_change([_quality(80.0, 100)]) is None
+
+    def test_the_last_period_is_compared_against_the_previous_ones(self) -> None:
+        change = trend_change([_quality(70.0, 100), _quality(70.0, 100), _quality(75.0, 100)])
+        assert change is not None
+        assert change.baseline_periods == 2
+        assert change.accuracy_change == 5.0
+
+    def test_only_the_last_three_periods_count_as_reference(self) -> None:
+        # Comparar contra todo el historial haría que un mal año lejano
+        # dijera "estás mejorando" para siempre.
+        periods = [_quality(10.0, 100)] + [_quality(70.0, 100)] * 3 + [_quality(75.0, 100)]
+        change = trend_change(periods)
+        assert change is not None
+        assert change.baseline_periods == 3
+        assert change.accuracy_change == 5.0
+
+    def test_the_reference_is_weighted_by_moves(self) -> None:
+        # Un mes de dos partidas no puede pesar lo mismo que uno de cuarenta.
+        change = trend_change([_quality(90.0, 10), _quality(70.0, 90), _quality(72.0, 100)])
+        assert change is not None
+        assert change.accuracy_change == 0.0  # la referencia es 72, no 80
+
+    def test_more_mistakes_than_before_is_a_positive_change(self) -> None:
+        # En errores, subir es empeorar: lo dice el campo, no el signo.
+        change = trend_change([_quality(80.0, 100, mistakes=1), _quality(80.0, 100, mistakes=4)])
+        assert change is not None
+        assert change.mistake_rate_change == 3.0

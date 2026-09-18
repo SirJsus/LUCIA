@@ -5,7 +5,14 @@ puede contar en SQL se agrega aquí (marcador, ratings, partidas por mes,
 precisión y reparto por fases); lo que hay que leer jugada a jugada —tipo de
 error, tramos de reloj y evaluación al salir de la apertura— se lo pide a
 `lucia_core.insights` a través de `services/insights.py`, y las reglas viven
-allí, no aquí.
+allí, no aquí. Lo consume `routers/stats.py`, que solo traduce estos
+`dataclass` a los modelos de respuesta de `GET /stats/{username}`.
+
+La excepción a ese reparto son las tendencias (RF-3.7): el núcleo compara
+tramos de jugadas sin saber de qué tamaño son, así que **el tramo se decide
+aquí** —mes natural, el mismo con el que se cuentan las partidas en RF-3.1—
+y aquí se le pega a cada mes el rating con el que se cerró, que es un dato de
+`games` y no del análisis.
 
 Una partida sin analizar cuenta para resultados y ratings (RF-3.1) pero no
 para lo demás, que necesita un `Analysis` terminado. Y una analizada con los
@@ -22,11 +29,15 @@ from dataclasses import dataclass, field
 from lucia_core.insights import (
     MistakeTypeCount,
     MoveContext,
+    MoveQuality,
     TimeBucketStats,
+    TrendChange,
     is_time_trouble,
     mistakes_by_type,
+    move_quality,
     opening_exit_win_percent,
     time_pressure,
+    trend_change,
 )
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -121,6 +132,37 @@ class TimeTroubleSummary:
 
 
 @dataclass
+class MonthlyQuality:
+    """Cómo se jugó en un mes concreto (RF-3.7)."""
+
+    year: int
+    month: int
+    analyzed_games: int
+    quality: MoveQuality
+    rating: int | None = None
+    """Rating con el que se cerró el mes en el control de tiempo más jugado
+    (`TrendsSummary.rating_time_class`). `None` si ese mes no se jugó ninguna partida
+    de ese control."""
+
+
+@dataclass
+class TrendsSummary:
+    """Evolución del juego en el tiempo (RF-3.7).
+
+    Solo entran los meses con **alguna partida analizada**: la precisión y el
+    tipo de error salen del análisis, y un mes jugado pero sin analizar
+    aparecería como un cero que se lee como un desastre.
+    """
+
+    by_month: list[MonthlyQuality] = field(default_factory=list)
+    change: TrendChange | None = None
+    rating_time_class: str | None = None
+    """A qué control de tiempo pertenece la línea de rating: el más jugado.
+    Mezclar bullet y rapid en una sola serie haría que un mes de más bullet
+    pareciera una caída de rating, cuando son dos escalas distintas."""
+
+
+@dataclass
 class PlayerStats:
     username: str
     total_games: int
@@ -134,6 +176,8 @@ class PlayerStats:
     by_time_left: list[TimeBucketStats] = field(default_factory=list)
     """Cómo cae la calidad de juego según baja el reloj (RF-3.5)."""
     time_trouble: TimeTroubleSummary | None = None
+    trends: TrendsSummary = field(default_factory=TrendsSummary)
+    """Evolución de precisión y tipo de errores mes a mes (RF-3.7)."""
     analyzed_games: int = 0
     average_accuracy: float | None = None
 
@@ -181,16 +225,16 @@ async def get_player_stats(
     move_contexts = await player_move_contexts(session, username)
     moves = [context for _game_id, context in move_contexts]
 
+    time_class_stats = [
+        TimeClassStats(time_class=time_class, record=record, current_rating=ratings.get(time_class))
+        for time_class, record in sorted(by_time_class.items())
+    ]
+
     return PlayerStats(
         username=username,
         total_games=overall.total,
         overall=overall,
-        by_time_class=[
-            TimeClassStats(
-                time_class=time_class, record=record, current_rating=ratings.get(time_class)
-            )
-            for time_class, record in sorted(by_time_class.items())
-        ],
+        by_time_class=time_class_stats,
         by_month=[
             MonthlyCount(year=year, month=month, games=games) for year, month, games in monthly_rows
         ],
@@ -199,9 +243,98 @@ async def get_player_stats(
         by_mistake_type=mistakes_by_type(moves),
         by_time_left=time_pressure(moves),
         time_trouble=_time_trouble_summary(move_contexts),
+        trends=await _trends_summary(session, username, move_contexts, time_class_stats),
         analyzed_games=analyzed_games,
         average_accuracy=average_accuracy,
     )
+
+
+async def _trends_summary(
+    session: AsyncSession,
+    username: str,
+    move_contexts: list[tuple[int, MoveContext]],
+    time_class_stats: list[TimeClassStats],
+) -> TrendsSummary:
+    """Evolución mes a mes de la precisión y del tipo de errores (RF-3.7).
+
+    El tramo es el **mes natural**, el mismo con el que ya se cuentan las
+    partidas en RF-3.1, para que las dos series se lean sobre el mismo eje. La
+    calidad de cada mes la resume `lucia_core.insights.move_quality` —la regla
+    de qué es un error y de qué tipo es la misma que la de RF-3.4—; aquí solo
+    se reparten las jugadas por mes y se les pega el rating de cierre.
+
+    El rating del mes es el de la **última** partida del mes en
+    `rating_time_class`, no la media: el rating es un estado, no una magnitud
+    que se promedie, y así la serie coincide con el "Rating" que la tabla de
+    RF-3.1 enseña para el mes en curso.
+    """
+    rating_time_class = _most_played_time_class(time_class_stats)
+    game_rows = (
+        await session.execute(
+            select(
+                Game.id,
+                Game.year,
+                Game.month,
+                Game.time_class,
+                player_side(username, Game.white_rating, Game.black_rating),
+            )
+            .where(is_player(username))
+            .order_by(Game.played_at)
+        )
+    ).all()
+
+    month_by_game: dict[int, tuple[int, int]] = {}
+    ratings_by_month: dict[tuple[int, int], int] = {}
+    for game_id, year, month, time_class, rating in game_rows:
+        month_by_game[game_id] = (year, month)
+        if time_class == rating_time_class and rating:
+            # De más antigua a más reciente: la última partida del mes gana.
+            ratings_by_month[(year, month)] = rating
+
+    moves_by_month: dict[tuple[int, int], list[MoveContext]] = {}
+    games_by_month: dict[tuple[int, int], set[int]] = {}
+    for game_id, move in move_contexts:
+        month = month_by_game[game_id]
+        moves_by_month.setdefault(month, []).append(move)
+        games_by_month.setdefault(month, set()).add(game_id)
+
+    by_month = [
+        MonthlyQuality(
+            year=year,
+            month=month,
+            analyzed_games=len(games_by_month[(year, month)]),
+            quality=quality,
+            rating=ratings_by_month.get((year, month)),
+        )
+        for (year, month) in sorted(moves_by_month)
+        if (quality := move_quality(moves_by_month[(year, month)])) is not None
+    ]
+    return TrendsSummary(
+        by_month=by_month,
+        change=trend_change([item.quality for item in by_month]),
+        rating_time_class=rating_time_class if by_month else None,
+    )
+
+
+#: Ritmo con el que se guarda una partida importada de un PGN que no dice a
+#: qué se jugó (RF-1.5). No puede ser el control de la serie de rating: esas
+#: partidas tampoco traen `WhiteElo`, así que la línea saldría vacía y con un
+#: hueco por nombre.
+UNKNOWN_TIME_CLASS = "unknown"
+
+
+def _most_played_time_class(time_class_stats: list[TimeClassStats]) -> str | None:
+    """El control de tiempo con más partidas, que es el de la línea de rating,
+    o `None` si no hay ninguno del que se pueda hablar.
+
+    Se elige uno y se dice cuál en vez de promediar todos: un mes de mucho
+    bullet bajaría una media que mezclara escalas y parecería una caída de
+    rating que no ocurrió.
+    """
+    known = [item for item in time_class_stats if item.time_class != UNKNOWN_TIME_CLASS]
+    if not known:
+        return None
+    return max(known, key=lambda item: item.record.total).time_class
 
 
 def _time_trouble_summary(

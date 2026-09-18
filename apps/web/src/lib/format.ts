@@ -122,9 +122,25 @@ export function formatDuration(totalSeconds: number): string {
  *
  * Las partidas importadas de un PGN manual (RF-1.5) rara vez traen `WhiteElo`
  * y se guardan con 0, que es el hueco de la columna. Enseñar "(0)" haría
- * pasar el hueco por un dato, y por uno malísimo. */
-export function formatRating(rating: number): string {
-  return rating > 0 ? String(rating) : MISSING_VALUE;
+ * pasar el hueco por un dato, y por uno malísimo. El hueco también llega como
+ * `null` —un mes sin partidas del control de tiempo de la serie (RF-3.7), o
+ * un control del que chess.com no da rating actual—, y las dos formas de no
+ * tener rating se enseñan igual (criterio C-5). */
+export function formatRating(rating: number | null | undefined): string {
+  return rating != null && rating > 0 ? String(rating) : MISSING_VALUE;
+}
+
+/** Una tasa por cada cien jugadas: "1.4" (RF-3.7).
+ *
+ * Un decimal, que es lo que distingue dos meses sin fingir una precisión que
+ * no hay. Vive aquí y no en la pantalla porque la misma magnitud se enseña en
+ * la tabla de tendencias, en el tooltip de su gráfico y en la frase de
+ * `lib/insights.ts`: tres sitios decidiendo por su cuenta cuántos decimales
+ * es justo lo que evita el criterio C-5. La unidad no va en el número —"1.4
+ * por cada cien jugadas" no cabe en una celda—: la ponen el encabezado de la
+ * columna y el pie del gráfico. */
+export function formatPerHundredMoves(value: number): string {
+  return value.toFixed(1);
 }
 
 /** Resultados que significan tablas para AMBOS jugadores: los de chess.com,

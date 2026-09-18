@@ -771,6 +771,13 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /** MistakeRateOut */
+        MistakeRateOut: {
+            /** Mistake Type */
+            mistake_type: string;
+            /** Per Hundred Moves */
+            per_hundred_moves: number;
+        };
         /**
          * MistakeTypeStatsOut
          * @description Cuántos errores de cada tipo y por qué (RF-3.4).
@@ -791,6 +798,28 @@ export interface components {
             month: number;
             /** Games */
             games: number;
+        };
+        /**
+         * MonthlyQualityOut
+         * @description Cómo se jugó en un mes (RF-3.7).
+         */
+        MonthlyQualityOut: {
+            /** Year */
+            year: number;
+            /** Month */
+            month: number;
+            /** Analyzed Games */
+            analyzed_games: number;
+            /** Moves */
+            moves: number;
+            /** Average Accuracy */
+            average_accuracy: number;
+            /** Blunders Per Hundred Moves */
+            blunders_per_hundred_moves: number;
+            /** Mistakes Per Hundred Moves */
+            mistakes_per_hundred_moves: components["schemas"]["MistakeRateOut"][];
+            /** Rating */
+            rating: number | null;
         };
         /** MoveComparisonOut */
         MoveComparisonOut: {
@@ -878,6 +907,7 @@ export interface components {
             /** By Time Left */
             by_time_left: components["schemas"]["TimeBucketStatsOut"][];
             time_trouble: components["schemas"]["TimeTroubleOut"] | null;
+            trends: components["schemas"]["TrendsOut"];
             /** Analyzed Games */
             analyzed_games: number;
             /** Average Accuracy */
@@ -984,6 +1014,26 @@ export interface components {
             analyzed_games_with_clocks: number;
             /** Share Of Games */
             share_of_games: number;
+        };
+        /**
+         * TrendChangeOut
+         * @description El último mes frente a los anteriores (RF-3.7).
+         */
+        TrendChangeOut: {
+            /** Baseline Months */
+            baseline_months: number;
+            /** Accuracy Change */
+            accuracy_change: number;
+            /** Mistake Rate Change */
+            mistake_rate_change: number;
+        };
+        /** TrendsOut */
+        TrendsOut: {
+            /** By Month */
+            by_month: components["schemas"]["MonthlyQualityOut"][];
+            change: components["schemas"]["TrendChangeOut"] | null;
+            /** Rating Time Class */
+            rating_time_class: string | null;
         };
         /** ValidationError */
         ValidationError: {

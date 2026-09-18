@@ -210,6 +210,39 @@ Cuánta teoría se sabe en cada momento es parte de la respuesta
 (`positions_missing`), y la pantalla lo dice siempre: ver la nota de RNF-1 más
 abajo.
 
+**Con qué reglas se cumplió RF-3.7** (**2026-09-18**). El texto del
+requerimiento —"evolución de precisión y tipo de errores en el tiempo"— no
+dice en qué tramo ni en qué unidad; esta es la lectura que se le dio. Las
+reglas de comparación son constantes con nombre en `lucia_core.insights`
+(`MISTAKE_TYPES`, `TREND_BASELINE_PERIODS`), ajustables sin tocar el
+requerimiento.
+
+- **El tramo es el mes natural**, el mismo con el que RF-3.1 cuenta las
+  partidas: las dos series se leen sobre el mismo eje, y así "en julio jugué
+  mucho y peor" se ve de un vistazo en dos gráficos que encajan.
+- **Los errores van por cada cien jugadas**, no en recuento crudo. Un mes de
+  cuarenta partidas y otro de cinco no se comparan contando: la línea subiría
+  al jugar más, no al jugar peor. El reparto por tipo usa las mismas reglas
+  que RF-3.4, de modo que la suma de todos los meses coincide con la
+  distribución global.
+- **Solo entran los meses con alguna partida analizada.** La precisión y el
+  tipo de error salen del análisis; un mes jugado pero sin analizar aparecería
+  como un cero que se lee como un desastre. Ese mes sigue contando en
+  "partidas por mes" (RF-3.1), que no necesita análisis.
+- **La frase de tendencia compara el último mes con hasta tres anteriores**,
+  ponderando por jugadas. Tres y no uno: contra el mes pasado, cualquier racha
+  mala de dos semanas diría "estás empeorando". Ponderado porque un mes de dos
+  partidas no puede pesar lo mismo que uno de cuarenta. La frase dice el
+  sentido con palabras y no con el signo, porque en precisión subir es mejorar
+  y en errores es empeorar.
+- **El rating se dibuja junto a la precisión**, y esto va más allá del texto de
+  RF-3.7: sirve para ver si la precisión y el resultado suben juntos. Es el
+  rating de la **última partida de cada mes en el control de tiempo más
+  jugado**, y la interfaz dice cuál es. Una media de todos los controles haría
+  que un mes de mucho bullet pareciera una caída de rating: bullet y rapid son
+  dos escalas distintas, no dos muestras de la misma. Un mes sin partidas de
+  ese control deja hueco en la línea en vez de una recta inventada.
+
 ### RF-4 · Entrenamiento
 
 | ID | Requerimiento | Prioridad |

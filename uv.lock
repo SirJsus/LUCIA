@@ -310,7 +310,7 @@ wheels = [
 
 [[package]]
 name = "lucia-api"
-version = "0.2.2"
+version = "0.2.3"
 source = { editable = "apps/api" }
 dependencies = [
     { name = "aiosqlite" },
@@ -356,7 +356,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "lucia-chesscom"
-version = "0.2.2"
+version = "0.2.3"
 source = { editable = "packages/chesscom" }
 dependencies = [
     { name = "chess" },
@@ -386,7 +386,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "lucia-core"
-version = "0.2.2"
+version = "0.2.3"
 source = { editable = "packages/core" }
 dependencies = [
     { name = "chess" },
@@ -416,7 +416,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "lucia-lichess"
-version = "0.2.2"
+version = "0.2.3"
 source = { editable = "packages/lichess" }
 dependencies = [
     { name = "httpx", extra = ["http2"] },
@@ -444,7 +444,7 @@ provides-extras = ["dev"]
 
 [[package]]
 name = "lucia-workspace"
-version = "0.2.2"
+version = "0.2.3"
 source = { virtual = "." }
 
 [[package]]

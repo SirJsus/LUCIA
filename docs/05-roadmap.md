@@ -369,7 +369,23 @@
         viven en `services/games.py`. Comprobado contra las 324 partidas
         reales: los filtros por resultado dan 193/14/117, exactamente el
         marcador que enseña el dashboard.
-- [ ] Tendencias temporales (RF-3.7).
+- [x] Tendencias temporales (RF-3.7). Hecho el 2026-09-18: sección "Cómo
+      evolucionas" en el dashboard, con la precisión y el rating mes a mes y
+      los errores por tipo apilados.
+
+      - **Mes natural como tramo**, el mismo eje que "Partidas por mes"
+        (RF-3.1), para que las dos series se lean juntas.
+      - **Errores por cada cien jugadas y no en recuento**: con 324 partidas
+        repartidas muy desigualmente por mes, el recuento crudo dibujaba la
+        cantidad de ajedrez jugado y no su calidad.
+      - **Solo los meses con partidas analizadas.** Uno jugado pero sin
+        analizar entraría como precisión cero, que se lee como un desastre.
+      - **Frase de tendencia** comparando el último mes con hasta tres
+        anteriores, ponderada por jugadas, y diciendo el sentido con palabras:
+        en precisión subir es mejorar y en errores es empeorar.
+      - **Línea de rating al lado**, que es un extra sobre el texto del RF: es
+        la del control de tiempo más jugado y la pantalla dice cuál, porque
+        promediar bullet con rapid inventaría caídas de rating.
 - [ ] Tablero de análisis, extras (RF-6.6 a 6.9): abrir partida importada como
       copia desacoplada (esto también cubre "explorar variantes desde el
       visor", RF-5.2), importar / exportar PGN con variantes y comentarios,

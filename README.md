@@ -57,8 +57,8 @@ anotado, con comentarios y variantes, para abrirla en lichess o ChessBase),
 **Tableros** (análisis libre desde
 FEN o PGN, con árbol de variantes y motor en vivo), **Estadísticas** (marcador,
 ratings, aperturas con su código ECO, en qué fase se pierde más ventaja, de qué
-tipo son los errores, qué pasa cuando baja el reloj y dónde te sales de la
-teoría de maestros) y **Motores** (profundidad, MultiPV, hilos y hash,
+tipo son los errores, qué pasa cuando baja el reloj, si mejoras mes a mes y
+dónde te sales de la teoría de maestros) y **Motores** (profundidad, MultiPV, hilos y hash,
 editables).
 
 Todo funciona sin conexión salvo dos cosas, y las dos las pides tú: importar

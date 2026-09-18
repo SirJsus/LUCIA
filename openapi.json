@@ -3,7 +3,7 @@
   "info": {
     "title": "L.U.C.I.A. API",
     "description": "Logic & Ultimate Chess Insight Algorithm",
-    "version": "0.2.2"
+    "version": "0.2.3"
   },
   "paths": {
     "/health": {
@@ -2232,6 +2232,24 @@
         "type": "object",
         "title": "HTTPValidationError"
       },
+      "MistakeRateOut": {
+        "properties": {
+          "mistake_type": {
+            "type": "string",
+            "title": "Mistake Type"
+          },
+          "per_hundred_moves": {
+            "type": "number",
+            "title": "Per Hundred Moves"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mistake_type",
+          "per_hundred_moves"
+        ],
+        "title": "MistakeRateOut"
+      },
       "MistakeTypeStatsOut": {
         "properties": {
           "mistake_type": {
@@ -2278,6 +2296,65 @@
           "games"
         ],
         "title": "MonthlyCountOut"
+      },
+      "MonthlyQualityOut": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "month": {
+            "type": "integer",
+            "title": "Month"
+          },
+          "analyzed_games": {
+            "type": "integer",
+            "title": "Analyzed Games"
+          },
+          "moves": {
+            "type": "integer",
+            "title": "Moves"
+          },
+          "average_accuracy": {
+            "type": "number",
+            "title": "Average Accuracy"
+          },
+          "blunders_per_hundred_moves": {
+            "type": "number",
+            "title": "Blunders Per Hundred Moves"
+          },
+          "mistakes_per_hundred_moves": {
+            "items": {
+              "$ref": "#/components/schemas/MistakeRateOut"
+            },
+            "type": "array",
+            "title": "Mistakes Per Hundred Moves"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "month",
+          "analyzed_games",
+          "moves",
+          "average_accuracy",
+          "blunders_per_hundred_moves",
+          "mistakes_per_hundred_moves",
+          "rating"
+        ],
+        "title": "MonthlyQualityOut",
+        "description": "Cómo se jugó en un mes (RF-3.7)."
       },
       "MoveComparisonOut": {
         "properties": {
@@ -2544,6 +2621,9 @@
               }
             ]
           },
+          "trends": {
+            "$ref": "#/components/schemas/TrendsOut"
+          },
           "analyzed_games": {
             "type": "integer",
             "title": "Analyzed Games"
@@ -2572,6 +2652,7 @@
           "by_mistake_type",
           "by_time_left",
           "time_trouble",
+          "trends",
           "analyzed_games",
           "average_accuracy"
         ],
@@ -2867,6 +2948,70 @@
           "share_of_games"
         ],
         "title": "TimeTroubleOut"
+      },
+      "TrendChangeOut": {
+        "properties": {
+          "baseline_months": {
+            "type": "integer",
+            "title": "Baseline Months"
+          },
+          "accuracy_change": {
+            "type": "number",
+            "title": "Accuracy Change"
+          },
+          "mistake_rate_change": {
+            "type": "number",
+            "title": "Mistake Rate Change"
+          }
+        },
+        "type": "object",
+        "required": [
+          "baseline_months",
+          "accuracy_change",
+          "mistake_rate_change"
+        ],
+        "title": "TrendChangeOut",
+        "description": "El último mes frente a los anteriores (RF-3.7)."
+      },
+      "TrendsOut": {
+        "properties": {
+          "by_month": {
+            "items": {
+              "$ref": "#/components/schemas/MonthlyQualityOut"
+            },
+            "type": "array",
+            "title": "By Month"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrendChangeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rating_time_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating Time Class"
+          }
+        },
+        "type": "object",
+        "required": [
+          "by_month",
+          "change",
+          "rating_time_class"
+        ],
+        "title": "TrendsOut",
+        "description": "Evolución del juego en el tiempo (RF-3.7), lo que el dashboard dibuja\nen \"Cómo evolucionas\"."
       },
       "ValidationError": {
         "properties": {

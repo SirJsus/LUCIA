@@ -365,6 +365,9 @@ async def _add_analyzed_game(
     clocks: list[float] | None = None,
     opening_name: str | None = None,
     opening_eco: str | None = None,
+    year: int = 2024,
+    month: int = 1,
+    white_rating: int = 1500,
 ) -> Game:
     """Una partida con análisis terminado y las jugadas que se le pasen.
 
@@ -380,6 +383,9 @@ async def _add_analyzed_game(
         black_result="checkmated",
         opening_name=opening_name,
         opening_eco=opening_eco,
+        year=year,
+        month=month,
+        white_rating=white_rating,
     )
     game.clocks_json = clocks
     analysis = Analysis(game_id=game.id, engine="stockfish", depth=10, multipv=3, status="done")
@@ -522,3 +528,83 @@ async def test_a_game_analyzed_twice_counts_once(db_session: AsyncSession) -> No
 
     assert stats.analyzed_games == 1
     assert sum(item.mistakes for item in stats.by_mistake_type) == 1
+
+
+async def test_trends_report_each_month_per_hundred_moves(db_session: AsyncSession) -> None:
+    """RF-3.7: la evolución se lee por mes y normalizada.
+
+    Dos meses con distinto número de partidas: en recuento crudo el segundo
+    parecería mucho peor solo por haber jugado más, y por cada cien jugadas se
+    ve que en realidad se falla igual.
+    """
+    await _add_analyzed_game(
+        db_session,
+        platform_id="tendencia-1",
+        white="ana",
+        black="beto",
+        year=2024,
+        month=1,
+        white_rating=1500,
+        moves=[
+            {"ply": 0, "color": "white", "classification": "mistake", "move_accuracy": 40.0},
+            {"ply": 2, "color": "white", "move_accuracy": 100.0},
+        ],
+    )
+    for index in (2, 3):
+        await _add_analyzed_game(
+            db_session,
+            platform_id=f"tendencia-{index}",
+            white="ana",
+            black="beto",
+            year=2024,
+            month=2,
+            white_rating=1500 + index,
+            moves=[
+                {"ply": 0, "color": "white", "classification": "mistake", "move_accuracy": 40.0},
+                {"ply": 2, "color": "white", "move_accuracy": 100.0},
+            ],
+        )
+
+    stats = await get_player_stats(db_session, "ana")
+
+    january, february = stats.trends.by_month
+    assert (january.year, january.month, january.analyzed_games) == (2024, 1, 1)
+    assert (february.year, february.month, february.analyzed_games) == (2024, 2, 2)
+    # Dos jugadas en enero y cuatro en febrero, pero la misma tasa de error.
+    assert january.quality.total_mistakes_per_hundred_moves == 50.0
+    assert february.quality.total_mistakes_per_hundred_moves == 50.0
+    assert january.quality.average_accuracy == 70.0
+    # El rating es el de la última partida del mes en el control más jugado.
+    assert stats.trends.rating_time_class == "blitz"
+    assert (january.rating, february.rating) == (1500, 1503)
+
+
+async def test_trends_leave_out_months_without_analysis(db_session: AsyncSession) -> None:
+    """Un mes jugado pero sin analizar no es un mes con precisión cero: no
+    aparece en la tendencia, aunque sí en "partidas por mes" (RF-3.1)."""
+    await _add_game(
+        db_session,
+        platform_id="sin-analizar",
+        white="ana",
+        black="beto",
+        white_result="win",
+        black_result="checkmated",
+        year=2024,
+        month=3,
+    )
+    await _add_analyzed_game(
+        db_session,
+        platform_id="analizada",
+        white="ana",
+        black="beto",
+        year=2024,
+        month=4,
+        moves=[{"ply": 0, "color": "white"}],
+    )
+
+    stats = await get_player_stats(db_session, "ana")
+
+    assert len(stats.by_month) == 2
+    assert [(item.year, item.month) for item in stats.trends.by_month] == [(2024, 4)]
+    # Un solo mes no se puede comparar con nada.
+    assert stats.trends.change is None

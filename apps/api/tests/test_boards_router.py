@@ -165,8 +165,7 @@ async def test_a_finished_position_is_not_sent_to_the_engine(db_session: AsyncSe
     try:
         with TestClient(app) as http:
             responses = [
-                http.post("/analysis/position", json={"fen": fen})
-                for fen in (checkmate, stalemate)
+                http.post("/analysis/position", json={"fen": fen}) for fen in (checkmate, stalemate)
             ]
     finally:
         app.dependency_overrides.clear()

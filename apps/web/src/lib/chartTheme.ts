@@ -11,6 +11,7 @@
  * de qué tema está activo, y para reaccionar al cambio sin recargar.
  */
 import { useEffect, useState } from "react";
+import type { BadgeTone } from "../components/Badge";
 
 export interface ChartTheme {
   /** Estilo del recuadro del tooltip. */
@@ -21,6 +22,15 @@ export interface ChartTheme {
   seriesColor: string;
   /** Color de lo que hay que destacar sobre la serie. */
   highlightColor: string;
+  /** Color de la serie de rating, que convive con la de precisión en el
+   * mismo gráfico de tendencias y tiene que distinguirse de ella. */
+  ratingColor: string;
+  /** Un color por tono de `Badge`, para las series que ya tienen una insignia
+   * en otra parte de la pantalla: así el mismo tipo de error se reconoce por
+   * el color en la tabla de "Por qué fallas" y en el gráfico de tendencias
+   * (criterio C-5 de docs/07-coherencia-ui.md). Son las tonalidades 500 y 400
+   * de Tailwind, las mismas familias que `TONE_CLASSES`. */
+  toneColors: Record<BadgeTone, string>;
 }
 
 const LIGHT_THEME: ChartTheme = {
@@ -34,6 +44,14 @@ const LIGHT_THEME: ChartTheme = {
   axisColor: "#475569",
   seriesColor: "#6366f1",
   highlightColor: "#ef4444",
+  ratingColor: "#10b981",
+  toneColors: {
+    neutral: "#64748b",
+    info: "#0ea5e9",
+    success: "#10b981",
+    warning: "#f59e0b",
+    danger: "#ef4444",
+  },
 };
 
 const DARK_THEME: ChartTheme = {
@@ -47,6 +65,14 @@ const DARK_THEME: ChartTheme = {
   axisColor: "#94a3b8",
   seriesColor: "#818cf8",
   highlightColor: "#f87171",
+  ratingColor: "#34d399",
+  toneColors: {
+    neutral: "#94a3b8",
+    info: "#38bdf8",
+    success: "#34d399",
+    warning: "#fbbf24",
+    danger: "#f87171",
+  },
 };
 
 export function useChartTheme(): ChartTheme {

@@ -1,4 +1,4 @@
-"""GET /stats/{username} — dashboard de estadísticas (RF-3.1 a RF-3.5)."""
+"""GET /stats/{username} — dashboard de estadísticas (RF-3.1 a RF-3.7)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db import get_session
 from lucia_api.dependencies import resolved_username
-from lucia_api.services.stats import PlayerStats, RecordSummary, get_player_stats
+from lucia_api.services.stats import PlayerStats, RecordSummary, TrendsSummary, get_player_stats
 
 router = APIRouter(tags=["stats"])
 
@@ -83,6 +83,57 @@ class PhaseStatsOut(BaseModel):
     blunders: int
 
 
+class MistakeRateOut(BaseModel):
+    mistake_type: str
+    per_hundred_moves: float
+
+
+class MonthlyQualityOut(BaseModel):
+    """Cómo se jugó en un mes (RF-3.7)."""
+
+    year: int
+    month: int
+    analyzed_games: int
+    moves: int
+    """Jugadas del jugador sobre las que se calculó el mes: dice si el punto es
+    sólido o son dos partidas sueltas."""
+    average_accuracy: float
+    blunders_per_hundred_moves: float
+    mistakes_per_hundred_moves: list[MistakeRateOut]
+    """Un valor por tipo de error, siempre los cuatro y siempre en el mismo
+    orden, para que la serie no cambie de categorías de un mes a otro. Va por
+    cada cien jugadas y no en recuento crudo: si no, la línea subiría al jugar
+    más partidas en vez de al jugar peor."""
+    rating: int | None
+    """Rating de cierre del mes en `TrendsOut.rating_time_class`."""
+
+
+class TrendChangeOut(BaseModel):
+    """El último mes frente a los anteriores (RF-3.7)."""
+
+    baseline_months: int
+    """Contra cuántos meses anteriores se comparó."""
+    accuracy_change: float
+    mistake_rate_change: float
+    """Subir es empeorar, al revés que la precisión."""
+
+
+class TrendsOut(BaseModel):
+    """Evolución del juego en el tiempo (RF-3.7), lo que el dashboard dibuja
+    en "Cómo evolucionas"."""
+
+    by_month: list[MonthlyQualityOut]
+    """De más antiguo a más reciente, y solo los meses con alguna partida
+    analizada: la lista vacía significa "todavía no hay nada que comparar"."""
+    change: TrendChangeOut | None
+    """`None` cuando solo hay un mes: no hay con qué compararlo."""
+    rating_time_class: str | None
+    """A qué control de tiempo pertenece `MonthlyQualityOut.rating`: el más
+    jugado. `None` si no hay ninguno del que hablar —solo partidas importadas
+    de un PGN sin control—, y entonces la interfaz omite la serie entera en
+    vez de rotularla con un hueco."""
+
+
 class PlayerStatsOut(BaseModel):
     username: str
     total_games: int
@@ -94,6 +145,7 @@ class PlayerStatsOut(BaseModel):
     by_mistake_type: list[MistakeTypeStatsOut]
     by_time_left: list[TimeBucketStatsOut]
     time_trouble: TimeTroubleOut | None
+    trends: TrendsOut
     analyzed_games: int
     average_accuracy: float | None
 
@@ -107,6 +159,41 @@ def _record_out(record: RecordSummary) -> RecordOut:
         losses=record.losses,
         total=record.total,
         score_percent=record.score_percent,
+    )
+
+
+def _trends_out(trends: TrendsSummary) -> TrendsOut:
+    # `MoveQuality` se aplana aquí: en el núcleo es un objeto aparte porque
+    # sirve para cualquier tramo, pero la interfaz dibuja una fila por mes.
+    return TrendsOut(
+        by_month=[
+            MonthlyQualityOut(
+                year=item.year,
+                month=item.month,
+                analyzed_games=item.analyzed_games,
+                moves=item.quality.moves,
+                average_accuracy=item.quality.average_accuracy,
+                blunders_per_hundred_moves=item.quality.blunders_per_hundred_moves,
+                mistakes_per_hundred_moves=[
+                    MistakeRateOut(
+                        mistake_type=rate.mistake_type, per_hundred_moves=rate.per_hundred_moves
+                    )
+                    for rate in item.quality.mistakes_per_hundred_moves
+                ],
+                rating=item.rating,
+            )
+            for item in trends.by_month
+        ],
+        change=(
+            TrendChangeOut(
+                baseline_months=trends.change.baseline_periods,
+                accuracy_change=trends.change.accuracy_change,
+                mistake_rate_change=trends.change.mistake_rate_change,
+            )
+            if trends.change is not None
+            else None
+        ),
+        rating_time_class=trends.rating_time_class,
     )
 
 
@@ -173,6 +260,7 @@ def _stats_out(stats: PlayerStats) -> PlayerStatsOut:
             if stats.time_trouble is not None
             else None
         ),
+        trends=_trends_out(stats.trends),
         analyzed_games=stats.analyzed_games,
         average_accuracy=stats.average_accuracy,
     )

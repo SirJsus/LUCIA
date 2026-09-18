@@ -4,6 +4,7 @@ import {
   formatDuration,
   formatEngineName,
   formatPercent,
+  formatPerHundredMoves,
   formatRating,
   formatTimeClass,
   formatTimeControl,
@@ -41,6 +42,18 @@ describe("formatRating", () => {
 
   it("enseña un hueco cuando el PGN no traía rating, en vez de un 0", () => {
     expect(formatRating(0)).toBe("—");
+  });
+
+  it("enseña el mismo hueco cuando no hay rating de ese mes o de ese control", () => {
+    expect(formatRating(null)).toBe("—");
+    expect(formatRating(undefined)).toBe("—");
+  });
+});
+
+describe("formatPerHundredMoves", () => {
+  it("da un decimal, que es lo que distingue dos meses", () => {
+    expect(formatPerHundredMoves(1.44)).toBe("1.4");
+    expect(formatPerHundredMoves(0)).toBe("0.0");
   });
 });
 

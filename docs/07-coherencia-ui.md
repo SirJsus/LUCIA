@@ -25,9 +25,11 @@ filas 61 a 63, cerradas también. La importación de un PGN de otra fuente
 (RF-1.5), del 2026-09-17, abrió las filas 64 a 67: la 64 y la 66 se cerraron ese
 mismo día y quedan abiertas la 65 y la 67. La exportación del análisis a PGN
 anotado (RF-5.5), del mismo día, abrió las filas 68 a 70, las tres sobre el
-mismo control del visor. Vacío es como debería encontrarse este documento
-siempre que se lea, así que cinco filas abiertas son cinco cosas que arreglar,
-no un estado estable.
+mismo control del visor. Las tendencias temporales del panel de estadísticas
+(RF-3.7), del 2026-09-18, abrieron las filas 71 a 73 y las tres se cerraron ese
+mismo día. Vacío es como debería encontrarse este documento siempre que se lea,
+así que cinco filas abiertas son cinco cosas que arreglar, no un estado
+estable.
 
 **Qué es cada mitad de este documento.** Los criterios C-1 a C-7 son
 **RNF-11**, que vive en la sección Post 1.0 de
@@ -58,12 +60,12 @@ antes de comitear cambios de front — ver [Cómo se verifica](#cómo-se-verific
 | C-6 | **Legible sin saber de ajedrez.** Todo número del motor va acompañado de etiqueta, leyenda o representación visual. `+0.35` solo, sin más, no comunica nada a quien no lee evaluaciones. |
 | C-7 | **Accesibilidad mínima.** Foco visible, `aria-label` en los botones que son solo icono, y ningún significado transmitido únicamente por color. |
 
-## Inventario de incoherencias abiertas (al 2026-09-17)
+## Inventario de incoherencias abiertas (al 2026-09-18)
 
 Quedan cinco, todas de presentación: qué enseñar y dónde, no cómo escribirlo.
 Dos son de la pantalla de Partidas y tres del control de exportar del visor.
 Los números no se renumeran al cerrar una fila —son la referencia con la que se
-habla de ella en un commit—, así que faltan la 64 y la 66.
+habla de ella en un commit—, así que faltan la 64, la 66 y las 71 a 73.
 
 | # | Incoherencia | Dónde | Criterio |
 | --- | --- | --- | --- |
@@ -415,6 +417,46 @@ las filas 68 a 70 y dos arreglos mecánicos, sin nada que decidir:
 - **C-6 · qué lleva el archivo.** "Exportar PGN anotado" no decía qué se
   descarga; lo dice ahora con la misma forma que "Copiar PGN" del tablero de
   análisis, que es la otra acción que saca el PGN de una partida.
+
+**2026-09-18 · las tendencias temporales (RF-3.7).** La sección "Cómo
+evolucionas" del panel de estadísticas: una frase de comparación, dos gráficos
+y una tabla mes a mes. La revisión abrió las filas 71 a 73 y las tres se
+arreglaron en el mismo commit, porque eran defectos de la sección recién
+escrita y no deuda heredada:
+
+- **C-3 · un solo mes analizado.** La frase de comparación no se pintaba
+  cuando no había con qué comparar, y los dos gráficos se quedaban con un
+  punto suelto sin explicar por qué. Ahora el mismo hueco dice "solo hay un mes
+  con partidas analizadas: la comparación aparece en cuanto haya un segundo".
+- **C-6 · "Rating (—)".** El control de tiempo más jugado podía ser `unknown`
+  —el de los PGN importados (RF-1.5), que además no traen rating—, y la leyenda
+  nombraba con un hueco una serie vacía. `_most_played_time_class` ya no elige
+  `unknown`, y sin control del que hablar el front omite la serie entera: eje,
+  línea y la mención del rating en el pie del gráfico.
+- **C-6 · orden de las secciones.** Los cuatro tipos de error se estrenaban en
+  el gráfico de áreas, dos secciones por encima de la regla que los define.
+  "Cómo evolucionas" va ahora detrás de "Por qué fallas", que es donde esa
+  regla está escrita.
+
+Y los tres arreglos mecánicos, sin nada que decidir:
+
+- **C-5 · la tasa por cada cien jugadas tiene un solo formateador.** El decimal
+  se decidía por separado en tres sitios —las dos columnas de la tabla, el
+  tooltip del gráfico de áreas y la frase de `formatTrendSentence`— con un
+  `.toFixed(1)` suelto por cada uno. Sale de `formatPerHundredMoves` en
+  `lib/format.ts`, que es donde vive el resto del formateo.
+- **C-5 · el rating también.** La tabla nueva pasaba por `formatRating` y la de
+  "Por control de tiempo", dos secciones más arriba, escribía `?? "—"` a mano:
+  el mismo dato con dos reglas en la misma pantalla, y un rating 0 —el de un
+  PGN importado— se habría visto como hueco en una y como "0" en la otra.
+  `formatRating` acepta ahora el `null` que trae la serie mensual y las dos
+  tablas lo usan.
+- **C-6 · "Errores / 100" y "Blunders / 100" no decían de qué son cien.** El
+  número tampoco se puede comparar con la columna "Errores" en recuento de las
+  otras dos tablas del panel. Los dos encabezados llevan su explicación en un
+  `abbr`, como ya hacían "V/T/D", "ECO" y "Al salir", y el segundo se llama "De
+  ellos, blunders / 100", que es el nombre que esa columna tiene en las otras
+  dos tablas.
 
 **Y un nombre que se revisó y se deja como está.** Que la acción se llame
 "Exportar PGN anotado" y no "Exportar PGN", teniendo Partidas un "Importar

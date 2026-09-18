@@ -31,6 +31,7 @@ flowchart TB
         ROUTERS["routers/<br/>sync · pgn_import · games · analysis<br/>stats · engines · boards · repertoire"]
         WORKER["worker/<br/>cola de análisis en background"]
         SVC_ANALYSIS["services/analysis.py<br/>run_analysis · analyze_position<br/>+ lectura de alternativas guardadas"]
+        SVC_STATS["services/stats.py<br/>agrega en SQL y reparte por mes<br/>(tendencias RF-3.7)"]
         SVC_INSIGHTS["services/insights.py<br/>lee el análisis guardado"]
         SVC_SYNC["services/chesscom_sync.py<br/>importa partidas y les pone apertura"]
         SVC_PGN["services/pgn_import.py<br/>archivo PGN → las mismas filas<br/>(platform=manual, RF-1.5)"]
@@ -44,7 +45,7 @@ flowchart TB
         ANALYSIS["analysis/GameAnalyzer"]
         CLASS["classification/MoveClassifier"]
         ACC["accuracy/"]
-        INSIGHTS["insights/<br/>momentos críticos · tipos de error<br/>presión de reloj · salida de apertura"]
+        INSIGHTS["insights/<br/>momentos críticos · tipos de error<br/>presión de reloj · salida de apertura<br/>calidad de un tramo y tendencia (RF-3.7)"]
         OPENINGS["openings/<br/>tabla ECO versionada (ADR-0009)<br/>identify_opening · opening_of_pgn"]
     end
 
@@ -59,8 +60,12 @@ flowchart TB
     WEB -- "WebSocket /ws" --> ROUTERS
     ROUTERS --> WORKER
     ROUTERS --> DB
-    ROUTERS -- "GET /games (filtros RF-5.3)<br/>+ GET /stats" --> SVC_GAMES
-    ROUTERS -- "GET /stats · GET /analysis/{id}" --> SVC_INSIGHTS
+    ROUTERS -- "GET /games (filtros RF-5.3)" --> SVC_GAMES
+    ROUTERS -- "GET /stats" --> SVC_STATS
+    ROUTERS -- "GET /analysis/{id}" --> SVC_INSIGHTS
+    SVC_STATS -- "lado del jugador en SQL" --> SVC_GAMES
+    SVC_STATS -- "jugadas ya analizadas" --> SVC_INSIGHTS
+    SVC_STATS -- "games: de qué mes es cada partida<br/>y con qué rating cerró (RF-3.7)" --> DB
     SVC_INSIGHTS --> DB
     SVC_INSIGHTS -- "sin motor (ADR-0008)" --> INSIGHTS
     ROUTERS -- "POST /analysis/position<br/>(síncrono, sin cola)" --> SVC_ANALYSIS
@@ -238,8 +243,8 @@ solo haría un diagrama ilegible—:
 - **Llamar al motor**: analizar una partida (RF-2, con cola) · analizar una
   posición en vivo (RF-5.2 / RF-6.2, síncrono).
 - **Leer el análisis ya guardado, sin motor**: alternativas por jugada
-  (RF-10) · exportar a PGN anotado (RF-5.5) · patrones (RF-2.8 · RF-3.2 ·
-  RF-3.4 · RF-3.5).
+  (RF-10) · exportar a PGN anotado (RF-5.5) · patrones y tendencias (RF-2.8 ·
+  RF-3.2 · RF-3.4 · RF-3.5 · RF-3.7).
 - **Contrastar con teoría externa**: repertorio contra maestros (RF-3.6).
 
 ### Sincronizar con chess.com (RF-1, implementado)
@@ -599,13 +604,16 @@ sequenceDiagram
     D-->>U: cuántas se trajeron y si hay que volver a pulsar
 ```
 
-### Deducir patrones del análisis guardado (RF-2.8 · RF-3.2 · RF-3.4 · RF-3.5, implementado)
+### Deducir patrones del análisis guardado (RF-2.8 · RF-3.2 · RF-3.4 · RF-3.5 · RF-3.7, implementado)
 
 Los patrones no se persisten ni vuelven a llamar al motor: se deducen al leer,
 sobre lo que el análisis ya guardó ([ADR-0008](adr/0008-patrones-deducidos-al-leer.md)).
 El núcleo (`lucia_core.insights`) solo ve `MoveContext`; quien lee SQLite y los
-construye es `services/insights.py`. Las reglas y umbrales concretos están en
-[02-requerimientos.md § RF-2 y RF-3](02-requerimientos.md).
+construye es `services/insights.py`. En las tendencias (RF-3.7) el reparto es
+el mismo: el núcleo compara tramos sin saber de qué tamaño son y quien decide
+que el tramo es el mes natural —y quien le pega el rating de cierre, que sale
+de `games` y no del análisis— es `services/stats.py`. Las reglas y umbrales
+concretos están en [02-requerimientos.md § RF-2 y RF-3](02-requerimientos.md).
 
 ```mermaid
 sequenceDiagram
@@ -629,9 +637,20 @@ sequenceDiagram
     ST->>CI: time_pressure(moves) + is_time_trouble [RF-3.5]
     ST->>CI: opening_exit_win_percent(moves) [RF-3.2]
     CI-->>ST: recuentos por tipo, tramos de reloj, win% al salir
+
+    Note over ST,CI: Tendencias (RF-3.7): el mismo material, partido por mes
+    ST->>DB: games del jugador: año/mes y rating de cada una
+    ST->>ST: _trends_summary: jugadas por mes natural<br/>+ rating de cierre en _most_played_time_class
+    loop cada mes con partidas analizadas
+        ST->>CI: move_quality(moves del mes)
+        CI-->>ST: MoveQuality (precisión y errores<br/>por cada cien jugadas, MISTAKE_TYPES fijos)
+    end
+    ST->>CI: trend_change([quality por mes])
+    CI-->>ST: TrendChange o nada si solo hay un mes<br/>(media ponderada de TREND_BASELINE_PERIODS previos)
+
     ST-->>R: PlayerStats → PlayerStatsOut
-    R-->>D: by_mistake_type · by_time_left · time_trouble<br/>+ columna "Al salir" por apertura
-    D-->>U: MistakeTypeSection · TimePressureSection<br/>(etiquetas y colores de lib/insights.ts)
+    R-->>D: by_mistake_type · by_time_left · time_trouble<br/>+ columna "Al salir" por apertura<br/>+ trends (TrendsOut: by_month · change · rating_time_class)
+    D-->>U: MistakeTypeSection · TimePressureSection · TrendsSection<br/>(etiquetas y colores de lib/insights.ts,<br/>ratingColor y toneColors de lib/chartTheme.ts)
 
     Note over U,DB: Visor: momentos críticos de una partida
     U->>D: abrir la partida
@@ -662,7 +681,8 @@ amplía a medida que se implementa cada RF (ver [05-roadmap.md](05-roadmap.md)).
 | RF-3.4 · Distribución de errores por tipo | `packages/core/lucia_core/insights/__init__.py` (`mistake_type`, `mistakes_by_type`), `apps/api/lucia_api/services/stats.py` (`by_mistake_type`) + `routers/stats.py`, `apps/web/src/features/dashboard/DashboardPage.tsx` (`MistakeTypeSection`) con las etiquetas de `apps/web/src/lib/insights.ts` (`mistakeTypeStyle`) | [ADR-0008](adr/0008-patrones-deducidos-al-leer.md), [02-requerimientos.md § RF-3](02-requerimientos.md) |
 | RF-3.5 · Gestión del tiempo y *time trouble* | `packages/core/lucia_core/insights/__init__.py` (`time_pressure`, `is_time_trouble`, `TimeBucketStats`), `apps/api/lucia_api/services/stats.py` (`by_time_left`, `time_trouble`, con los relojes de `Game.clocks_json`) + `routers/stats.py`, `apps/web/src/features/dashboard/DashboardPage.tsx` (`TimePressureSection`, tramos con `formatTimeLeftBucket` de `lib/insights.ts`) | [ADR-0008](adr/0008-patrones-deducidos-al-leer.md), [02-requerimientos.md § RF-3](02-requerimientos.md) |
 | RF-3.6 · Repertorio contra la teoría de maestros | `packages/lichess/lucia_lichess/` (`LichessExplorerClient.masters`, `ExplorerPosition`), `apps/api/lucia_api/services/repertoire.py` (`compare_repertoire` sin red, `refresh_repertoire` con tope por llamada), `routers/repertoire.py` (`GET /repertoire`, `POST /repertoire/refresh`), `apps/api/lucia_api/db/models.py` (`ExplorerPositionCache`, tabla `explorer_positions`, migración `apps/api/migrations/versions/b4e8c17f0a92_agrega_cache_del_opening_explorer.py`), `apps/web/src/features/dashboard/RepertoireSection.tsx` (con `components/RecordBadges.tsx`) | [ADR-0010](adr/0010-repertorio-con-red-y-cacheado.md), [02-requerimientos.md § RF-3](02-requerimientos.md) |
-| RF-3.7-3.8 · Insight avanzado restante | pendiente (fase 2): tendencias temporales (RF-3.7), rivales recurrentes (RF-3.8) | [05-roadmap.md § fase 2](05-roadmap.md) |
+| RF-3.7 · Tendencias temporales | `packages/core/lucia_core/insights/__init__.py` (`move_quality`, `trend_change`, con `MoveQuality`, `MistakeRate`, `TrendChange`, `MISTAKE_TYPES` y `TREND_BASELINE_PERIODS`: el núcleo compara tramos sin saber de qué tamaño son), `apps/api/lucia_api/services/stats.py` (`_trends_summary`, `TrendsSummary`, `MonthlyQuality`, `_most_played_time_class`: aquí el tramo se concreta en mes natural y se le pega el rating de cierre, leído de `games`), `routers/stats.py` (`TrendsOut` con `MonthlyQualityOut`, `MistakeRateOut` y `TrendChangeOut`, colgado de `PlayerStatsOut.trends` en `GET /stats`: sin endpoint, tabla ni migración nuevos), `apps/web/src/features/dashboard/DashboardPage.tsx` (`TrendsSection`, "Cómo evolucionas") con `apps/web/src/lib/insights.ts` (`formatTrendSentence`), `lib/format.ts` (`formatPerHundredMoves`) y `lib/chartTheme.ts` (`ratingColor`, `toneColors`) | [ADR-0008](adr/0008-patrones-deducidos-al-leer.md), [02-requerimientos.md § RF-3](02-requerimientos.md), [05-roadmap.md § fase 2](05-roadmap.md) |
+| RF-3.8 · Rivales recurrentes | pendiente (fase 2) | [05-roadmap.md § fase 2](05-roadmap.md) |
 | Lectura de patrones sin persistirlos | `apps/api/lucia_api/services/insights.py` (`latest_analysis_ids`, `player_move_contexts`, `analysis_critical_moments`): traduce filas de `analyzed_moves` a `MoveContext` para que `lucia_core.insights` no sepa de SQLite ni vuelva a llamar al motor | [ADR-0008](adr/0008-patrones-deducidos-al-leer.md) |
 | RF-4 · Entrenamiento | pendiente (fase 3) | [05-roadmap.md](05-roadmap.md) |
 | RF-5.1 · Visor de partida | `apps/web/src/features/viewer/` (`GameViewerPage`, con `parsePgn` sacando de ahí la posición inicial de la partida; `MoveList`, `EvalChart`, `useAnalysisProgress`); la numeración de las jugadas sale de `apps/web/src/lib/moves.ts` y los colores del gráfico de `lib/chartTheme.ts`; tablero, barra, botón de jugada (`MoveButton`), lista de líneas del motor (`EngineLineList`) y navegación —con `useMoveNavigationKeys`— se importan de `apps/web/src/components/board/` | [03-arquitectura.md § web](03-arquitectura.md) |
@@ -679,7 +699,7 @@ amplía a medida que se implementa cada RF (ver [05-roadmap.md](05-roadmap.md)).
 | RF-9 · Comparación entre motores (tabla y flechas) | pendiente (Post 1.0); amplía lo que hoy hace `services/comparison.py` + `EngineComparison.tsx` | [02-requerimientos.md § RF-9](02-requerimientos.md) |
 | RF-11 · Partidas con ventaja (odds) contra el motor | pendiente (Post 1.0, fase 6); analizar una partida con ventaja ya funciona, porque `services/analysis.py::run_analysis` parte de la posición del PGN — falta jugarla | [02-requerimientos.md § RF-11](02-requerimientos.md), [05-roadmap.md § fase 6](05-roadmap.md) |
 | Posición de partida no estándar (odds, Chess960, posición dada) | `apps/api/lucia_api/db/models.py` (`Game.starts_from_custom_position`, derivado del PGN: sin columna ni migración) expuesto por `routers/games.py` en `GameSummary`/`GameDetail`; lo avisa `apps/web/src/components/CustomPositionBadge.tsx` en listado, visor y tableros; al analizar lo respeta `apps/api/lucia_api/services/analysis.py::run_analysis` | [03-arquitectura.md § api y flujo 2](03-arquitectura.md) |
-| RNF-11 · Coherencia de interfaz | transversal a `apps/web/`: lo compartido vive en `apps/web/src/components/` (`Button.tsx`, `Panel.tsx`, `Feedback.tsx`, `DataTable.tsx`, `EngineSelect.tsx`, `FilterBar.tsx` (barra de filtros de listado y dashboard, con la espera al teclear), `FieldLabel.tsx` (la etiqueta de campo de la barra, Sincronizar, `BoardsPage` y `EnginesPage`) y `RecordBadges.tsx` (el marcador V/T/D de las tablas de control de tiempo, apertura y salidas de la teoría), `Badge.tsx` con sus dos usos con significado `ClassificationBadge.tsx` y `CustomPositionBadge.tsx`, `styles.ts` con las recetas de clases y las medidas comunes, y las piezas de tablero en `components/board/`, incluidos `MoveButton.tsx`, `EngineLineList.tsx` y `useMoveNavigationKeys.ts`) y en `apps/web/src/lib/` lo que debe dar el mismo resultado en todas las pantallas (`format.ts`, `score.ts`, `classification.ts`, `moves.ts`, `chartTheme.ts`, `insights.ts` con las etiquetas y colores de tipos de error y momentos críticos, que comparten dashboard y visor); inventariado en su [README](../apps/web/src/components/README.md); criterios C-1 a C-7, inventario de incumplimientos vacío: las 63 filas que llegó a tener están cerradas | [07-coherencia-ui.md](07-coherencia-ui.md) |
+| RNF-11 · Coherencia de interfaz | transversal a `apps/web/`: lo compartido vive en `apps/web/src/components/` (`Button.tsx`, `Panel.tsx`, `Feedback.tsx`, `DataTable.tsx`, `EngineSelect.tsx`, `FilterBar.tsx` (barra de filtros de listado y dashboard, con la espera al teclear), `FieldLabel.tsx` (la etiqueta de campo de la barra, Sincronizar, `BoardsPage` y `EnginesPage`) y `RecordBadges.tsx` (el marcador V/T/D de las tablas de control de tiempo, apertura y salidas de la teoría), `Badge.tsx` con sus dos usos con significado `ClassificationBadge.tsx` y `CustomPositionBadge.tsx`, `styles.ts` con las recetas de clases y las medidas comunes, y las piezas de tablero en `components/board/`, incluidos `MoveButton.tsx`, `EngineLineList.tsx` y `useMoveNavigationKeys.ts`) y en `apps/web/src/lib/` lo que debe dar el mismo resultado en todas las pantallas (`format.ts`, `score.ts`, `classification.ts`, `moves.ts`, `chartTheme.ts` (desde RF-3.7, con `toneColors`: un color de gráfico por tono de `Badge`, para que un tipo de error se reconozca igual en la tabla y en la serie), `insights.ts` con las etiquetas y colores de tipos de error y momentos críticos, que comparten dashboard y visor); inventariado en su [README](../apps/web/src/components/README.md); criterios C-1 a C-7, inventario de incumplimientos vacío: las 63 filas que llegó a tener están cerradas | [07-coherencia-ui.md](07-coherencia-ui.md) |
 | Destinos externos y su ritmo | `packages/chesscom/lucia_chesscom/` (importación, fuera de la sesión de uso) y `packages/lichess/lucia_lichess/` (Opening Explorer, el único que se consulta mientras se usa la aplicación: espaciado entre consultas, reintento y tope por llamada desde `routers/repertoire.py`) | [ADR-0010](adr/0010-repertorio-con-red-y-cacheado.md), [04-stack-tecnologico.md](04-stack-tecnologico.md) |
 | Motores UCI | `engines/`, `scripts/setup-engines.sh` | [ADR-0002](adr/0002-motores-como-submodulos.md) |
 | Tabla de aperturas versionada | `packages/core/lucia_core/openings/data/openings.tsv` (3.810 posiciones, generadas desde chess-openings de Lichess, CC0) + `scripts/build-openings-table.py`; la carga cacheada es `default_book()`; la columna en BD la añade `apps/api/migrations/versions/9c2d51ab7e04_agrega_apertura_propia_a_games.py`, que rellena también las partidas ya importadas | [ADR-0009](adr/0009-tabla-de-aperturas-versionada.md) |

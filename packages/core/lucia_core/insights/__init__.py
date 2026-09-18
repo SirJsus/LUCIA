@@ -1,4 +1,4 @@
-"""Extractores de patrones sobre partidas ya analizadas (RF-2.8, RF-3.4, RF-3.5).
+"""Extractores de patrones sobre partidas ya analizadas (RF-2.8, RF-3.4, RF-3.5, RF-3.7).
 
 Aquí no se consulta al motor: todo sale de lo que el análisis ya guardó —la
 clasificación de cada jugada, su probabilidad de victoria antes y después, las
@@ -24,11 +24,15 @@ Qué extrae cada cosa:
   reloj.
 - **Evaluación al salir de la apertura** (lo que faltaba de RF-3.2): con qué
   posición se sale del repertorio.
+- **Tendencias** (RF-3.7): cómo se jugó en un tramo de tiempo y si el último
+  va mejor o peor que los anteriores. Aquí solo está la regla de comparación;
+  quién parte las jugadas en tramos —por mes— es cosa de `services/stats.py`.
 """
 
 from __future__ import annotations
 
 from collections import Counter
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Literal
 
@@ -336,3 +340,118 @@ def opening_exit_win_percent(moves: list[MoveContext]) -> float | None:
     if not opening_moves:
         return None
     return max(opening_moves, key=lambda move: move.ply).win_percent_after
+
+
+#: Tipos de error en el orden fijo en que se representan en la tendencia. El
+#: orden importa: `mistakes_by_type` los devuelve del más frecuente al menos,
+#: que cambia de un mes a otro, y una serie temporal cuyas categorías bailan
+#: no se puede leer.
+MISTAKE_TYPES: tuple[MistakeType, ...] = ("tactical", "positional", "time", "endgame")
+
+
+@dataclass(frozen=True)
+class MistakeRate:
+    """Cada cuántas jugadas se comete un error de este tipo (RF-3.7)."""
+
+    mistake_type: MistakeType
+    per_hundred_moves: float
+
+
+@dataclass(frozen=True)
+class MoveQuality:
+    """Cómo se jugó en un conjunto de jugadas, en magnitudes comparables entre
+    conjuntos de distinto tamaño (RF-3.7).
+
+    Todo va **por cada cien jugadas** y no en recuento crudo a propósito: un
+    mes de cuarenta partidas y otro de cinco no se pueden comparar contando
+    errores, porque la línea subiría al jugar más y no al jugar peor.
+    """
+
+    moves: int
+    """Sobre cuántas jugadas del jugador se calculó: es lo que dice si el
+    punto es sólido o son tres partidas sueltas."""
+    average_accuracy: float
+    blunders_per_hundred_moves: float
+    """La gravedad aparte de la frecuencia: distingue "fallo menos" de "fallo
+    menos grave"."""
+    mistakes_per_hundred_moves: tuple[MistakeRate, ...]
+    """Un valor por cada tipo de `MISTAKE_TYPES`, siempre los cuatro y siempre
+    en el mismo orden, aunque alguno sea cero."""
+
+    @property
+    def total_mistakes_per_hundred_moves(self) -> float:
+        return sum(rate.per_hundred_moves for rate in self.mistakes_per_hundred_moves)
+
+
+def move_quality(
+    moves: list[MoveContext], thresholds: InsightThresholds | None = None
+) -> MoveQuality | None:
+    """Resume cómo se jugó ese conjunto de jugadas, o `None` si está vacío.
+
+    Es la unidad con la que se comparan dos tramos de tiempo (RF-3.7): quien
+    llama agrupa las jugadas como quiera —aquí se agrupan por mes— y esta
+    función solo dice cómo se jugó en cada grupo. El reparto por tipo usa las
+    mismas reglas de `mistake_type` que la distribución global de RF-3.4, de
+    modo que la suma de los doce meses coincide con ella.
+    """
+    if not moves:
+        return None
+    share_of_hundred = 100 / len(moves)
+    mistakes = {item.mistake_type: item.mistakes for item in mistakes_by_type(moves, thresholds)}
+    return MoveQuality(
+        moves=len(moves),
+        average_accuracy=sum(move.accuracy for move in moves) / len(moves),
+        blunders_per_hundred_moves=sum(1 for move in moves if move.classification == "blunder")
+        * share_of_hundred,
+        mistakes_per_hundred_moves=tuple(
+            MistakeRate(found_type, mistakes.get(found_type, 0) * share_of_hundred)
+            for found_type in MISTAKE_TYPES
+        ),
+    )
+
+
+#: Cuántos tramos anteriores entran en la comparación de `trend_change`. Tres
+#: meses y no uno: comparar contra el mes pasado convierte cualquier racha
+#: mala de dos semanas en "estás empeorando".
+TREND_BASELINE_PERIODS = 3
+
+
+@dataclass(frozen=True)
+class TrendChange:
+    """Cuánto ha cambiado el juego en el último tramo frente a los anteriores
+    (RF-3.7)."""
+
+    baseline_periods: int
+    """Contra cuántos tramos anteriores se comparó: menos de
+    `TREND_BASELINE_PERIODS` cuando aún no hay tantos."""
+    accuracy_change: float
+    """Puntos de precisión ganados (positivo) o perdidos respecto a la
+    referencia."""
+    mistake_rate_change: float
+    """Lo mismo para los errores por cada cien jugadas. Aquí **subir es
+    empeorar**, al revés que la precisión."""
+
+
+def trend_change(quality_by_period: list[MoveQuality]) -> TrendChange | None:
+    """Compara el último tramo con los anteriores, o `None` si solo hay uno.
+
+    La referencia es la media de hasta `TREND_BASELINE_PERIODS` tramos previos,
+    **ponderada por jugadas**: un mes de tres partidas no puede pesar lo mismo
+    que uno de cuarenta al decidir si se está mejorando.
+    """
+    if len(quality_by_period) < 2:
+        return None
+    latest = quality_by_period[-1]
+    baseline = quality_by_period[-1 - TREND_BASELINE_PERIODS : -1]
+    baseline_moves = sum(period.moves for period in baseline)
+
+    def baseline_average(value_of: Callable[[MoveQuality], float]) -> float:
+        return sum(value_of(period) * period.moves for period in baseline) / baseline_moves
+
+    return TrendChange(
+        baseline_periods=len(baseline),
+        accuracy_change=latest.average_accuracy
+        - baseline_average(lambda period: period.average_accuracy),
+        mistake_rate_change=latest.total_mistakes_per_hundred_moves
+        - baseline_average(lambda period: period.total_mistakes_per_hundred_moves),
+    )
