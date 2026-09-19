@@ -1,8 +1,18 @@
 /** Árbol de variantes navegable (RF-6.3): la línea principal en línea, las
- * variantes indentadas, con acciones de promover y borrar. */
+ * variantes indentadas, con acciones de promover y borrar.
+ *
+ * Cuando el tablero se ha analizado (RF-6.9), las jugadas de la línea
+ * principal llevan además su insignia de clasificación, la misma que la
+ * lista de jugadas del visor: es el mismo dato y se enseña igual (criterio
+ * C-5 de docs/07-coherencia-ui.md). Las variantes no la llevan porque no se
+ * analizan; para eso está el motor en vivo.
+ */
+import type { AnalyzedMoveOut } from "@lucia/shared-types";
+import { ClassificationBadge } from "../../components/ClassificationBadge";
 import { EmptyState } from "../../components/Feedback";
 import { MoveButton } from "../../components/board/MoveButton";
 import { MOVE_LIST_HEIGHT_CLASS } from "../../components/styles";
+import { formatAccuracy } from "../../lib/format";
 import { moveNumberLabel, plyFromFen } from "../../lib/moves";
 import { type TreeNode } from "./tree";
 
@@ -12,6 +22,8 @@ interface VariationTreeProps {
   onSelect: (nodeId: string) => void;
   onPromote: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
+  /** La jugada analizada de cada nodo, para los que la tengan (RF-6.9). */
+  analyzedByNodeId: Map<string, AnalyzedMoveOut>;
 }
 
 export function VariationTree({
@@ -20,6 +32,7 @@ export function VariationTree({
   onSelect,
   onPromote,
   onDelete,
+  analyzedByNodeId,
 }: VariationTreeProps) {
   if (root.children.length === 0) {
     return (
@@ -43,6 +56,7 @@ export function VariationTree({
         onSelect={onSelect}
         onPromote={onPromote}
         onDelete={onDelete}
+        analyzedByNodeId={analyzedByNodeId}
       />
     </div>
   );
@@ -55,6 +69,7 @@ function Variation({
   onSelect,
   onPromote,
   onDelete,
+  analyzedByNodeId,
   depth = 0,
 }: {
   node: TreeNode;
@@ -63,6 +78,7 @@ function Variation({
   onSelect: (id: string) => void;
   onPromote: (id: string) => void;
   onDelete: (id: string) => void;
+  analyzedByNodeId: Map<string, AnalyzedMoveOut>;
   depth?: number;
 }) {
   if (node.children.length === 0) return null;
@@ -78,6 +94,7 @@ function Variation({
         onPromote={onPromote}
         onDelete={onDelete}
         canPromote={depth > 0}
+        analyzed={analyzedByNodeId.get(mainChild.id)}
       />
 
       {variations.map((variation) => (
@@ -101,6 +118,7 @@ function Variation({
             onSelect={onSelect}
             onPromote={onPromote}
             onDelete={onDelete}
+            analyzedByNodeId={analyzedByNodeId}
             depth={depth + 1}
           />
         </div>
@@ -113,6 +131,7 @@ function Variation({
         onSelect={onSelect}
         onPromote={onPromote}
         onDelete={onDelete}
+        analyzedByNodeId={analyzedByNodeId}
         depth={depth}
       />
     </>
@@ -127,6 +146,7 @@ function MoveChip({
   onPromote,
   onDelete,
   canPromote,
+  analyzed,
 }: {
   node: TreeNode;
   ply: number;
@@ -135,12 +155,19 @@ function MoveChip({
   onPromote: (id: string) => void;
   onDelete: (id: string) => void;
   canPromote: boolean;
+  analyzed?: AnalyzedMoveOut;
 }) {
   return (
     <span className="group mr-1 inline-flex items-center gap-1">
       {ply % 2 === 0 && <span className="opacity-50">{moveNumberLabel(ply)}</span>}
       <MoveButton isCurrent={isCurrent} onClick={() => onSelect(node.id)} className="px-1">
         {node.san}
+        {analyzed && (
+          <ClassificationBadge
+            classification={analyzed.classification}
+            detail={`precisión ${formatAccuracy(analyzed.move_accuracy)}`}
+          />
+        )}
       </MoveButton>
       {/* Promover y borrar estaban solo en `group-hover`: sin ratón no había
           forma de llegar a ellas, y al tabular se caía en un botón invisible.

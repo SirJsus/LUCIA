@@ -52,10 +52,15 @@ make types     # regenera los tipos TS del front desde el OpenAPI de la API
 La web tiene cinco pantallas: **Partidas** (lista con filtros, sincronización
 desde chess.com e importación de un archivo PGN de otra fuente —OTB, lichess—),
 **Visor** (tablero, jugadas clasificadas, gráfico de
-evaluación, análisis con progreso en vivo y exportación de la partida a PGN
-anotado, con comentarios y variantes, para abrirla en lichess o ChessBase),
-**Tableros** (análisis libre desde
-FEN o PGN, con árbol de variantes y motor en vivo), **Estadísticas** (marcador,
+evaluación, análisis con progreso en vivo, exportación de la partida a PGN
+anotado —con comentarios y variantes, para abrirla en lichess o ChessBase— y
+"Abrir como tablero", que la lleva al tablero de análisis como copia
+desacoplada), **Tableros** (análisis libre desde FEN o PGN, con árbol de
+variantes, motor en vivo, deshacer / rehacer que sobrevive a recargar y
+análisis completo de la línea principal en background; el PGN entra y sale
+con sus variantes y comentarios, y un tablero que sea una partida tuya —una
+OTB, una de club— se marca como "partida propia" y pasa a contar en Partidas y
+en Estadísticas como cualquier otra), **Estadísticas** (marcador,
 ratings, aperturas con su código ECO, en qué fase se pierde más ventaja, de qué
 tipo son los errores, qué pasa cuando baja el reloj, si mejoras mes a mes y
 dónde te sales de la teoría de maestros) y **Motores** (profundidad, MultiPV, hilos y hash,

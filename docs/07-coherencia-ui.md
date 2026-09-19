@@ -27,9 +27,19 @@ mismo día y quedan abiertas la 65 y la 67. La exportación del análisis a PGN
 anotado (RF-5.5), del mismo día, abrió las filas 68 a 70, las tres sobre el
 mismo control del visor. Las tendencias temporales del panel de estadísticas
 (RF-3.7), del 2026-09-18, abrieron las filas 71 a 73 y las tres se cerraron ese
-mismo día. Vacío es como debería encontrarse este documento siempre que se lea,
-así que cinco filas abiertas son cinco cosas que arreglar, no un estado
-estable.
+mismo día. Abrir una partida como tablero y traer un PGN pegado (RF-6.6 y
+RF-6.7), del mismo 2026-09-18, abrieron las filas 74 a 77, cerradas ese mismo
+día. Deshacer y rehacer (RF-6.8) y el análisis completo del tablero (RF-6.9),
+del mismo día, abrieron las filas 78 a 82 —todas de la misma raíz: el tablero
+de análisis hace ya lo mismo que el visor y lo enseñaba en otro sitio y con
+otra forma— y se cerraron también, y con ellas la 69, que llevaba abierta
+desde RF-5.5. El editor de posición pieza a pieza —lo que faltaba de RF-6.1,
+del mismo 2026-09-18— abrió las filas 83 a 85 y las tres se cerraron ese mismo
+día. Marcar un tablero como partida propia (RF-6.5), del mismo día, dejó de ser
+una casilla y pasó a ser un formulario de cuatro campos, y abrió las filas 86 y
+87, cerradas también ese mismo día. Vacío es como debería encontrarse este
+documento siempre que se lea, así que cuatro filas abiertas son cuatro cosas
+que arreglar, no un estado estable.
 
 **Qué es cada mitad de este documento.** Los criterios C-1 a C-7 son
 **RNF-11**, que vive en la sección Post 1.0 de
@@ -62,23 +72,23 @@ antes de comitear cambios de front — ver [Cómo se verifica](#cómo-se-verific
 
 ## Inventario de incoherencias abiertas (al 2026-09-18)
 
-Quedan cinco, todas de presentación: qué enseñar y dónde, no cómo escribirlo.
-Dos son de la pantalla de Partidas y tres del control de exportar del visor.
-Los números no se renumeran al cerrar una fila —son la referencia con la que se
-habla de ella en un commit—, así que faltan la 64, la 66 y las 71 a 73.
+Quedan seis, todas de presentación: qué enseñar y dónde, no cómo escribirlo.
+Dos son de la pantalla de Partidas, dos del control de exportar del visor y dos
+del formulario de partida propia del tablero de análisis. Los números no se
+renumeran al cerrar una fila —son la referencia con la que se habla de ella en
+un commit—, así que faltan la 64, la 66 y las 71 a 85.
 
 | # | Incoherencia | Dónde | Criterio |
 | --- | --- | --- | --- |
 | 65 | La cabecera de Partidas reparte con `justify-between` el título y **dos** formularios, y el de importar tiene tres controles: al envolverse, el título se queda solo en una fila y las dos formas de traer partidas quedan a distinta altura. Ninguna otra pantalla tiene dos formularios en la cabecera. | `apps/web/src/features/games/GamesPage.tsx` (la fila de la cabecera, `flex flex-wrap items-end justify-between`) | C-2 |
 | 67 | El listado no dice de dónde vino una partida. Una importada de un PGN enseña hueco en los dos ratings, en el control de tiempo y en el ritmo, y nada explica por qué le faltan cuatro datos que sus vecinas sí tienen; las partidas que no empiezan en la posición estándar sí llevan insignia (`CustomPositionBadge`). | `apps/web/src/features/games/GamesPage.tsx` (tabla), `apps/web/src/features/viewer/GameViewerPage.tsx` (cabecera) | C-6 |
 | 68 | "Exportar PGN anotado" no existe hasta que hay un análisis terminado: quien abre una partida sin analizar no ve el control en ninguna parte y no puede saber que existe, ni que analizar es lo que lo trae. La aplicación ya resuelve esto al revés en la barra de filtros de Partidas (fila 56): el control se enseña deshabilitado y se dice por qué. | `apps/web/src/features/viewer/GameViewerPage.tsx` (cabecera, `analysis?.status === "done" && …`) | C-3 |
-| 69 | La acción que saca el PGN de la partida ocupa sitios distintos en las dos pantallas con tablero: en el tablero de análisis "Copiar PGN" es la última de la fila, y en el visor "Exportar PGN anotado" es la segunda, entre "Girar tablero" y el desplegable de motor, partiendo el grupo de controles del motor del orden acordado (girar tablero · motor · acción principal). | `apps/web/src/features/viewer/GameViewerPage.tsx` (cabecera), `apps/web/src/features/board/BoardPage.tsx` (cabecera) | C-2 |
 | 70 | La descarga no tiene desenlace en pantalla: la hace el navegador, así que si `GET /analysis/{id}/pgn` responde 409 (análisis no terminado) o 404 (partida borrada desde otra pestaña), el navegador guarda el cuerpo del error como si fuera el archivo y la pantalla no dice nada. El resto de acciones del visor sí tienen `ErrorBox`. | `apps/web/src/features/viewer/GameViewerPage.tsx` (el `<a download>`), `apps/api/lucia_api/routers/analysis.py` (`get_analysis_pgn`) | C-3 |
 
 ## Lo que se cerró
 
-Las 65 filas cerradas de este inventario —todas menos las cinco de arriba— se
-cerraron en diez pasadas, y aquí queda el rastro de qué se hizo, para que un
+Las 83 filas cerradas de este inventario —todas menos las cuatro de arriba— se
+cerraron en once pasadas, y aquí queda el rastro de qué se hizo, para que un
 `git blame` no sea la única forma de averiguarlo.
 
 **2026-09-06 · legibilidad del análisis.** Apareció la barra de evaluación, el
@@ -458,6 +468,237 @@ Y los tres arreglos mecánicos, sin nada que decidir:
   ellos, blunders / 100", que es el nombre que esa columna tiene en las otras
   dos tablas.
 
+**2026-09-18 · la partida como tablero y el PGN pegado (RF-6.6, RF-6.7).** El
+visor gana "Abrir como tablero" y el tablero de análisis, un panel donde pegar
+un PGN. La revisión abrió las filas 74 a 77 y amplió la 69. Las cuatro se
+arreglaron en el mismo commit —eran defectos de lo recién escrito, no deuda
+heredada— y la 69 queda abierta, porque es una decisión de jerarquía que
+afecta también al control de RF-5.5:
+
+- **C-2 · un solo verbo para traer un PGN.** El botón de la cabecera decía
+  "Pegar PGN" y el que lo ejecuta "Importar", que es además el nombre que la
+  acción tiene en Partidas. Los dos dicen ahora **importar**; que sea el
+  reverso de "Copiar PGN" se explica en el texto de ayuda, que es donde cabe.
+- **C-3 · una importación a medias se cuenta.** `fromPgn` devuelve
+  `truncatedBranches` y el recuadro verde lo dice: "se descartaron N ramas con
+  jugadas que no encajan en su posición". Antes cortaba la rama en silencio y
+  anunciaba éxito.
+- **C-3 · cada fallo dice el suyo.** `fromPgn` ya no devuelve `null` para dos
+  cosas distintas: lanza con el motivo, y "la cabecera [FEN …] no describe una
+  posición legal" manda a mirar donde está el error y no donde no está.
+- **C-2 / C-6 · el título sigue al PGN importado.** Se compone de las
+  cabeceras `White`/`Black`/`Date` con `formatBoardTitleFromPgnHeaders`, que
+  da el mismo formato que `formatBoardTitleFromGame`. Pesa más aquí que en
+  otro sitio porque un tablero **no se puede renombrar** desde ninguna pantalla: el título
+  equivocado se quedaba para siempre. Si el PGN no nombra a los dos jugadores
+  no se toca, que es mejor que inventar uno.
+
+Y cuatro arreglos mecánicos más, sin nada que decidir:
+
+- **C-3 · importar no tenía desenlace.** "Copiar PGN" deja un `SuccessBox` y su
+  reverso no decía nada: el único aviso de que la importación había ido bien
+  era que el tablero cambiara solo. Ahora dice cuántas jugadas trae la línea
+  principal, como el recuadro verde de la importación de Partidas.
+- **C-3 · el desenlace no sobrevive al panel siguiente.** Abrir "Pegar PGN"
+  hace `reset()` de la mutación: un recuadro verde de la importación anterior
+  junto a un campo vacío se lee como si lo recién pegado ya estuviera dentro.
+  Es el mismo fallo que se corrigió en el aviso de partidas saltadas de
+  Partidas (RF-1.5).
+- **C-3 / C-4 · el aviso de que importar destruye lo que hay** vivía en una
+  línea gris de `text-xs` al lado del botón, que es justo lo que C-3 llama
+  letra pequeña: cambia lo que va a pasar al pulsar. Es un `WarningBox`, como
+  la comparación incompleta del repertorio.
+- **C-2 · una acción primaria por pantalla.** "Importar" salía primario con
+  "Copiar PGN" también primario tres centímetros más arriba. La misma regla de
+  `components/Button.tsx` que cerró las filas 61 y la de Partidas: la principal
+  sigue siendo copiar.
+
+Y un quinto, de la pantalla de al lado: **C-6 · "Abrir como tablero" no decía
+qué se lleva.** El tablero nace con los comentarios del análisis si está
+terminado y con las jugadas peladas si no, y la diferencia se descubría al
+llegar; el texto de ayuda la dice, con la misma forma que "Copiar PGN" y
+"Exportar PGN anotado".
+
+**2026-09-18 · deshacer, rehacer y el análisis del tablero (RF-6.8, RF-6.9).**
+El tablero de análisis gana historial (`Ctrl+Z` / `Ctrl+Y`, con sus dos
+botones) y pasa a poder pedir el análisis completo de su línea principal, que
+es lo mismo que hace el visor con una partida. La revisión abrió las filas 78
+a 82 y las cinco se arreglaron en el mismo commit, y con ellas la **69**, que
+llevaba abierta desde RF-5.5: la 82 era su otra mitad y las dos pedían lo
+mismo.
+
+- **C-2 · las dos cabeceras con tablero, en el mismo orden.** Queda fijado
+  como **girar · historial · motor · las acciones que sacan la partida de
+  aquí · la principal**. El visor tenía "Exportar PGN anotado" y "Abrir como
+  tablero" delante del motor y ahora van detrás, que es donde el tablero de
+  análisis pone "Importar PGN" y "Copiar PGN". Cierra la 69 y la 82.
+- **C-2 · el reloj de tiempo transcurrido, en las dos.** `useElapsedSeconds`
+  era función local del visor; vive con `useTrackedAnalysis` en `lib/` y
+  acompaña también a la barra del tablero. Hace falta ahí igual: con
+  posiciones ya cacheadas la barra avanza a saltos y solo el reloj dice
+  cuánto se lleva esperado.
+- **C-2 / C-5 · la precisión, en el mismo sitio y con la misma forma.** Era
+  una línea de texto suelta bajo la cabecera del tablero y es ahora el mismo
+  `Panel` "Precisión" que abre el lateral del visor, con "Blancas" y "Negras"
+  en lugar de los nombres, porque un tablero de análisis no tiene jugadores.
+- **C-3 · el motivo de "Analizar" deshabilitado se enseña.** Estaba solo en
+  un `title`, que con teclado no aparece; es la misma solución que cerró la
+  fila 56 en la barra de filtros de Partidas.
+- **C-3 · un tablero sin analizar lo dice.** Sin esto, las insignias de
+  clasificación de RF-6.9 aparecían de la nada la primera vez. El visor ya lo
+  resolvía con su `EmptyState` "Sin analizar".
+
+Y siete arreglos mecánicos, sin nada que decidir:
+
+- **C-1 · los atajos nuevos, anunciados donde se anuncian los demás.**
+  `Ctrl+Z` y `Ctrl+Y` vivían solo en el `title` de sus botones, que con teclado
+  no aparece nunca y que en un botón deshabilitado —que es como están cuando no
+  hay historial— tampoco. Van ya en la frase bajo el tablero, junto a «← →
+  recorren la línea, Inicio y Fin van a sus extremos», que es donde las dos
+  pantallas con tablero anuncian los suyos (`BOARD_HINT_CLASSES`). Chocar no
+  chocan: la navegación no mira `ctrlKey` y el historial solo actúa con él.
+- **C-2 / C-4 · un análisis que falla es un error en las dos pantallas.** El
+  tablero lo decía con `WarningBox` —el recuadro ámbar de «funciona, pero con
+  una limitación»— y el visor con `ErrorBox`. Es el mismo estado del mismo
+  trabajo: `ErrorBox` en los dos, con el mismo texto de respaldo cuando la API
+  no manda motivo.
+- **C-5 · el contador de progreso cuenta lo mismo con la misma palabra.** El
+  tablero decía «jugada N de M» y el visor «posición N de M» del mismo campo
+  `ply`/`total` del mismo evento. Ahora los dos dicen «posición».
+- **C-2 · la barra de progreso nombra el motor en las dos.** «Analizando con el
+  motor…» del visor no decía con cuál, y el tablero sí. Los dos lo nombran; el
+  tablero añade «la línea principal», que es la diferencia real entre los dos
+  trabajos.
+- **C-2 · «Reanalizar» solo si lo hecho es de ese motor.** El botón del tablero
+  miraba solo que hubiera un análisis terminado, así que con uno de Stockfish y
+  Lc0 elegido en el desplegable ofrecía «Reanalizar con Lc0», que nunca se
+  había hecho. Es la regla que el visor ya aplicaba con `doneAnalysisByEngine`.
+- **C-3 · deshacer y rehacer dicen que están trabajando.** La única señal
+  mientras la petición viajaba era que los dos botones se apagaran; ahora dicen
+  «Deshaciendo…» y «Rehaciendo…», como «Eliminando…» en Tableros o
+  «Abriendo…» en el visor.
+- **C-3 · un fallo al consultar los análisis anteriores del tablero se ve.**
+  `listAnalyses({ boardId })` es lo que decide si el tablero sale como
+  analizado; si fallaba, la pantalla quedaba idéntica a la de un tablero que no
+  se ha analizado nunca. Lleva ya su `ErrorBox` con reintento, como la consulta
+  equivalente del visor.
+
+**2026-09-18 · el editor de posición pieza a pieza (RF-6.1).** La cuarta forma
+de empezar un tablero: un panel que se despliega bajo el campo "FEN o PGN" de
+Tableros, monta una posición sobre un tablero editable y escribe su FEN en ese
+campo. La revisión abrió las filas 83 a 85 y las tres se arreglaron en el
+mismo commit:
+
+- **C-1 · el tablero se puede usar con el teclado.** Era la única interacción
+  de la aplicación sin esa vía: chessground no pone `tabindex` en ninguna
+  casilla ni escucha teclas. Encima del tablero va ahora una rejilla de 64
+  botones (`SquareKeyboardGrid`) con una sola parada de tabulador y las
+  flechas para moverse dentro, que es el patrón de cualquier rejilla
+  accesible; Intro coloca la pieza elegida. La capa entera lleva
+  `pointer-events-none`, así que el ratón y el arrastre la atraviesan y
+  chessground los sigue recibiendo intactos —comprobado en navegador: clic,
+  arrastre desde la paleta y teclado conviven—.
+- **C-2 · una sola forma de cerrar el panel.** El botón de arriba decía
+  "Cerrar el editor de posición" y dentro había además un "Cancelar": dos
+  controles con dos nombres para lo mismo. Ahora el botón de arriba pasa a
+  "Cancelar" mientras el panel está abierto, que es lo que ya hace "Importar
+  PGN" en el tablero de análisis.
+- **C-2 · una sola forma de decir "esto es lo elegido".** La goma se marcaba
+  con `variant="primary"`, la variante de la acción principal de la pantalla
+  —que aquí es "Usar esta posición"—, mientras las piezas usaban borde y
+  fondo índigo. La goma es ahora un botón del mismo tamaño y con la misma
+  marca que ellas.
+
+Y seis arreglos mecánicos, sin nada que decidir:
+
+- **C-2 · la caja del panel es la compartida.** El editor escribía a mano
+  `space-y-3 p-3` más `PANEL_CLASSES`, que es exactamente lo que da `<Panel>`;
+  el panel de "Importar PGN", que es su hermano, usa el componente. La receta
+  a mano es de las que se sostienen copiando y pegando (filas 39 a 41).
+- **C-1 · la frase bajo el tablero, con la receta de las otras dos.** Era un
+  `text-center text-xs opacity-60` escrito a mano, que es literalmente
+  `BOARD_HINT_CLASSES`, la constante que usan el visor y el tablero de
+  análisis para decir lo mismo en el mismo sitio.
+- **C-2 · un solo tamaño de etiqueta de campo.** Los dos `legend` del panel
+  ("Qué se coloca", "Enroques disponibles") iban a `text-sm` y las etiquetas de
+  `FieldLabel` de al lado ("Mueven", "Captura al paso") al tamaño base: cuatro
+  rótulos de la misma clase con dos tamaños, en la misma columna.
+- **C-6 · qué hace "Goma", a la vista.** Vivía en un `title`, que con teclado
+  no aparece nunca; es la misma corrección que la fila 57 hizo con las ayudas
+  de los filtros de Partidas.
+- **C-6 · el FEN lleva su etiqueta.** La línea monoespaciada del pie era una
+  cadena suelta sin decir qué es, y el editor está justamente para quien no
+  tiene un FEN a mano.
+- **C-2 · "posición estándar" es el nombre que el concepto ya tiene.** El botón
+  decía "Posición inicial" y la insignia `CustomPositionBadge` y el panel de
+  estadísticas la llaman "posición estándar" desde la pasada del 2026-09-09.
+  El texto de ayuda del campo "FEN o PGN", que decía lo mismo con el otro
+  nombre, va con él.
+
+Y un comentario que afirmaba lo contrario de lo que hace el código: el
+docstring del editor decía que pulsar las casillas «es lo único que funciona
+con el dedo y con teclado» cuando por teclado no funciona nada del tablero
+(fila 83). Dice ya lo que hay y a qué fila remite.
+
+**2026-09-18 · la partida propia como formulario (RF-6.5).** Marcar un tablero
+dejó de ser una casilla —el tablero no sabe contra quién se jugó, de qué color,
+cómo acabó ni qué día— y pasó a ser un panel de cuatro campos
+(`features/board/OwnGamePanel.tsx`) que publica el tablero en el historial. La
+revisión abrió las filas 86 y 87 y las dos se cerraron en el mismo commit, más
+seis arreglos mecánicos de vocabulario:
+
+- **C-1 · el panel es un `<form>` (fila 86).** Los otros cuatro formularios de
+  escritura de la aplicación —sincronizar e importar PGN en Partidas, crear
+  tablero, configurar motores— se envían con Intro, y este se quedaba mirando:
+  quien iba con teclado tenía que llegar hasta el botón. El de guardar es
+  `type="submit"`; "Quitar la marca" sigue siendo `type="button"`, que si no
+  enviaría el formulario al pulsarlo.
+- **C-2 / C-3 · "Quitar la marca" pregunta antes (fila 87).** Saca una partida
+  del historial y de las Estadísticas, igual de destructivo que eliminar un
+  tablero o una variante, que sí preguntan. La consecuencia —qué partida se va
+  y que el tablero se queda entero— se dice en la pregunta y no en un `title`,
+  que con teclado no aparece nunca; es la misma razón que cerró las filas 56 y
+  57.
+
+Y los seis arreglos de vocabulario:
+
+- **C-2 · los cuatro campos se llaman como sus filtros en Partidas.** Eran
+  "Jugué con" y "Contra" para lo que la barra de filtros llama «Color» y
+  «Rival», y el resultado se elegía entre "Gané / Tablas / Perdí" donde el
+  filtro dice "Victorias / Tablas / Derrotas". Los cuatro rótulos y los tres
+  valores usan ya ese vocabulario, en singular porque aquí se habla de una
+  sola partida. La primera persona no se usa en ninguna otra pantalla.
+- **C-2 · "Estadísticas" es como se llama la pantalla.** La línea de estado
+  decía "cuenta en el dashboard" y la insignia del listado "cuenta en tus
+  estadísticas": dos nombres, ninguno el de la barra de navegación. Y "los
+  patrones", que salía en las dos frases, no es nombre de nada que el usuario
+  vea: las secciones de esa pantalla se llaman "Por qué fallas" o "Cómo
+  evolucionas".
+- **C-2 · el mismo texto no puede ser dos acciones.** "Marcar como partida
+  propia" era a la vez el botón que abre el panel y el que lo envía. El que
+  envía se llama "Guardar los datos" marque por primera vez o corrija, que es
+  la misma forma que "Importar PGN" (abre) e "Importar" (ejecuta).
+- **C-2 · ir a una partida se llama "Ver partida".** El enlace de la línea de
+  estado decía "Ver en el historial" y se veía como texto suelto, mientras que
+  las dos pantallas que llevan a una partida usan un enlace con aspecto de
+  botón (`buttonClasses`) y ese nombre. La misma corrección que cerró la fila
+  de "Ver tablero" en el barrido del 2026-09-08.
+- **C-5 · el hueco del control de tiempo se nombra como se ve.** El aviso
+  prometía que la partida saldría "bajo el control de tiempo «sin
+  determinar»", pero lo que la pantalla enseña para `unknown` es "—"
+  (`formatTimeClass`), el mismo hueco del rating y de la precisión.
+- **C-3 · el pie del panel "Precisión" decía lo contrario de lo que hace el
+  sistema.** Afirmaba que el análisis del tablero "no cuenta en tus
+  estadísticas" siempre, y desde RF-6.5 sí cuenta cuando el tablero está
+  publicado y lo analizado sigue siendo la línea principal
+  (`services/own_games.py::link_analyses_to_own_game`). Ahora dice una cosa u otra según
+  el tablero.
+
+Y una fuga de vocabulario interno: dos textos de usuario llevaban el
+identificador del requerimiento dentro —"Cuenta en tus estadísticas (RF-6.5)"
+en la insignia del listado y la misma coletilla en el pie de "Precisión"—. Los
+RF viven en `docs/02-requerimientos.md`, no en la pantalla.
+
 **Y un nombre que se revisó y se deja como está.** Que la acción se llame
 "Exportar PGN anotado" y no "Exportar PGN", teniendo Partidas un "Importar
 PGN", no es asimetría gratuita: lo que sale no es el PGN que entró, sino el
@@ -502,6 +743,6 @@ Antes de comitear cualquier cambio que toque `apps/web`:
    igual — o cambiar las dos a la vez.
 3. Si aparece una incoherencia que no se arregla en el mismo commit, añadirla
    al inventario de arriba —`# · Incoherencia · Dónde · Criterio`, numerando
-   desde el 71— en vez de dejarla suelta. Una fila se borra cuando se arregla,
+   desde el 88— en vez de dejarla suelta. Una fila se borra cuando se arregla,
    y las demás no se renumeran: el número es la referencia con la que se habla
    de ella en un commit o en una revisión.

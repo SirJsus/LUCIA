@@ -9,7 +9,10 @@ Las piezas de tablero que comparte con el tablero de análisis (`Chessboard`,
 `EvalBar`, `BoardWithEvalBar`, `MoveNavigator`, `MoveButton`, `EngineLineList`,
 `boardConfig` y los atajos de `useMoveNavigationKeys`) ya no viven aquí, sino en
 `components/board/`; fuera de tablero comparte con él `EngineSelect` y
-`ClassificationBadge`: la regla es que el visor y el tablero de
+`ClassificationBadge`, y desde RF-6.9 también el seguimiento del análisis en
+background (`lib/useTrackedAnalysis.ts`, con `useElapsedSeconds`), que estaba
+aquí como `useAnalysisProgress` hasta que el tablero de análisis pasó a pedir
+el mismo análisis: la regla es que el visor y el tablero de
 análisis enseñen lo mismo de la misma forma (RNF-11 y criterio C-5 de
 [`docs/07-coherencia-ui.md`](../../../../../docs/07-coherencia-ui.md)); si una
 de las dos se desviara, el problema es la desviación, no el compartir.
@@ -21,7 +24,6 @@ de las dos se desviara, el problema es la desviación, no el compartir.
 | `MoveList.tsx` | Jugadas emparejadas por turno con su clasificación | visor |
 | `CriticalMoments.tsx` | Las jugadas donde se decidió la partida y por qué (RF-2.8) | visor |
 | `EngineComparison.tsx` | Dónde discrepan dos motores sobre la misma partida (RF-2.6) | visor |
-| `useAnalysisProgress.ts` | Progreso del análisis por WebSocket, con respaldo HTTP (RF-2.4) | visor |
 
 ## De dónde salen los números
 
@@ -78,6 +80,19 @@ exporta: un análisis a medias daría una partida comentada hasta la jugada 20 y
 muda a partir de ahí. Qué lleva exactamente el archivo está en la nota de
 RF-5.5 de
 [`docs/02-requerimientos.md`](../../../../../docs/02-requerimientos.md).
+
+## Abrir como tablero
+
+"Abrir como tablero" (RF-6.6) crea un tablero de análisis **nuevo** con las
+jugadas de esta partida: pide el PGN anotado (`GET /analysis/{id}/pgn`) si hay
+análisis terminado y usa el crudo de `games.pgn` si no, lo pasa por
+`features/board/tree.ts::fromPgn` y lo manda a `POST /boards`. Desde ahí las
+dos cosas van por su cuenta: explorar variantes en la copia no toca el análisis
+original, que es justo lo que pide RF-5.2.
+
+La copia **nunca nace marcada como "partida propia"** (RF-6.5): esa marca
+publica el tablero en el historial, y esta partida ya está en él, así que
+marcarla la contaría dos veces en el dashboard.
 
 ## Momentos críticos
 

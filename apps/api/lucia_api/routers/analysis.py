@@ -54,7 +54,12 @@ class AnalysisSummary(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
-    game_id: int
+    game_id: int | None
+    """Nulo en un análisis de tablero (RF-6.9), donde lo que se llena es
+    `board_id`. Los dos van llenos cuando el tablero está publicado como
+    partida propia (RF-6.5, ADR-0014): las jugadas son del tablero y cuentan
+    como las de esa partida."""
+    board_id: int | None
     engine: str
     depth: int
     multipv: int
@@ -188,12 +193,16 @@ async def position_analysis(
 async def list_analyses(
     session: Annotated[AsyncSession, Depends(get_session)],
     game_id: int | None = None,
+    board_id: int | None = None,
 ) -> list[AnalysisSummary]:
-    """Análisis existentes, opcionalmente los de una partida concreta. Sirve
-    para que el visor sepa si ya hay uno hecho en vez de volver a analizar."""
+    """Análisis existentes, opcionalmente los de una partida o un tablero
+    concretos. Sirve para que el visor —y el tablero de análisis (RF-6.9)—
+    sepan si ya hay uno hecho en vez de volver a analizar."""
     query = select(Analysis).order_by(Analysis.created_at.desc())
     if game_id is not None:
         query = query.where(Analysis.game_id == game_id)
+    if board_id is not None:
+        query = query.where(Analysis.board_id == board_id)
     result = await session.execute(query)
     return [AnalysisSummary.model_validate(analysis) for analysis in result.scalars().all()]
 

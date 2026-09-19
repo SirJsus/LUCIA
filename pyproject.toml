@@ -1,6 +1,6 @@
 [project]
 name = "lucia-workspace"
-version = "0.2.3"
+version = "0.2.5"
 description = "L.U.C.I.A. - Logic & Ultimate Chess Insight Algorithm (workspace raiz)"
 requires-python = ">=3.12"
 dependencies = []
@@ -34,3 +34,17 @@ asyncio_mode = "auto"
 # (test_smoke.py) y sin __init__.py; el modo de import por defecto de pytest
 # los importaría como el mismo módulo top-level y colisionaría en la colección.
 addopts = "--import-mode=importlib"
+# Dos avisos de dependencias que no podemos arreglar desde aquí: los dos son
+# código de terceros que Python 3.14 marca como obsoleto, y los dos están ya
+# en su última versión publicada (chess 1.11.2, starlette 1.6.0). Se silencian
+# nombrando el módulo exacto, no la categoría entera, para que un aviso nuestro
+# —o uno nuevo de otra dependencia— siga viéndose: tres líneas de ruido fijo en
+# cada corrida acaban enseñando a no mirar el resumen.
+#
+# Revisar al subir cualquiera de las dos: si el aviso ya no sale, sobra la línea.
+filterwarnings = [
+    # chess/engine.py: `asyncio.DefaultEventLoopPolicy`, que se va en 3.16.
+    "ignore:.*DefaultEventLoopPolicy.*:DeprecationWarning:chess.engine",
+    # starlette/testclient.py: el alias `anyio.abc.BlockingPortal`.
+    "ignore:.*BlockingPortal.*:DeprecationWarning:starlette.testclient",
+]

@@ -133,8 +133,9 @@ export interface paths {
         };
         /**
          * List Analyses
-         * @description Análisis existentes, opcionalmente los de una partida concreta. Sirve
-         *     para que el visor sepa si ya hay uno hecho en vez de volver a analizar.
+         * @description Análisis existentes, opcionalmente los de una partida o un tablero
+         *     concretos. Sirve para que el visor —y el tablero de análisis (RF-6.9)—
+         *     sepan si ya hay uno hecho en vez de volver a analizar.
          */
         get: operations["list_analyses_analysis_get"];
         put?: never;
@@ -326,6 +327,101 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/boards/{board_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo Board
+         * @description Devuelve el tablero a su estado anterior (RF-6.8).
+         *
+         *     409 y no 400 cuando no hay nada que deshacer: la petición es correcta, es
+         *     el estado del tablero el que no la admite.
+         */
+        post: operations["undo_board_boards__board_id__undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/boards/{board_id}/redo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Redo Board */
+        post: operations["redo_board_boards__board_id__redo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/boards/{board_id}/own-game": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Publish Own Game
+         * @description Publica el tablero en el historial como partida propia (RF-6.5).
+         *
+         *     A partir de aquí cuenta en el dashboard, en los patrones y en los filtros
+         *     del listado como cualquier otra partida. La misma llamada sirve para
+         *     corregir los datos y para poner al día las jugadas después de deshacer o
+         *     rehacer: reescribe la partida publicada en vez de crear otra.
+         */
+        put: operations["publish_own_game_boards__board_id__own_game_put"];
+        post?: never;
+        /**
+         * Withdraw Own Game
+         * @description Retira la marca de partida propia: el tablero deja de contar y su
+         *     partida se va del historial (RF-6.5). El tablero se queda como estaba.
+         */
+        delete: operations["withdraw_own_game_boards__board_id__own_game_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/boards/{board_id}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Analyze Board
+         * @description Encola el análisis completo de la línea principal del tablero (RF-6.9).
+         *
+         *     Devuelve en cuanto está en la cola, con el id que el front usa para
+         *     seguir el progreso por `WS /ws/analysis/{id}`, igual que una partida. El
+         *     análisis **no cuenta en las estadísticas** salvo que el tablero esté
+         *     publicado como partida propia (RF-6.5), que es cuando nace con `game_id`.
+         */
+        post: operations["analyze_board_boards__board_id__analysis_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/repertoire": {
         parameters: {
             query?: never;
@@ -399,7 +495,9 @@ export interface components {
             /** Id */
             id: number;
             /** Game Id */
-            game_id: number;
+            game_id: number | null;
+            /** Board Id */
+            board_id: number | null;
             /** Engine */
             engine: string;
             /** Depth */
@@ -442,7 +540,9 @@ export interface components {
             /** Id */
             id: number;
             /** Game Id */
-            game_id: number;
+            game_id: number | null;
+            /** Board Id */
+            board_id: number | null;
             /** Engine */
             engine: string;
             /** Depth */
@@ -488,6 +588,25 @@ export interface components {
              */
             alternatives: components["schemas"]["EngineLineOut"][];
         };
+        /**
+         * BoardAnalysisRequest
+         * @description Lo que hace falta para analizar la línea principal de un tablero
+         *     (RF-6.9).
+         */
+        BoardAnalysisRequest: {
+            /** Pgn */
+            pgn: string;
+            /**
+             * Engine
+             * @default stockfish
+             * @enum {string}
+             */
+            engine: "stockfish" | "lc0";
+            /** Depth */
+            depth?: number | null;
+            /** Multipv */
+            multipv?: number | null;
+        };
         /** BoardCreate */
         BoardCreate: {
             /** Title */
@@ -503,11 +622,6 @@ export interface components {
             };
             /** Tags Json */
             tags_json?: string[] | null;
-            /**
-             * Is Own Game
-             * @default false
-             */
-            is_own_game: boolean;
         };
         /** BoardDetail */
         BoardDetail: {
@@ -535,6 +649,11 @@ export interface components {
             tree_json: {
                 [key: string]: unknown;
             };
+            /** Can Undo */
+            can_undo: boolean;
+            /** Can Redo */
+            can_redo: boolean;
+            own_game?: components["schemas"]["OwnGameLink"] | null;
         };
         /**
          * BoardSummary
@@ -569,14 +688,16 @@ export interface components {
         BoardUpdate: {
             /** Title */
             title?: string | null;
+            /** Root Fen */
+            root_fen?: string | null;
             /** Tree Json */
             tree_json?: {
                 [key: string]: unknown;
             } | null;
             /** Tags Json */
             tags_json?: string[] | null;
-            /** Is Own Game */
-            is_own_game?: boolean | null;
+            /** Pgn */
+            pgn?: string | null;
         };
         /** Body_import_pgn_file_import_pgn_post */
         Body_import_pgn_file_import_pgn_post: {
@@ -861,6 +982,65 @@ export interface components {
             average_opening_exit_win_percent: number | null;
         };
         /**
+         * OwnGameLink
+         * @description La partida del historial en la que está publicado el tablero (RF-6.5).
+         *
+         *     Lleva los datos con los que se publicó para que la pantalla los vuelva a
+         *     enseñar tal cual al corregirlos, y el `game_id` para poder abrirla en el
+         *     visor como cualquier otra partida.
+         */
+        OwnGameLink: {
+            /**
+             * Player Color
+             * @enum {string}
+             */
+            player_color: "white" | "black";
+            /** Opponent Name */
+            opponent_name: string;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "win" | "draw" | "loss";
+            /**
+             * Played On
+             * Format: date
+             */
+            played_on: string;
+            /** Username */
+            username?: string | null;
+            /** Game Id */
+            game_id: number;
+        };
+        /**
+         * OwnGamePublishRequest
+         * @description Marcar el tablero como partida propia (RF-6.5): los datos que el
+         *     tablero no tiene, más las jugadas que sí.
+         */
+        OwnGamePublishRequest: {
+            /**
+             * Player Color
+             * @enum {string}
+             */
+            player_color: "white" | "black";
+            /** Opponent Name */
+            opponent_name: string;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "win" | "draw" | "loss";
+            /**
+             * Played On
+             * Format: date
+             */
+            played_on: string;
+            /** Username */
+            username?: string | null;
+            /** Pgn */
+            pgn: string;
+        };
+        /**
          * PgnImportSummary
          * @description Qué pasó con cada partida del archivo.
          */
@@ -1027,7 +1207,11 @@ export interface components {
             /** Mistake Rate Change */
             mistake_rate_change: number;
         };
-        /** TrendsOut */
+        /**
+         * TrendsOut
+         * @description Evolución del juego en el tiempo (RF-3.7), lo que el dashboard dibuja
+         *     en "Cómo evolucionas".
+         */
         TrendsOut: {
             /** By Month */
             by_month: components["schemas"]["MonthlyQualityOut"][];
@@ -1221,6 +1405,7 @@ export interface operations {
         parameters: {
             query?: {
                 game_id?: number | null;
+                board_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -1644,6 +1829,169 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_board_boards__board_id__undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    redo_board_boards__board_id__redo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_own_game_boards__board_id__own_game_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnGamePublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_own_game_boards__board_id__own_game_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analyze_board_boards__board_id__analysis_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BoardAnalysisRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisSummary"];
+                };
             };
             /** @description Validation Error */
             422: {

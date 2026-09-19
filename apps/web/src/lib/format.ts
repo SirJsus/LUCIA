@@ -164,6 +164,33 @@ export function gameResult(game: Pick<GameSummary, "white_result">): string {
   return "0-1";
 }
 
+/** Cómo se nombra una partida cuando hay que darle un título: "Ana - Beto,
+ * 12 sept 2026" (RF-6.6).
+ *
+ * Lo usa el tablero de análisis que se crea a partir de una partida, que
+ * necesita un título y no tiene ninguno propio. Vive aquí porque compone
+ * nombres y fecha con el mismo `formatDate` que el resto de la aplicación
+ * (criterio C-5). */
+export function formatBoardTitleFromGame(
+  game: Pick<GameSummary, "white_username" | "black_username" | "played_at">,
+): string {
+  return `${game.white_username} - ${game.black_username}, ${formatDate(game.played_at)}`;
+}
+
+/** El mismo título, compuesto desde las cabeceras de un PGN pegado (RF-6.7).
+ *
+ * `null` si el archivo no nombra a los dos jugadores: sin ellos no hay título
+ * que valga más que el que el tablero ya tiene. La fecha del PGN
+ * ("2026.09.12", con puntos y a veces con interrogantes) se pasa a ISO para
+ * que salga por `formatDate` como la de cualquier otra partida. */
+export function formatBoardTitleFromPgnHeaders(headers: Record<string, string>): string | null {
+  const { White, Black, Date: playedOn } = headers;
+  if (!White || !Black) return null;
+  const isoDate = playedOn?.replaceAll(".", "-");
+  const day = isoDate && !isoDate.includes("?") ? `, ${formatDate(isoDate)}` : "";
+  return `${White} - ${Black}${day}`;
+}
+
 /** "180" -> "3+0", "600+5" -> "10+5" (chess.com da el control en segundos). */
 export function formatTimeControl(timeControl: string): string {
   if (timeControl === UNKNOWN_TIME_CONTROL) return MISSING_VALUE;

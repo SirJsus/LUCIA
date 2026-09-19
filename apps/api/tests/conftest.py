@@ -8,14 +8,9 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
-from lucia_api.db.base import Base
+from lucia_api.db.base import Base, create_db_engine
 from lucia_chesscom import ChessComGame, ChessComPlayer, ChessComPlayerStats
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 # packages/core/tests/conftest.py -> tests -> api -> apps -> raíz del repo.
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -50,8 +45,13 @@ async def db_engine(tmp_path: Path) -> AsyncIterator[AsyncEngine]:
     modelos que produce Alembic), sin tocar `data/lucia.db`. Expuesto aparte
     de `db_session` para que el worker en background pueda tener su propia
     fábrica de sesiones apuntando a la misma base temporal (ver
-    `db_session_factory`), tal como pasa en producción con `data/lucia.db`."""
-    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'test.db'}")
+    `db_session_factory`), tal como pasa en producción con `data/lucia.db`.
+
+    Por `create_db_engine` y no por `create_async_engine` a secas: es lo que
+    enciende las claves foráneas de sqlite, y un motor de test sin ellas diría
+    que los borrados en cascada funcionan aunque en producción no lo
+    hicieran."""
+    engine = create_db_engine(f"sqlite+aiosqlite:///{tmp_path / 'test.db'}")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine

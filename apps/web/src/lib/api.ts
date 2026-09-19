@@ -18,6 +18,7 @@ import type {
   EnginesConfigOut,
   GameDetail,
   GameSummary,
+  OwnGamePublishRequest,
   PgnImportSummary,
   PlayerStats,
   RepertoireComparison,
@@ -136,8 +137,20 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  listAnalyses: (gameId?: number) =>
-    request<AnalysisSummary[]>(`/analysis${gameId === undefined ? "" : `?game_id=${gameId}`}`),
+  listAnalyses: (filters: { gameId?: number; boardId?: number } = {}) =>
+    request<AnalysisSummary[]>(
+      `/analysis${toQueryString({ game_id: filters.gameId, board_id: filters.boardId })}`,
+    ),
+
+  /** Encola el análisis completo de la línea principal de un tablero
+   * (RF-6.9). El PGN va en la petición porque el árbol lo recorre chess.js
+   * aquí, no la API; el progreso se sigue por `analysisProgressUrl`, igual
+   * que el de una partida. */
+  analyzeBoard: (boardId: number, body: { pgn: string; engine: string }) =>
+    request<AnalysisSummary>(`/boards/${boardId}/analysis`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   compareAnalyses: (analysisA: number, analysisB: number) =>
     request<AnalysisComparison>(
@@ -157,21 +170,59 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  /** El PGN anotado como texto, para traerlo al tablero de análisis (RF-6.6).
+   *
+   * Convive con `analysisPgnUrl`, que sirve para descargarlo: aquí el archivo
+   * no se guarda, se lee, así que hace falta el cuerpo y no un enlace. No pasa
+   * por `request`, que espera JSON. */
+  getAnalysisPgn: async (analysisId: number): Promise<string> => {
+    const response = await fetch(analysisPgnUrl(analysisId));
+    if (!response.ok) throw new ApiError(response.status, await extractErrorMessage(response));
+    return response.text();
+  },
+
   listBoards: () => request<BoardSummary[]>("/boards"),
 
   getBoard: (boardId: number) => request<BoardDetail>(`/boards/${boardId}`),
 
-  createBoard: (body: {
-    title: string;
-    root_fen?: string;
-    tree_json?: unknown;
-    is_own_game?: boolean;
-  }) => request<BoardDetail>("/boards", { method: "POST", body: JSON.stringify(body) }),
+  createBoard: (body: { title: string; root_fen?: string; tree_json?: unknown }) =>
+    request<BoardDetail>("/boards", { method: "POST", body: JSON.stringify(body) }),
 
+  /** Guarda lo que cambió del tablero. `pgn` solo hace falta cuando el
+   * tablero está publicado como partida propia (RF-6.5): es lo que mantiene
+   * al día su fila del historial, y sin él la API responde 422. */
   updateBoard: (
     boardId: number,
-    body: { title?: string; tree_json?: unknown; is_own_game?: boolean },
+    body: { title?: string; root_fen?: string; tree_json?: unknown; pgn?: string },
   ) => request<BoardDetail>(`/boards/${boardId}`, { method: "PUT", body: JSON.stringify(body) }),
+
+  /** Publica el tablero en el historial como partida propia (RF-6.5).
+   *
+   * La misma llamada marca, corrige los datos y pone al día las jugadas
+   * después de deshacer o rehacer: reescribe la partida en vez de crear otra.
+   * El PGN va en la petición porque el árbol lo recorre chess.js aquí, igual
+   * que al pedir el análisis. */
+  publishOwnGame: (boardId: number, body: OwnGamePublishRequest) =>
+    request<BoardDetail>(`/boards/${boardId}/own-game`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
+  /** Retira la marca: el tablero se queda entero y su partida se va del
+   * historial (RF-6.5). */
+  withdrawOwnGame: (boardId: number) =>
+    request<BoardDetail>(`/boards/${boardId}/own-game`, { method: "DELETE" }),
+
+  /** Deshacer y rehacer sobre el historial guardado del tablero (RF-6.8).
+   *
+   * Van al servidor y no a una pila en memoria porque el historial vive en la
+   * base: así el deshacer sobrevive a recargar la pantalla. Responden 409
+   * cuando no queda nada en esa dirección. */
+  undoBoard: (boardId: number) =>
+    request<BoardDetail>(`/boards/${boardId}/undo`, { method: "POST" }),
+
+  redoBoard: (boardId: number) =>
+    request<BoardDetail>(`/boards/${boardId}/redo`, { method: "POST" }),
 
   deleteBoard: async (boardId: number): Promise<void> => {
     const response = await fetch(`${BASE_URL}/boards/${boardId}`, { method: "DELETE" });

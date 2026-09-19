@@ -1,7 +1,11 @@
 /** Visor de una partida (RF-5.1): tablero, jugadas clasificadas, gráfico de
- * evaluación y disparo del análisis con progreso en vivo. */
+ * evaluación y disparo del análisis con progreso en vivo.
+ *
+ * Desde aquí también se abre la partida como tablero de análisis (RF-6.6):
+ * una copia desacoplada donde probar variantes sin tocar ni la partida ni su
+ * análisis, que es lo que RF-5.2 pide poder hacer desde el visor. */
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { Chess, DEFAULT_POSITION } from "chess.js";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "../../components/Button";
@@ -29,18 +33,20 @@ import {
   formatDate,
   formatDuration,
   formatEngineName,
+  formatBoardTitleFromGame,
   formatRating,
   formatTimeClass,
   gameResult,
   type EngineId,
 } from "../../lib/format";
 import { moveNumberLabel, plyFromFen } from "../../lib/moves";
+import { fromPgn } from "../board/tree";
 import { whiteWinPercentAfterMove } from "../../lib/score";
 import { CriticalMoments } from "./CriticalMoments";
 import { EngineComparison } from "./EngineComparison";
 import { EvalChart } from "./EvalChart";
 import { MoveList } from "./MoveList";
-import { useAnalysisProgress } from "./useAnalysisProgress";
+import { useElapsedSeconds, useTrackedAnalysis } from "../../lib/useTrackedAnalysis";
 
 interface ParsedPosition {
   /** FEN resultante tras esta jugada. */
@@ -59,6 +65,7 @@ interface ParsedGame {
 export function GameViewerPage() {
   const { gameId } = useParams({ from: "/games/$gameId" });
   const id = Number(gameId);
+  const navigate = useNavigate();
 
   const [currentPly, setCurrentPly] = useState(-1); // -1 = posición inicial
   const [analysisId, setAnalysisId] = useState<number | null>(null);
@@ -72,7 +79,7 @@ export function GameViewerPage() {
   // gastar minutos de motor.
   const existingQuery = useQuery({
     queryKey: ["analyses", id],
-    queryFn: () => api.listAnalyses(id),
+    queryFn: () => api.listAnalyses({ gameId: id }),
   });
 
   useEffect(() => {
@@ -83,18 +90,7 @@ export function GameViewerPage() {
     if (analysisId === null && (done || pending)) setAnalysisId((done ?? pending)!.id);
   }, [existingQuery.data, analysisId]);
 
-  const analysisQuery = useQuery({
-    queryKey: ["analysis", analysisId],
-    queryFn: () => api.getAnalysis(analysisId as number),
-    enabled: analysisId !== null,
-  });
-
-  const analysis = analysisQuery.data;
-  const isRunning = analysis?.status === "queued" || analysis?.status === "running";
-
-  const progress = useAnalysisProgress(isRunning ? analysisId : null, () =>
-    analysisQuery.refetch(),
-  );
+  const { analysis, isRunning, progress } = useTrackedAnalysis(analysisId);
   const elapsedSeconds = useElapsedSeconds(isRunning);
 
   const analyzeMutation = useMutation({
@@ -103,6 +99,31 @@ export function GameViewerPage() {
       setAnalysisId(created[0].id);
       void existingQuery.refetch(); // para que aparezca en el selector de motor
     },
+  });
+
+  // --- Abrir como tablero de análisis (RF-6.6) ---
+  // La copia es **desacoplada**: se lee el PGN una vez y lo que se juegue
+  // después en el tablero no vuelve a esta partida ni a su análisis. Se
+  // prefiere el PGN anotado (RF-5.5) cuando hay análisis terminado, porque
+  // trae los comentarios y las líneas del motor y así el tablero se abre con
+  // lo que ya se sabía en vez de con las jugadas peladas.
+  const openAsBoardMutation = useMutation({
+    mutationFn: async () => {
+      const pgn =
+        analysis?.status === "done"
+          ? await api.getAnalysisPgn(analysis.id)
+          : (gameQuery.data?.pgn ?? "");
+      const parsed = fromPgn(pgn); // lanza con el motivo si no hay árbol que sacar
+      return api.createBoard({
+        title: formatBoardTitleFromGame(gameQuery.data!),
+        root_fen: parsed.root.fen,
+        tree_json: parsed.root,
+        // La copia nace sin marcar como "partida propia" (RF-6.5), que es
+        // como nace cualquier tablero: la original ya cuenta en las
+        // estadísticas, y publicar la copia la contaría dos veces.
+      });
+    },
+    onSuccess: (board) => navigate({ to: "/boards/$boardId", params: { boardId: String(board.id) } }),
   });
 
   // Con análisis terminados de dos motores distintos se puede comparar (RF-2.6).
@@ -221,12 +242,16 @@ export function GameViewerPage() {
           </p>
         </div>
 
-        {/* `flex-wrap` como en la cabecera del tablero de análisis: con cuatro
-            controles en la fila, sin él se desbordan en una ventana estrecha. */}
+        {/* Mismo orden que la cabecera del tablero de análisis —girar ·
+            motor · las acciones que sacan la partida de aquí · la principal—
+            para no tener que buscar los controles al cambiar de pantalla
+            (criterio C-2 de docs/07-coherencia-ui.md). `flex-wrap` porque en
+            una ventana estrecha se desbordan. */}
         <div className="flex flex-wrap items-center gap-2">
           <Button onClick={() => setOrientation(orientation === "white" ? "black" : "white")}>
             Girar tablero
           </Button>
+          <EngineSelect value={engine} onChange={setEngine} />
           {/* Un enlace y no un botón: descarga un archivo, así que el
               navegador hace el trabajo y respeta el nombre que manda el
               servidor. Solo sale con el análisis terminado, que es lo único
@@ -244,7 +269,24 @@ export function GameViewerPage() {
               Exportar PGN anotado
             </a>
           )}
-          <EngineSelect value={engine} onChange={setEngine} />
+          {/* Va junto a "Exportar PGN anotado" porque las dos sacan la partida
+              de aquí: una a un archivo y otra a un tablero propio. A
+              diferencia de aquella, esta no necesita análisis: una partida sin
+              analizar también se puede explorar (criterio C-3). */}
+          <Button
+            onClick={() => openAsBoardMutation.mutate()}
+            disabled={openAsBoardMutation.isPending}
+            // Qué se lleva el tablero, con la misma forma que "Copiar PGN" y
+            // "Exportar PGN anotado", que son las otras dos que sacan la
+            // partida de donde está (criterio C-6).
+            title={
+              analysis?.status === "done"
+                ? "Crea un tablero de análisis con las jugadas de esta partida y los comentarios del análisis. Lo que pruebes allí no toca ni la partida ni su análisis."
+                : "Crea un tablero de análisis con las jugadas de esta partida. Lo que pruebes allí no toca la partida; analízala antes si quieres llevarte también los comentarios."
+            }
+          >
+            {openAsBoardMutation.isPending ? "Abriendo…" : "Abrir como tablero"}
+          </Button>
           <Button
             variant="primary"
             onClick={() => analyzeMutation.mutate()}
@@ -260,6 +302,7 @@ export function GameViewerPage() {
       </div>
 
       {analyzeMutation.isError && <ErrorBox error={analyzeMutation.error} />}
+      {openAsBoardMutation.isError && <ErrorBox error={openAsBoardMutation.error} />}
       {existingQuery.isError && (
         <ErrorBox error={existingQuery.error} onRetry={existingQuery.refetch} />
       )}
@@ -267,9 +310,12 @@ export function GameViewerPage() {
         <ErrorBox error={new Error(analysis.error ?? "el análisis falló")} />
       )}
 
-      {isRunning && (
+      {/* El mismo trabajo corre desde el tablero de análisis (RF-6.9) y allí
+          el recuadro dice con qué motor: es el mismo estado y se anuncia con
+          las mismas palabras en los dos sitios (criterio C-2). */}
+      {isRunning && analysis && (
         <ProgressBox
-          label="Analizando con el motor…"
+          label={`Analizando con ${formatEngineName(analysis.engine)}…`}
           detail={`${
             progress ? `posición ${progress.ply} de ${progress.total}` : "en cola"
           } · ${formatDuration(elapsedSeconds)}`}
@@ -418,35 +464,6 @@ export function GameViewerPage() {
       </div>
     </div>
   );
-}
-
-/** Segundos que lleva corriendo el análisis, mientras `isRunning` sea cierto.
- *
- * Acompaña a la barra de progreso en vez de sustituirla porque miden cosas
- * distintas: la barra va por posición evaluada, y esas no tardan lo mismo —
- * las que ya están en `position_cache` salen al instante y Lc0 tarda distinto
- * en cada una. El reloj es lo único que dice cuánto se lleva esperado de
- * verdad. Cuenta desde que esta pantalla ve el análisis en marcha, así que al
- * recargar la página empieza de cero; para que sobreviviera habría que
- * exponer `created_at` de la fila `analyses`, que hoy no sale en la API.
- */
-function useElapsedSeconds(isRunning: boolean): number {
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
-
-  useEffect(() => {
-    if (!isRunning) {
-      setElapsedSeconds(0);
-      return;
-    }
-    const startedAt = Date.now();
-    const timer = setInterval(
-      () => setElapsedSeconds(Math.round((Date.now() - startedAt) / 1000)),
-      1000,
-    );
-    return () => clearInterval(timer);
-  }, [isRunning]);
-
-  return elapsedSeconds;
 }
 
 /** Lista de jugadas cuando todavía no hay análisis: solo la notación. */

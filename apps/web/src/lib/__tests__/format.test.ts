@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   formatAccuracy,
+  formatDate,
   formatDuration,
   formatEngineName,
   formatPercent,
   formatPerHundredMoves,
+  formatBoardTitleFromPgnHeaders,
   formatRating,
   formatTimeClass,
   formatTimeControl,
@@ -147,5 +149,28 @@ describe("formatYearMonth", () => {
   it("rellena el mes a dos cifras para que los meses se ordenen a la vista", () => {
     expect(formatYearMonth(2026, 9)).toBe("2026-09");
     expect(formatYearMonth(2026, 12)).toBe("2026-12");
+  });
+});
+
+describe("formatBoardTitleFromPgnHeaders", () => {
+  it("nombra el tablero con los jugadores y la fecha del PGN", () => {
+    expect(formatBoardTitleFromPgnHeaders({ White: "Ana", Black: "Beto", Date: "2026.09.12" })).toBe(
+      `Ana - Beto, ${formatDate("2026-09-12")}`,
+    );
+  });
+
+  it("omite la fecha que el PGN no sabe", () => {
+    // "????.??.??" es lo que escribe un PGN sin fecha; pasarlo a Date daría
+    // "Invalid Date" en el título.
+    expect(formatBoardTitleFromPgnHeaders({ White: "Ana", Black: "Beto", Date: "????.??.??" })).toBe(
+      "Ana - Beto",
+    );
+    expect(formatBoardTitleFromPgnHeaders({ White: "Ana", Black: "Beto" })).toBe("Ana - Beto");
+  });
+
+  it("no propone título si el PGN no nombra a los dos jugadores", () => {
+    // Sin ellos, el título que ya tiene el tablero vale más que uno inventado.
+    expect(formatBoardTitleFromPgnHeaders({ White: "Ana" })).toBeNull();
+    expect(formatBoardTitleFromPgnHeaders({})).toBeNull();
   });
 });

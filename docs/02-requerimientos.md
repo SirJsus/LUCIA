@@ -340,6 +340,183 @@ Espacio de trabajo independiente del historial de chess.com, al estilo de los ta
 | RF-6.8 | Autoguardado y control de versiones simple (deshacer/rehacer sobre el árbol). | P1 |
 | RF-6.9 | Análisis completo del tablero en background (clasificación de jugadas y precisión como en RF-2) si el usuario lo pide. | P1 |
 
+**Con qué reglas se cumplieron RF-6.6 y RF-6.7** (**2026-09-18**). Los dos
+textos dicen qué tiene que poder hacerse —"abrir una partida como tablero",
+"importar/exportar el tablero completo como PGN"— y no qué pasa con lo que ya
+había en pantalla. Esta es la lectura que se les dio. Exportar (`toPgn`) ya
+existía desde el núcleo de RF-6; lo nuevo es el camino de vuelta, `fromPgn` en
+`apps/web/src/features/board/tree.ts`.
+
+- **Importar sustituye el tablero, no se fusiona con él.** "El tablero
+  completo" es otra partida entera, y fundir dos árboles daría un tercero que
+  no es ninguno de los dos. Se avisa antes de pulsar y con cuántas jugadas hay
+  en juego; desde RF-6.8 la importación además se deshace, y el aviso lo dice.
+- **Un solo lector de PGN para las dos puertas.** Crear un tablero pegando un
+  PGN (RF-6.1) usaba `loadPgn` de chess.js, que descarta variantes y
+  comentarios, y el panel de importar usa `fromPgn`, que las conserva: el
+  mismo archivo daba dos tableros distintos según por dónde entrara. Las dos
+  puertas pasan ya por `fromPgn`.
+- **El título sigue al PGN importado**, compuesto de las cabeceras
+  `White`/`Black`/`Date`. Un tablero no se puede renombrar desde ninguna
+  pantalla, así que un nombre que se quedó describiendo la partida anterior se
+  quedaría para siempre. Si el archivo no nombra a los dos jugadores, el
+  título no se toca: inventarlo sería peor.
+- **Una rama ilegal se corta y se cuenta; el archivo no se rechaza.** Una
+  jugada que no encaja en su posición trunca esa variante y la lectura sigue,
+  y la pantalla dice cuántas se cortaron. Tirar un archivo de trescientas
+  jugadas por un error de transcripción es peor que quedarse sin una rama;
+  callar el recorte, también.
+- **Al abrir una partida como tablero se prefiere el PGN anotado** (RF-5.5)
+  cuando hay análisis terminado, y el PGN crudo cuando no. Lo que ya se sabe
+  de la partida se lleva con ella: empezar a explorar desde las jugadas
+  peladas obligaría a tener el visor abierto al lado.
+- **La copia nunca se marca como "partida propia".** RF-6.5 deja esa marca al
+  usuario; aquí, además, la partida original ya cuenta en estadísticas y en
+  patrones, así que marcar la copia la contaría dos veces.
+
+Que el PGN se lea en el front y no en la API no es decisión nueva: el árbol de
+variantes viaja como JSON opaco y quien sabe si una jugada es legal en una
+posición es chess.js, que vive en el cliente (ver `tree.ts` y la cabecera de
+`apps/api/lucia_api/routers/boards.py`). Lo único que la API tuvo que aprender
+es a aceptar un `root_fen` nuevo en `PUT /boards/{id}`: un PGN con cabecera
+`[FEN ...]` mueve la posición de partida del tablero.
+
+**Con qué reglas se cumplieron RF-6.8 y RF-6.9** (**2026-09-18**). Los dos
+textos dicen qué tiene que poder hacerse —"deshacer/rehacer sobre el árbol",
+"análisis completo del tablero en background"— y no dónde vive el historial ni
+qué pasa después con ese análisis. Esta es la lectura que se les dio.
+
+- **El historial de deshacer se guarda en la base, no es una pila en
+  memoria.** Cada escritura que cambia el árbol anota una fila en
+  `board_versions` (con su `root_fen`, porque importar un PGN puede mover la
+  raíz — RF-6.7, y con su PGN desde RF-6.5, porque la API no sabe recorrer el
+  árbol) y `boards.current_version_id` es el **cursor**: deshacer lo
+  mueve hacia atrás sin borrar nada, y la primera edición después de deshacer
+  descarta lo que quedaba por delante. Así el deshacer sobrevive a recargar la
+  pantalla y a abrir el tablero en otra pestaña, que es lo que se espera de
+  algo que ya se autoguarda solo. El historial es **lineal**, como el de un
+  editor de texto: un árbol de versiones sería más potente y muy difícil de
+  explicar en una pantalla que ya tiene un árbol de variantes. Razonado en
+  [ADR-0012](adr/0012-historial-de-tablero-lineal-y-persistido.md).
+- **Solo lo que cambia el árbol hace historial.** Renombrar el tablero o
+  marcarlo como "partida propia" no se deshace con Ctrl+Z; si contaran,
+  retirar una jugada pediría pulsar dos veces sin decir por qué.
+- **Se guardan 50 versiones por tablero** (`MAX_VERSIONS_PER_BOARD`), podando
+  por el extremo antiguo. Es "deshaz lo que acabas de hacer", no un control de
+  versiones: conservarlo todo llenaría la base de copias del mismo árbol.
+- **Antes de deshacer se vacía el autoguardado pendiente** (`flushPendingSave`
+  en `BoardPage`). El autoguardado espera un momento antes de escribir; sin
+  esto, deshacer justo después de mover retiraría la jugada *anterior* y la
+  recién hecha se escribiría encima al vencer la espera.
+- **Analizar un tablero es el mismo trabajo que analizar una partida**, así
+  que lo hace el mismo worker y se guarda en las mismas tablas: `Analysis`
+  cuelga de `game_id` **o** de `board_id` —o de los dos, que es la excepción
+  del tablero publicado como partida propia de la nota de RF-6.5—, y `run_analysis`
+  recibe el PGN en vez de un `Game`. Razonado en
+  [ADR-0013](adr/0013-analisis-de-partida-o-de-tablero.md).
+- **El PGN a analizar lo manda el front** (`POST /boards/{id}/analysis` con lo
+  que devuelve `toPgn`) y se guarda en `analyses.analyzed_pgn`. La API no sabe
+  recorrer el árbol —eso es chess.js—, y un tablero se sigue editando después
+  de analizarlo: guardar lo que se analizó es lo que permite decir "esto es de
+  una versión anterior" (`matchAnalyzedLine`) en vez de pegar clasificaciones
+  sobre jugadas que ya no son las mismas.
+- **Se analiza la línea principal, no el árbol entero.** Las variantes son
+  tanteos, y analizarlas todas multiplicaría el tiempo de motor por algo que
+  el usuario no está mirando. Para una variante concreta está el motor en vivo
+  de RF-6.2.
+- **Un análisis de tablero no cuenta en estadísticas ni en patrones** por
+  defecto (`latest_analysis_ids` solo mira los que tienen `game_id`), que es
+  lo que RF-6.5 pide. La excepción llegó el mismo día con RF-6.5: un tablero
+  publicado como partida propia sí cuenta, y su análisis nace con `game_id`
+  además de `board_id` (ver la nota de RF-6.5 más abajo).
+
+**Con qué reglas se cumplió RF-6.5** (**2026-09-18**). El texto dice que un
+tablero no cuenta en estadísticas ni en patrones "salvo que el usuario los
+marque explícitamente como partida propia", y no qué se le pregunta a un
+tablero marcado ni por dónde entra en RF-3. Esta es la lectura que se le dio.
+Vive en `apps/api/lucia_api/services/own_games.py` y en
+`apps/web/src/features/board/OwnGamePanel.tsx`, y está razonada en
+[ADR-0014](adr/0014-tablero-propio-publicado-como-partida.md).
+
+- **Marcar el tablero lo publica en el historial como una partida.** Las
+  agregaciones de RF-3 leen columnas de `games` que un tablero no tiene, así
+  que en vez de enseñarle a cada consulta qué es un tablero, el tablero
+  marcado se guarda además como una fila de `games` —la misma puerta por la
+  que entra una partida OTB en RF-1.5—. Desde ahí cuenta en el marcador, en
+  las aperturas, en las fases, en los patrones y en los filtros de Partidas
+  sin que ninguna consulta cambie.
+- **Se piden cuatro datos y ninguno más**: de qué color jugó, contra quién,
+  cómo acabó —desde su punto de vista, "Gané / Tablas / Perdí", no "1-0"— y
+  qué día. Rating, control de tiempo y "de competición" se quedan en el mismo
+  hueco que deja RF-1.5, porque un tablero tampoco los sabe; la pantalla lo
+  dice antes de pulsar. La apertura se deduce de las jugadas.
+- **La marca es el enlace a esa partida** (`boards.own_game_id`), no un
+  booleano aparte que pudiera contradecirlo. Retirarla borra la partida del
+  historial; el tablero se queda entero.
+- **El análisis del tablero cuenta mientras siga siendo el de estas jugadas.**
+  Estando publicado, su análisis lleva también `game_id` y entra en el
+  dashboard por `latest_analysis_ids`; en cuanto el tablero se edita, deja de
+  contar hasta que se vuelva a analizar. Es la misma regla que ya avisa en
+  pantalla (`matchAnalyzedLine`), aplicada a lo que se cuenta.
+- **Guardar un tablero publicado exige mandar su PGN**, porque quien recorre
+  el árbol es chess.js y no la API (misma razón que en RF-6.7 y RF-6.9). Sin
+  él la partida del historial se quedaría atrasada sin que nada lo dijera.
+  Deshacer y rehacer (RF-6.8) no lo piden otra vez: cada versión guarda el PGN
+  con el que se anotó, así que la partida se pone al día en la misma petición
+  y la pantalla no tiene que volver a publicar el tablero.
+
+**Con qué reglas se cumplió el editor de posición de RF-6.1** (**2026-09-18**).
+RF-6.1 pide cuatro formas de arrancar un tablero y la cuarta —"editor de
+posición (colocar/quitar piezas, turno, enroques, al paso)"— era lo último que
+quedaba del requerimiento; las otras tres estaban desde la fase 1. El texto
+dice qué tiene que poder tocarse, no dónde vive el editor ni hasta dónde
+comprueba lo que se monta. Esta es la lectura que se le dio. Vive en
+`apps/web/src/features/board/PositionEditor.tsx` (pantalla) y
+`features/board/position.ts` (la posición y su FEN, lógica pura con pruebas
+propias).
+
+- **La posición que se edita no es un `Chess` de chess.js.** Mientras se monta
+  una posición es ilegal casi todo el rato —sin reyes, con tres damas a medio
+  poner, con el peón a mitad de camino— y chess.js se niega a cargar eso, así
+  que el modelo es propio (`EditablePosition`: piezas por casilla, turno,
+  enroques y casilla al paso) y guarda lo que hay puesto sin juzgarlo.
+  chess.js entra solo al final, para decir si la posición sirve. Es una
+  decisión local de este componente, no de arquitectura: no cambia quién habla
+  con quién ni sustituye a chess.js en ninguna otra parte, así que no lleva
+  ADR.
+- **Tres formas de colocar una pieza, y las tres hacen falta.** Elegir en la
+  paleta y pulsar casillas (lo único que funciona con el dedo), arrastrar
+  desde la paleta hasta el tablero (lo que espera quien viene de lichess), y
+  el teclado. Las piezas ya puestas se recolocan arrastrándolas y se quitan
+  soltándolas fuera del tablero o con la goma de la paleta. El teclado necesitó
+  una rejilla de 64 botones superpuesta al tablero porque chessground no hace
+  enfocable ninguna casilla; va con `pointer-events-none`, así que el ratón la
+  atraviesa y el tablero de siempre sigue recibiendo los clics y los arrastres
+  intactos (criterio C-1 de [07-coherencia-ui.md](07-coherencia-ui.md)).
+- **El editor rellena el campo "FEN o PGN"; no es otra puerta de creación.**
+  Escribe el FEN de lo montado en el campo que ya existía en la pantalla de
+  Tableros y es ese campo, con `parseSource`, quien crea el tablero. Una
+  segunda ruta de creación en paralelo habría que mantenerla en paralelo
+  —título, etiquetas, errores— y se desviaría de la primera a la tercera
+  corrección. Por lo mismo, el FEN se enseña a la vista mientras se edita: es
+  lo que va a quedar guardado.
+- **Se valida al final y solo lo que impide empezar a jugar**: lo que
+  comprueba `validateFen` de chess.js (falta un rey, hay dos, peones en la
+  primera o la última fila, la casilla al paso no encaja con el turno, los
+  enroques no son posibles con esas piezas) y una comprobación propia que
+  chess.js no hace —que el bando que **no** mueve no esté dando jaque, que es
+  imposible en una partida real y el motor rechazaría—. Los motivos llegan de
+  chess.js en inglés y se traducen; el aviso dice qué falta **antes** de pulsar
+  "Usar esta posición", no al pulsarlo (criterio C-3).
+- **No se comprueba que la posición sea alcanzable** desde la inicial (número
+  de piezas, peones de más, alfiles del mismo color): un tablero de análisis
+  existe justamente para posiciones de libro, de clase o inventadas, y el motor
+  las evalúa igual. El límite es "esto puede darse en una partida", no "esto se
+  jugó".
+- **El reloj de medias jugadas y el número de jugada van siempre a `0 1`**: una
+  posición montada a mano no viene de ninguna partida y no hay historia que
+  contar. Quien la abra en el tablero empieza a contar desde ahí.
+
 ### RF-7 · Ocupación del tablero (control de casillas)
 
 Capa de visualización activable con una tecla sobre **cualquier tablero** (visor RF-5, tablero de análisis RF-6, entrenamiento RF-4). No es un modo aparte: no obliga a salir de lo que se está haciendo. Se calcula en el cliente con chess.js, sin motor.

@@ -1,5 +1,9 @@
 /** Lista de tableros de análisis guardados (RF-6.4), y su creación desde la
- * posición inicial, un FEN o un PGN pegado (RF-6.1). */
+ * posición inicial, un FEN, un PGN pegado o el editor de posición (RF-6.1).
+ *
+ * Las cuatro formas terminan en el mismo sitio: el campo "FEN o PGN", que
+ * `parseSource` convierte en la raíz y el árbol del tablero. El editor no es
+ * una segunda forma de crear, es un ayudante que escribe en ese campo. */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Chess } from "chess.js";
@@ -12,9 +16,9 @@ import { EmptyState, ErrorBox, Spinner } from "../../components/Feedback";
 import { buttonClasses, FIELD_CLASSES, PANEL_CLASSES } from "../../components/styles";
 import { api } from "../../lib/api";
 import { formatDate } from "../../lib/format";
-import { addMove, createRoot, type TreeNode } from "./tree";
-
-const STANDARD_STARTING_FEN = new Chess().fen();
+import { STANDARD_STARTING_FEN } from "./position";
+import { PositionEditor } from "./PositionEditor";
+import { createRoot, fromPgn, type TreeNode } from "./tree";
 
 export function BoardsPage() {
   const queryClient = useQueryClient();
@@ -22,6 +26,7 @@ export function BoardsPage() {
   const [title, setTitle] = useState("");
   const [source, setSource] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isEditorOpen, setEditorOpen] = useState(false);
 
   const boardsQuery = useQuery({ queryKey: ["boards"], queryFn: api.listBoards });
 
@@ -91,7 +96,7 @@ export function BoardsPage() {
 
         <FieldLabel
           label="FEN o PGN de partida"
-          hint="Opcional: vacío empieza en la posición inicial."
+          hint="Opcional: vacío empieza en la posición estándar."
         >
           <textarea
             value={source}
@@ -101,6 +106,29 @@ export function BoardsPage() {
             className={`w-full font-mono text-xs ${FIELD_CLASSES}`}
           />
         </FieldLabel>
+
+        {/* La cuarta forma de partir (RF-6.1), para quien no tiene un FEN a
+            mano: monta la posición sobre un tablero y escribe su FEN en el
+            campo de arriba. Va debajo del campo y no en otra pantalla porque
+            es un ayudante de ese campo, no otra manera de crear. */}
+        <div>
+          <Button
+            onClick={() => setEditorOpen(!isEditorOpen)}
+            title="Coloca las piezas sobre un tablero y usa esa posición"
+          >
+            {isEditorOpen ? "Cancelar" : "Editor de posición"}
+          </Button>
+        </div>
+        {isEditorOpen && (
+          <PositionEditor
+            initialFen={source.trim() || STANDARD_STARTING_FEN}
+            onUse={(fen) => {
+              setSource(fen);
+              setEditorOpen(false);
+              setError(null);
+            }}
+          />
+        )}
 
         {/* El error de validación usa el mismo recuadro que el de la API:
             antes uno era un párrafo rojo suelto y el otro un `ErrorBox`, a dos
@@ -132,7 +160,10 @@ export function BoardsPage() {
                 <span className="font-medium">{board.title}</span>
                 {board.is_own_game && (
                   <span className="ml-2">
-                    <Badge tone="info" title="Cuenta en tus estadísticas (RF-6.5)">
+                    <Badge
+                      tone="info"
+                      title="Está publicado como una partida más: cuenta en Partidas y en tus Estadísticas"
+                    >
                       partida propia
                     </Badge>
                   </span>
@@ -188,7 +219,13 @@ interface ParsedSource {
 }
 
 /** Acepta un FEN, un PGN o nada (RF-6.1). Se intenta primero como FEN porque
- * es más específico: un PGN nunca se confunde con un FEN válido. */
+ * es más específico: un PGN nunca se confunde con un FEN válido.
+ *
+ * El PGN pasa por el mismo `fromPgn` que el panel "Importar PGN" del tablero
+ * (RF-6.7), no por `loadPgn` de chess.js: aquel conserva las variantes y los
+ * comentarios y este los descarta, y pegar el mismo archivo al crear o
+ * después no puede dar dos tableros distintos (criterio C-5 de
+ * docs/07-coherencia-ui.md). */
 function parseSource(source: string): ParsedSource | null {
   const trimmedSource = source.trim();
   if (!trimmedSource) {
@@ -203,22 +240,9 @@ function parseSource(source: string): ParsedSource | null {
   }
 
   try {
-    const chess = new Chess();
-    chess.loadPgn(trimmedSource);
-    const pgnMoves = chess.history({ verbose: true });
-    if (pgnMoves.length === 0) return null;
-
-    const rootFen = pgnMoves[0].before;
-    let tree = createRoot(rootFen);
-    let cursor = tree.id;
-    for (const move of pgnMoves) {
-      const result = addMove(tree, cursor, move.san);
-      if (!result) break;
-      tree = result.root;
-      cursor = result.nodeId;
-    }
-    return { rootFen, tree };
+    const parsed = fromPgn(trimmedSource);
+    return { rootFen: parsed.root.fen, tree: parsed.root };
   } catch {
-    return null;
+    return null; // tampoco es un PGN con jugadas legales
   }
 }

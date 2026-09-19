@@ -1,6 +1,6 @@
 [project]
 name = "lucia-core"
-version = "0.2.3"
+version = "0.2.5"
 description = "Nucleo de LUCIA: puente UCI con motores, analisis de partidas, clasificacion de jugadas e insight."
 requires-python = ">=3.12"
 license = "GPL-3.0-or-later"

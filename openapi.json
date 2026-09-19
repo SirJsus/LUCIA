@@ -3,7 +3,7 @@
   "info": {
     "title": "L.U.C.I.A. API",
     "description": "Logic & Ultimate Chess Insight Algorithm",
-    "version": "0.2.3"
+    "version": "0.2.5"
   },
   "paths": {
     "/health": {
@@ -428,7 +428,7 @@
           "analysis"
         ],
         "summary": "List Analyses",
-        "description": "Análisis existentes, opcionalmente los de una partida concreta. Sirve\npara que el visor sepa si ya hay uno hecho en vez de volver a analizar.",
+        "description": "Análisis existentes, opcionalmente los de una partida o un tablero\nconcretos. Sirve para que el visor —y el tablero de análisis (RF-6.9)—\nsepan si ya hay uno hecho en vez de volver a analizar.",
         "operationId": "list_analyses_analysis_get",
         "parameters": [
           {
@@ -445,6 +445,22 @@
                 }
               ],
               "title": "Game Id"
+            }
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Board Id"
             }
           }
         ],
@@ -1030,6 +1046,238 @@
         }
       }
     },
+    "/boards/{board_id}/undo": {
+      "post": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Undo Board",
+        "description": "Devuelve el tablero a su estado anterior (RF-6.8).\n\n409 y no 400 cuando no hay nada que deshacer: la petición es correcta, es\nel estado del tablero el que no la admite.",
+        "operationId": "undo_board_boards__board_id__undo_post",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards/{board_id}/redo": {
+      "post": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Redo Board",
+        "operationId": "redo_board_boards__board_id__redo_post",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards/{board_id}/own-game": {
+      "put": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Publish Own Game",
+        "description": "Publica el tablero en el historial como partida propia (RF-6.5).\n\nA partir de aquí cuenta en el dashboard, en los patrones y en los filtros\ndel listado como cualquier otra partida. La misma llamada sirve para\ncorregir los datos y para poner al día las jugadas después de deshacer o\nrehacer: reescribe la partida publicada en vez de crear otra.",
+        "operationId": "publish_own_game_boards__board_id__own_game_put",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnGamePublishRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Withdraw Own Game",
+        "description": "Retira la marca de partida propia: el tablero deja de contar y su\npartida se va del historial (RF-6.5). El tablero se queda como estaba.",
+        "operationId": "withdraw_own_game_boards__board_id__own_game_delete",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards/{board_id}/analysis": {
+      "post": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Analyze Board",
+        "description": "Encola el análisis completo de la línea principal del tablero (RF-6.9).\n\nDevuelve en cuanto está en la cola, con el id que el front usa para\nseguir el progreso por `WS /ws/analysis/{id}`, igual que una partida. El\nanálisis **no cuenta en las estadísticas** salvo que el tablero esté\npublicado como partida propia (RF-6.5), que es cuando nace con `game_id`.",
+        "operationId": "analyze_board_boards__board_id__analysis_post",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardAnalysisRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/repertoire": {
       "get": {
         "tags": [
@@ -1208,8 +1456,26 @@
             "title": "Id"
           },
           "game_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Game Id"
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id"
           },
           "engine": {
             "type": "string",
@@ -1280,6 +1546,7 @@
         "required": [
           "id",
           "game_id",
+          "board_id",
           "engine",
           "depth",
           "multipv",
@@ -1345,8 +1612,26 @@
             "title": "Id"
           },
           "game_id": {
-            "type": "integer",
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Game Id"
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id"
           },
           "engine": {
             "type": "string",
@@ -1402,6 +1687,7 @@
         "required": [
           "id",
           "game_id",
+          "board_id",
           "engine",
           "depth",
           "multipv",
@@ -1490,6 +1776,52 @@
         ],
         "title": "AnalyzedMoveOut"
       },
+      "BoardAnalysisRequest": {
+        "properties": {
+          "pgn": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Pgn"
+          },
+          "engine": {
+            "type": "string",
+            "enum": [
+              "stockfish",
+              "lc0"
+            ],
+            "title": "Engine",
+            "default": "stockfish"
+          },
+          "depth": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depth"
+          },
+          "multipv": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multipv"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pgn"
+        ],
+        "title": "BoardAnalysisRequest",
+        "description": "Lo que hace falta para analizar la línea principal de un tablero\n(RF-6.9)."
+      },
       "BoardCreate": {
         "properties": {
           "title": {
@@ -1521,11 +1853,6 @@
               }
             ],
             "title": "Tags Json"
-          },
-          "is_own_game": {
-            "type": "boolean",
-            "title": "Is Own Game",
-            "default": false
           }
         },
         "type": "object",
@@ -1578,6 +1905,24 @@
             "additionalProperties": true,
             "type": "object",
             "title": "Tree Json"
+          },
+          "can_undo": {
+            "type": "boolean",
+            "title": "Can Undo"
+          },
+          "can_redo": {
+            "type": "boolean",
+            "title": "Can Redo"
+          },
+          "own_game": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OwnGameLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -1589,7 +1934,9 @@
           "is_own_game",
           "created_at",
           "updated_at",
-          "tree_json"
+          "tree_json",
+          "can_undo",
+          "can_redo"
         ],
         "title": "BoardDetail"
       },
@@ -1662,6 +2009,17 @@
             ],
             "title": "Title"
           },
+          "root_fen": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Fen"
+          },
           "tree_json": {
             "anyOf": [
               {
@@ -1688,16 +2046,16 @@
             ],
             "title": "Tags Json"
           },
-          "is_own_game": {
+          "pgn": {
             "anyOf": [
               {
-                "type": "boolean"
+                "type": "string"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Is Own Game"
+            "title": "Pgn"
           }
         },
         "type": "object",
@@ -2490,6 +2848,121 @@
           "average_opening_exit_win_percent"
         ],
         "title": "OpeningStatsOut"
+      },
+      "OwnGameLink": {
+        "properties": {
+          "player_color": {
+            "type": "string",
+            "enum": [
+              "white",
+              "black"
+            ],
+            "title": "Player Color"
+          },
+          "opponent_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Opponent Name"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "win",
+              "draw",
+              "loss"
+            ],
+            "title": "Result"
+          },
+          "played_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Played On"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "player_color",
+          "opponent_name",
+          "result",
+          "played_on",
+          "game_id"
+        ],
+        "title": "OwnGameLink",
+        "description": "La partida del historial en la que está publicado el tablero (RF-6.5).\n\nLleva los datos con los que se publicó para que la pantalla los vuelva a\nenseñar tal cual al corregirlos, y el `game_id` para poder abrirla en el\nvisor como cualquier otra partida."
+      },
+      "OwnGamePublishRequest": {
+        "properties": {
+          "player_color": {
+            "type": "string",
+            "enum": [
+              "white",
+              "black"
+            ],
+            "title": "Player Color"
+          },
+          "opponent_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Opponent Name"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "win",
+              "draw",
+              "loss"
+            ],
+            "title": "Result"
+          },
+          "played_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Played On"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "pgn": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Pgn"
+          }
+        },
+        "type": "object",
+        "required": [
+          "player_color",
+          "opponent_name",
+          "result",
+          "played_on",
+          "pgn"
+        ],
+        "title": "OwnGamePublishRequest",
+        "description": "Marcar el tablero como partida propia (RF-6.5): los datos que el\ntablero no tiene, más las jugadas que sí."
       },
       "PgnImportSummary": {
         "properties": {

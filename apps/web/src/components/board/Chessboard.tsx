@@ -13,6 +13,8 @@ import type { Api } from "chessground/api";
 import { useEffect, useRef } from "react";
 import { buildBoardConfig, type EngineArrow } from "./boardConfig";
 
+export type { Api as ChessboardApi };
+
 export interface ChessboardProps {
   fen: string;
   /** Flechas del motor sobre el tablero: sus mejores líneas, o la
@@ -29,6 +31,22 @@ export interface ChessboardProps {
   /** Turno al que se le permite mover; solo aplica con `legalMoves`. */
   turnColor?: "white" | "black";
   onMove?: (from: string, to: string) => void;
+  /** Modo editor de posición (RF-6.1): las piezas se arrastran a cualquier
+   * casilla sin comprobar reglas, y soltarlas fuera del tablero las quita.
+   * Es lo contrario de `legalMoves`, así que no se usan juntos. */
+  editable?: boolean;
+  /** Cualquier cambio de piezas en modo editor, ya sea moviendo, quitando o
+   * soltando una pieza nueva. Llega sin decir qué cambió: quien edita relee
+   * el tablero entero con `getFen()` de la API, que es más simple que
+   * reconstruirlo a partir de tres eventos distintos. */
+  onPositionChange?: () => void;
+  /** Al pulsar una casilla en modo editor: es como se coloca una pieza sin
+   * arrastrarla, que es lo único que funciona con teclado y con el dedo. */
+  onSelectSquare?: (square: string) => void;
+  /** Recibe la API imperativa de chessground al montarse. Hace falta para lo
+   * que no cabe en propiedades: soltar una pieza arrastrada desde la bandeja
+   * (`dragNewPiece`) y releer las piezas (`getFen`). */
+  onReady?: (api: Api) => void;
 }
 
 export function Chessboard({
@@ -39,28 +57,45 @@ export function Chessboard({
   legalMoves,
   turnColor,
   onMove,
+  editable = false,
+  onPositionChange,
+  onSelectSquare,
+  onReady,
 }: ChessboardProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<Api | null>(null);
-  // El callback se guarda en una ref porque chessground se configura una sola
-  // vez: sin esto, el handler quedaría congelado en el del primer render.
-  const onMoveRef = useRef(onMove);
-  onMoveRef.current = onMove;
+  // Los callbacks se guardan en una ref porque chessground se configura una
+  // sola vez: sin esto, los handlers quedarían congelados en los del primer
+  // render. Se reasigna en cada render para que apunten siempre a los últimos.
+  const handlers = useRef({ onMove, onPositionChange, onSelectSquare });
+  handlers.current = { onMove, onPositionChange, onSelectSquare };
 
   useEffect(() => {
     if (!containerRef.current) return;
     apiRef.current = Chessground(containerRef.current, {
       ...buildBoardConfig({ fen, orientation, engineArrows, lastMoveUci, legalMoves, turnColor }),
-      viewOnly: !onMoveRef.current,
+      viewOnly: !editable && !handlers.current.onMove,
       coordinates: true,
-      animation: { enabled: true, duration: 150 },
-      movable: {
-        free: false,
-        color: turnColor,
-        dests: legalMoves as never,
-        events: { after: (from, to) => onMoveRef.current?.(from, to) },
+      // Sin animación al editar: las piezas no se mueven, aparecen y
+      // desaparecen, y animarlo las hace deslizarse por el tablero.
+      animation: { enabled: !editable, duration: 150 },
+      movable: editable
+        ? { free: true, color: "both", events: {} }
+        : {
+            free: false,
+            color: turnColor,
+            dests: legalMoves as never,
+            events: { after: (from, to) => handlers.current.onMove?.(from, to) },
+          },
+      // Soltar una pieza fuera del tablero la quita, que es como se borra sin
+      // tener que elegir la goma en la paleta.
+      draggable: { enabled: true, deleteOnDropOff: editable },
+      events: {
+        change: () => handlers.current.onPositionChange?.(),
+        select: (key) => handlers.current.onSelectSquare?.(key),
       },
     });
+    onReady?.(apiRef.current);
     return () => {
       apiRef.current?.destroy();
       apiRef.current = null;

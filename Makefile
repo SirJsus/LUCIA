@@ -12,8 +12,8 @@ help:
 	@echo "make api      - levanta la API FastAPI en :$(API_PORT) (API_PORT=8001 para cambiarlo)"
 	@echo "make web      - levanta el frontend en :5173"
 	@echo "make types    - regenera los tipos TS del front desde el OpenAPI de la API"
-	@echo "make test     - corre pytest"
-	@echo "make lint     - ruff + eslint"
+	@echo "make test     - corre las pruebas: pytest (Python) + vitest (web)"
+	@echo "make lint     - ruff + eslint + tsc (comprobacion de tipos del front)"
 
 doctor:
 	./scripts/doctor.sh
@@ -38,9 +38,17 @@ types:
 	uv run python3 scripts/export-openapi.py
 	pnpm --filter @lucia/shared-types generate
 
+# Las dos mitades del monorepo, en un solo comando: hasta ahora `make test`
+# solo corría Python y las pruebas de `apps/web` había que acordarse de
+# lanzarlas aparte. Python primero porque es donde está el grueso.
 test:
 	uv run pytest
+	pnpm test
 
+# `tsc --noEmit` va aquí y no en `make test` porque no es una prueba: es la
+# misma comprobación estática que ruff y eslint, y hasta ahora no la corría
+# ningún comando, así que un error de tipos solo salía al construir el front.
 lint:
 	uv run ruff check .
 	pnpm lint
+	pnpm typecheck

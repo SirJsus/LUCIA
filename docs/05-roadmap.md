@@ -73,9 +73,10 @@
       (`POST /analysis/position`, con tope de profundidad porque es síncrono);
       exportación a PGN con variantes. Independiente del historial: los
       tableros no cuentan en estadísticas salvo que se marquen como partida
-      propia. 17 tests del árbol de variantes. Pendiente: editor de posición
-      pieza a pieza (RF-6.1 permite FEN, que cubre el caso), deshacer/rehacer
-      explícito (RF-6.8).
+      propia. 17 tests del árbol de variantes. El deshacer/rehacer explícito
+      que quedaba pendiente aquí llegó con RF-6.8, y el editor de posición
+      pieza a pieza —la cuarta forma de arrancar que pide RF-6.1— con el ítem
+      de los extras del tablero, los dos en la fase 2.
 
 ## Fase 2 · Insight (P1)
 
@@ -386,12 +387,104 @@
       - **Línea de rating al lado**, que es un extra sobre el texto del RF: es
         la del control de tiempo más jugado y la pantalla dice cuál, porque
         promediar bullet con rapid inventaría caídas de rating.
-- [ ] Tablero de análisis, extras (RF-6.6 a 6.9): abrir partida importada como
-      copia desacoplada (esto también cubre "explorar variantes desde el
-      visor", RF-5.2), importar / exportar PGN con variantes y comentarios,
-      auto-guardado con deshacer / rehacer, análisis completo en background
-      bajo demanda, y editor de posición pieza a pieza (lo que falta de
-      RF-6.1; hoy se puede partir de un FEN, que cubre el caso).
+- [x] Tablero de análisis, extras (RF-6.6 a 6.9) y el editor de posición que
+      faltaba de RF-6.1. **Hechos el 2026-09-18**
+      RF-6.6 y RF-6.7: "Abrir como tablero" en el visor crea una copia
+      desacoplada de la partida (esto también cubre "explorar variantes desde
+      el visor", RF-5.2), y el tablero de análisis importa un PGN pegado con
+      variantes y comentarios, `fromPgn` en `features/board/tree.ts` —lector
+      propio, porque `loadPgn` de chess.js descarta las variantes—, con
+      `root_fen` nuevo en `PUT /boards/{id}` para los PGN que arrancan de una
+      posición dada. Exportar ya estaba desde el núcleo de la fase 1, y el
+      lector nuevo sustituye también al `loadPgn` con que la pantalla de
+      Tableros creaba un tablero desde un PGN pegado: descartaba las
+      variantes, así que el mismo archivo daba un tablero distinto según se
+      pegara al crear o después.
+
+      - **Al abrir desde el visor se prefiere el PGN anotado** (RF-5.5) si hay
+        análisis terminado, y el crudo si no: el tablero nace con lo que ya se
+        sabía de la partida. La copia nunca se marca como partida propia
+        (RF-6.5), que contaría dos veces la misma partida.
+      - **Importar sustituye el árbol y renombra el tablero** desde las
+        cabeceras del PGN: un tablero no se puede renombrar a mano desde
+        ninguna pantalla.
+      - **Una jugada ilegal corta su rama y se cuenta**, en vez de tumbar la
+        importación entera; la pantalla dice cuántas ramas se perdieron.
+
+      **Hechos también el 2026-09-18** RF-6.8 y RF-6.9: deshacer / rehacer
+      sobre el árbol (el autoguardado ya estaba desde la fase 1) y análisis
+      completo del tablero en background bajo demanda.
+
+      - **El historial se guarda en la base**, no en la pantalla: tabla
+        `board_versions` y `boards.current_version_id` como cursor, de modo
+        que deshacer sobrevive a recargar. Es lineal —editar después de
+        deshacer descarta lo de delante— y se poda a 50 versiones por
+        tablero ([ADR-0012](adr/0012-historial-de-tablero-lineal-y-persistido.md)).
+        `POST /boards/{id}/undo` y `/redo`, botones y atajos (Ctrl+Z, Ctrl+Y
+        o Ctrl+Mayús+Z) en `useUndoRedoKeys`. Solo lo que cambia el árbol
+        hace historial: renombrar, no.
+      - **El análisis del tablero lo hace el mismo worker que las partidas**:
+        `Analysis` cuelga de `game_id` o de `board_id`
+        ([ADR-0013](adr/0013-analisis-de-partida-o-de-tablero.md)), el PGN de
+        la línea principal lo manda el front (`toPgn`) y se guarda en
+        `analyses.analyzed_pgn`, así que la pantalla avisa cuando el tablero
+        cambió desde el análisis (`matchAnalyzedLine`). No cuenta en las
+        estadísticas (RF-6.5), y **que un tablero marcado como propio sí
+        cuente sigue pendiente**: las agregaciones de RF-3 se apoyan en
+        columnas de `games` que un tablero no tiene (ver la nota de RF-6.8 /
+        RF-6.9 en [02-requerimientos.md](02-requerimientos.md)).
+
+      **Y el mismo 2026-09-18** lo último que quedaba de RF-6.1: el editor de
+      posición pieza a pieza, `features/board/PositionEditor.tsx` con la
+      posición y su FEN en `features/board/position.ts` (13 tests). Con esto
+      el ítem queda cerrado.
+
+      - **El editor rellena el campo "FEN o PGN" de la pantalla de Tableros**,
+        que sigue siendo la única forma de crear: es un ayudante de ese campo
+        y no una segunda puerta que mantener en paralelo.
+      - **La posición que se edita no es un `Chess` de chess.js**: a medio
+        montar es ilegal casi siempre y chess.js no la carga, así que el
+        modelo es propio y chess.js entra solo al final, para decir si sirve
+        —más una comprobación que él no hace: que el bando que no mueve no
+        esté dando jaque—, con los motivos traducidos y a la vista antes de
+        pulsar. Es una decisión local del componente, sin ADR (razonada en la
+        nota de RF-6.1 en [02-requerimientos.md](02-requerimientos.md)).
+      - **Tres formas de colocar**: elegir en la paleta y pulsar casillas,
+        arrastrar desde la paleta, y el teclado. Esto último pidió una rejilla
+        de 64 botones superpuesta al tablero con `pointer-events-none`, porque
+        chessground no hace enfocable ninguna casilla y el ratón tiene que
+        seguir llegándole intacto (criterio C-1).
+- [x] Tableros marcados como "partida propia" contando en estadísticas y
+      patrones (lo que faltaba de **RF-6.5**). Hecho el 2026-09-18: marcar el
+      tablero lo **publica en el historial como una partida**, y desde ahí
+      cuenta sin que ninguna consulta de RF-3 cambie
+      ([ADR-0014](adr/0014-tablero-propio-publicado-como-partida.md)).
+
+      - **Se piden cuatro datos y ninguno más** —color, rival, resultado y
+        fecha—, los que las agregaciones de RF-3 necesitan para contarlo sin
+        inventar nada. Rating y control de tiempo se quedan en el mismo hueco
+        que deja la importación de PGN manual (RF-1.5), porque un tablero
+        tampoco los sabe, y la pantalla lo dice antes de pulsar.
+      - **La marca es el enlace a esa partida** (`boards.own_game_id`), no un
+        booleano aparte: un booleano podría contradecir a la fila publicada y
+        entonces el listado diría una cosa y el dashboard otra. La migración
+        `a71c40f5d3e8` pierde las marcas anteriores, que no traían esos datos.
+      - **El análisis del tablero cuenta mientras siga siendo el de estas
+        jugadas**: lleva `game_id` además de `board_id`, y se desenlaza en
+        cuanto el tablero se edita. La regla de ADR-0013 ("uno de los dos,
+        nunca los dos") pasa a ser "al menos uno".
+      - **Deshacer y rehacer arrastran la partida publicada** en la misma
+        petición: cada versión del historial guarda su PGN
+        (`board_versions.pgn`, migración `d4b7e0c25a19`), así que la pantalla
+        ya no tiene que volver a publicar el tablero después.
+      - **De paso se encendieron las claves foráneas de sqlite**
+        (`PRAGMA foreign_keys=ON` en `db/base.py::create_db_engine`): venían
+        apagadas por conexión, así que ningún `ON DELETE` del esquema se
+        ejecutaba y borrar un tablero dejaba huérfanas sus versiones y sus
+        análisis. Con ellas encendidas salió a la luz que
+        `analyzed_moves.analysis_id` no tenía cascada (migración
+        `c8f3a2b91e47`). Las migraciones siguen corriendo con el pragma
+        apagado, porque alembic recrea tablas enteras para cambiarlas.
 - [ ] Capa de ocupación del tablero (RF-7.1 a 7.7): sub-modo mapa de calor, sub-modo cobertura directa del turno, inspección por casilla, piezas colgadas, rayos X aparte y clavadas marcadas, reglas de conteo (rey, peones en diagonal, al paso). Cálculo en cliente con chess.js, activable en visor, tablero de análisis y entrenamiento.
 - [x] Exportar PGN anotado (RF-5.5). Hecho el 2026-09-17:
       `GET /analysis/{id}/pgn` y el enlace "Exportar PGN anotado" en la
@@ -482,9 +575,10 @@ en el código.
 ### Fase 6 · Partidas con ventaja (RF-11)
 
 Bloque planteado el **2026-09-07**, después del corte de alcance, así que no
-cuenta para el progreso hacia 1.0.0. Depende de dos cosas que sí son alcance de
-1.0 y hay que tener antes: el editor de posición pieza a pieza (RF-6.1, fase 2)
-y el sparring contra motor con fuerza calibrada (RF-4.3, fase 3).
+cuenta para el progreso hacia 1.0.0. Dependía de dos cosas que sí son alcance
+de 1.0: el editor de posición pieza a pieza (RF-6.1), que llegó el 2026-09-18
+con los extras del tablero, y el sparring contra motor con fuerza calibrada
+(RF-4.3, fase 3), que sigue por hacer.
 
 - [ ] Jugar contra el motor desde una posición inicial personalizada, eligiendo
       color y bando con ventaja (RF-11.1).

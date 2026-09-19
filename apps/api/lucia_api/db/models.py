@@ -125,16 +125,45 @@ class SyncState(Base):
 
 
 class Analysis(Base):
-    """Una corrida de análisis de motor sobre una partida (RF-2).
+    """Una corrida de análisis de motor sobre una partida (RF-2) o sobre la
+    línea principal de un tablero de análisis (RF-6.9).
 
     Puede haber varias por partida (distinto motor, profundidad o MultiPV);
     por eso no es una columna más de `Game` sino su propia tabla.
+
+    **Nunca cuelga de nada**: al menos una de las dos columnas está llena.
+    `board_id` dice de qué tablero salieron las jugadas; `game_id`, a qué
+    partida del historial se le atribuyen. Un análisis de partida solo tiene
+    la segunda y uno de tablero solo la primera, salvo que el tablero esté
+    publicado como partida propia (RF-6.5), donde tiene las dos: las jugadas
+    son del tablero y cuentan como las de esa partida (ADR-0014).
+
+    Son la misma corrida de motor sobre las mismas jugadas y dan el mismo
+    resultado, así que compartir tabla evita duplicar `analyzed_moves` y todo
+    lo que lee de ella (el visor, la exportación a PGN, los patrones).
     """
 
     __tablename__ = "analyses"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    game_id: Mapped[int] = mapped_column(ForeignKey("games.id"))
+    game_id: Mapped[int | None] = mapped_column(ForeignKey("games.id"), default=None)
+    board_id: Mapped[int | None] = mapped_column(
+        ForeignKey("boards.id", ondelete="CASCADE"), default=None
+    )
+    """El tablero del que salieron las jugadas (RF-6.9).
+
+    Por sí solo **no cuenta en las estadísticas** (RF-6.5): lo garantiza
+    `latest_analysis_ids`, que solo mira los análisis con `game_id`. Un
+    tablero publicado como partida propia lo llena además, y entonces sí
+    cuenta (`services/own_games.py`)."""
+    analyzed_pgn: Mapped[str | None] = mapped_column(default=None)
+    """La línea principal que se analizó, solo para los tableros.
+
+    Una partida no la necesita —su PGN está en `games.pgn` y no cambia—, pero
+    un tablero se sigue editando después de analizarlo: guardar aquí lo que
+    se analizó es lo que permite decir "este análisis es de una versión
+    anterior" en vez de enseñar clasificaciones que ya no corresponden a las
+    jugadas que hay en pantalla."""
     engine: Mapped[str]
     """"stockfish" | "lc0" (RF-2.6), o cualquier otro configurado en `EngineConfig`."""
     depth: Mapped[int]
@@ -149,7 +178,7 @@ class Analysis(Base):
     )
     finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
-    game: Mapped[Game] = relationship(back_populates="analyses")
+    game: Mapped[Game | None] = relationship(back_populates="analyses")
     moves: Mapped[list[AnalyzedMove]] = relationship(
         back_populates="analysis",
         cascade="all, delete-orphan",
@@ -164,7 +193,11 @@ class AnalyzedMove(Base):
     __tablename__ = "analyzed_moves"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    analysis_id: Mapped[int] = mapped_column(ForeignKey("analyses.id"))
+    analysis_id: Mapped[int] = mapped_column(ForeignKey("analyses.id", ondelete="CASCADE"))
+    """Con `CASCADE` en la base y no solo en la relación de SQLAlchemy: borrar
+    un tablero se lleva sus análisis por la clave foránea, sin que el ORM los
+    llegue a cargar, y entonces nadie recorrería la relación para borrar estas
+    filas. Sin esto, borrar un tablero analizado falla."""
     ply: Mapped[int]
     color: Mapped[str]
     """"white" | "black": quién jugó esta jugada."""
@@ -255,8 +288,11 @@ class Board(Base):
     lógica en el servidor solo daría dos sitios donde equivocarse. El servidor
     lo trata como un documento que guarda y devuelve.
 
-    `is_own_game` existe por RF-6.5: los tableros no cuentan para las
-    estadísticas salvo que el usuario marque que esa partida la jugó él.
+    Un tablero no cuenta para las estadísticas (RF-6.5) salvo que el usuario
+    marque que esa partida la jugó él, y entonces se **publica al historial**
+    como una fila de `games` a la que apunta `own_game_id`: así el dashboard,
+    los filtros y los patrones lo cuentan sin que ninguna de sus consultas
+    tenga que aprender qué es un tablero (ADR-0014).
     """
 
     __tablename__ = "boards"
@@ -269,11 +305,80 @@ class Board(Base):
     posición montada en el editor."""
     tree_json: Mapped[dict] = mapped_column(JSON)
     """Árbol de variantes con comentarios (ver `lucia_api.routers.boards`)."""
-    is_own_game: Mapped[bool] = mapped_column(default=False)
+    own_game_id: Mapped[int | None] = mapped_column(
+        ForeignKey("games.id", ondelete="SET NULL"), default=None
+    )
+    """La partida del historial en la que se publicó este tablero (RF-6.5), o
+    `None` si no está marcado como partida propia.
+
+    Es la **única** marca: un booleano aparte podría contradecir a la fila
+    publicada, y entonces el listado diría una cosa y el dashboard otra.
+    `SET NULL` porque borrar esa partida desde el historial es retirar la
+    marca, no borrar el tablero."""
+    current_version_id: Mapped[int | None] = mapped_column(default=None)
+    """En qué punto del historial está el tablero (RF-6.8).
+
+    No es "la última versión" sino "la que se está viendo": deshacer mueve
+    este puntero hacia atrás sin borrar nada, y así rehacer puede volver.
+    Guardarlo aquí y no en la pantalla es lo que hace que el deshacer
+    sobreviva a recargar.
+
+    Sin `ForeignKey` a propósito: `board_versions.board_id` ya apunta aquí, y
+    declarar las dos direcciones deja un ciclo de tablas que SQLite no puede
+    romper —no sabe añadir una restricción después de crear la tabla—. Las
+    versiones se borran en cascada con su tablero, así que el puntero no
+    puede quedar colgando.
+    """
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
     )
     updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
+    )
+
+    @property
+    def is_own_game(self) -> bool:
+        """Si el tablero está publicado como partida propia (RF-6.5).
+
+        Se deduce del enlace en vez de guardarse aparte para que no haya dos
+        versiones de la misma verdad. Las respuestas de la API lo exponen tal
+        cual, así que el front sigue viendo el mismo campo de siempre."""
+        return self.own_game_id is not None
+
+
+class BoardVersion(Base):
+    """Un estado por el que pasó un tablero de análisis (RF-6.8).
+
+    El historial es **lineal**, como el de un editor de texto: se apunta con
+    `Board.current_version_id` y editar después de deshacer borra lo que
+    quedaba por delante. Un árbol de versiones sería más potente y mucho más
+    difícil de explicar en una pantalla que ya tiene un árbol de variantes.
+
+    Se guarda el árbol entero y no un diff: un tablero pesa unos kilobytes,
+    y reconstruir un estado aplicando diferencias es la clase de código que
+    falla justo cuando hace falta.
+    """
+
+    __tablename__ = "board_versions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    board_id: Mapped[int] = mapped_column(ForeignKey("boards.id", ondelete="CASCADE"))
+    root_fen: Mapped[str]
+    """Va con el árbol porque importar un PGN puede mover la posición de
+    partida (RF-6.7): sin esto, deshacer una importación dejaría el árbol
+    viejo colgando de la raíz nueva."""
+    tree_json: Mapped[dict] = mapped_column(JSON)
+    pgn: Mapped[str | None] = mapped_column(default=None)
+    """El mismo árbol en PGN, tal como lo compuso el front (`tree.ts::toPgn`).
+
+    Se guarda junto al árbol porque la API no sabe recorrerlo —quien sabe de
+    jugadas es chess.js— y al deshacer hace falta: un tablero publicado como
+    partida propia (RF-6.5) tiene que poner al día su fila del historial con
+    las jugadas que quedaron, y sin esto habría que pedírselas a la pantalla
+    en un segundo viaje. `None` en las versiones anteriores a RF-6.5 y en la
+    primera de un tablero recién creado, donde no se sabe cómo quedó: ahí el
+    análisis se desenlaza hasta el siguiente guardado."""
+    created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
     )
 

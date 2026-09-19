@@ -14,6 +14,15 @@ aquí** —mes natural, el mismo con el que se cuentan las partidas en RF-3.1—
 y aquí se le pega a cada mes el rating con el que se cerró, que es un dato de
 `games` y no del análisis.
 
+Aquí solo hay partidas: los tableros de análisis no entran (RF-6.5) y sus
+análisis los descarta `latest_analysis_ids`. Un tablero marcado como "partida
+propia" sí cuenta, pero tampoco hace falta mirarlo: al marcarlo se publica
+como una fila más de `games` y llega a estas consultas como cualquier otra
+partida, sin que ninguna de ellas cambie (ADR-0014). Sale bajo el control de
+tiempo "sin determinar", como las importadas de un PGN, así que no entra en la
+línea de rating de las tendencias (`_most_played_time_class` descarta
+`"unknown"`).
+
 Una partida sin analizar cuenta para resultados y ratings (RF-3.1) pero no
 para lo demás, que necesita un `Analysis` terminado. Y una analizada con los
 dos motores (RF-2.6) cuenta **una sola vez**, con su análisis más reciente

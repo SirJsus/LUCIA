@@ -17,7 +17,7 @@ from lucia_core.engine import EngineBridge, EngineConfig
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from lucia_api.db.models import Analysis, AnalyzedMove, Game, PositionCache
+from lucia_api.db.models import Analysis, AnalyzedMove, PositionCache
 from lucia_api.services.engines import get_effective_config
 
 ProgressCallback = Callable[[int, int], Awaitable[None]]
@@ -266,10 +266,16 @@ def _pv_to_san(board: chess.Board, pv: list[chess.Move]) -> list[str]:
 async def run_analysis(
     session: AsyncSession,
     analysis: Analysis,
-    game: Game,
+    pgn: str,
     on_progress: ProgressCallback | None = None,
 ) -> None:
-    """Ejecuta el análisis de `game` y persiste el resultado en `analysis`.
+    """Ejecuta el análisis de esa partida y persiste el resultado en
+    `analysis`.
+
+    Recibe el **PGN** y no un `Game` porque lo mismo se analiza una partida
+    del historial (RF-2) que la línea principal de un tablero de análisis
+    (RF-6.9): son las mismas jugadas y el mismo trabajo de motor, y lo único
+    que las distingue es de dónde salió el texto. Quién lo saca es el worker.
 
     Dejar `analysis` en estado "error" en vez de propagar la excepción es a
     propósito: quien llama (el worker) es un job en background sin nadie
@@ -277,9 +283,9 @@ async def run_analysis(
     error no se pierda en silencio es guardarlo en la fila.
     """
     try:
-        pgn_game = chess.pgn.read_game(io.StringIO(game.pgn))
+        pgn_game = chess.pgn.read_game(io.StringIO(pgn))
         if pgn_game is None:
-            raise ValueError(f"PGN inválido en la partida {game.id}")
+            raise ValueError(f"PGN inválido en el análisis {analysis.id}")
         # La posición inicial sale del PGN, no de `chess.Board()`: chess.com
         # marca con `[SetUp "1"]` + `[FEN ...]` las partidas que no empiezan en
         # la posición estándar (odds chess, Chess960, "partidas desde

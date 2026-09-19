@@ -11,6 +11,12 @@ patrones se deducen cada vez que se piden, sobre lo guardado (ADR-0008).
 Lo consumen `routers/analysis.py` (los momentos críticos de una partida) y
 `services/stats.py` (los patrones agregados del jugador).
 
+**Un tablero no cuenta, salvo que sea una partida del usuario.** Lo que se
+agrega son partidas: los análisis de tablero (RF-6.9) se quedan fuera en
+`latest_analysis_ids`. La excepción de RF-6.5 no se ve desde aquí, porque un
+tablero marcado como "partida propia" cuenta *como su partida publicada*, no
+como tablero (ADR-0014).
+
 **Una partida cuenta una sola vez.** Una misma partida puede tener análisis de
 Stockfish y de Lc0 (RF-2.6); sumar los dos contaría cada jugada dos veces y
 diría que se juega el doble de mal. Se toma el análisis terminado más reciente
@@ -37,10 +43,22 @@ def latest_analysis_ids():
 
     `max(id)` y no `max(created_at)` porque el id es monótono y no empata: dos
     análisis encolados en el mismo segundo tienen la misma fecha.
+
+    **Los análisis de tablero quedan fuera** (`game_id` nulo, RF-6.9): un
+    tablero de análisis no cuenta en las estadísticas ni en la detección de
+    patrones (RF-6.5). Se excluyen aquí y no en cada consulta porque esta
+    subconsulta es por donde pasan todas.
+
+    Con una excepción, y por eso el filtro mira `game_id` y no `board_id`: un
+    tablero marcado como "partida propia" se publica como una fila de `games`
+    y su análisis se enlaza a ella, así que llega aquí con las dos columnas
+    llenas y entra como el de cualquier partida. Quién pone y quita ese enlace
+    es `services/own_games.py::link_analyses_to_own_game` (ADR-0014); aquí no
+    hay nada que distinguir.
     """
     return (
         select(func.max(Analysis.id))
-        .where(Analysis.status == "done")
+        .where(Analysis.status == "done", Analysis.game_id.is_not(None))
         .group_by(Analysis.game_id)
         .scalar_subquery()
     )

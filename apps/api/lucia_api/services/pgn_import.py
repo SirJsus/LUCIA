@@ -38,8 +38,9 @@ from lucia_api.db.models import Game, Player
 
 #: Resultado del PGN traducido al vocabulario por bando que usa `games`
 #: (ver `lucia_api.services.games`). Una partida sin terminar ("*") no está
-#: aquí a propósito: no se importa.
-_SIDE_RESULTS_BY_PGN_RESULT = {
+#: aquí a propósito: no se importa. Lo usa también `services/own_games.py`,
+#: que publica tableros por esta misma puerta (RF-6.5).
+SIDE_RESULTS_BY_PGN_RESULT = {
     "1-0": ("win", "loss"),
     "0-1": ("loss", "win"),
     "1/2-1/2": ("draw", "draw"),
@@ -77,7 +78,7 @@ async def import_pgn(
     las partidas cuenten en el dashboard y en los filtros por color, resultado
     y rival (RF-3, RF-5.3).
     """
-    player = await _get_or_create_player(session, username)
+    player = await get_or_create_player(session, username)
 
     imported = 0
     already_present = 0
@@ -121,13 +122,15 @@ def _find_import_problem(parsed_game: chess.pgn.Game) -> str | None:
     """Por qué esta partida no se puede guardar, o `None` si se puede."""
     if not parsed_game.variations:
         return "no trae jugadas."
-    if parsed_game.headers.get("Result") not in _SIDE_RESULTS_BY_PGN_RESULT:
+    if parsed_game.headers.get("Result") not in SIDE_RESULTS_BY_PGN_RESULT:
         return f"resultado «{parsed_game.headers.get('Result', '?')}», sin terminar o ilegible."
     return None
 
 
-async def _get_or_create_player(session: AsyncSession, username: str) -> Player:
-    """El jugador al que se atribuyen las partidas importadas.
+async def get_or_create_player(session: AsyncSession, username: str) -> Player:
+    """El jugador al que se atribuyen las partidas que no vienen de
+    chess.com: las de un PGN manual (RF-1.5) y las de un tablero publicado
+    como partida propia (RF-6.5, `services/own_games.py`).
 
     Se busca por nombre en cualquier plataforma para caer en la **misma** fila
     que creó la sincronización con chess.com: si fueran dos jugadores, el
@@ -168,7 +171,7 @@ async def _upsert_game(
         game = Game(player_id=player_id, platform="manual", platform_id=platform_id)
         session.add(game)
 
-    white_result, black_result = _SIDE_RESULTS_BY_PGN_RESULT[headers["Result"]]
+    white_result, black_result = SIDE_RESULTS_BY_PGN_RESULT[headers["Result"]]
     game.pgn = pgn_text
     game.white_username = _resolve_side_username(
         headers.get("White", "?"), player_name_in_pgn, username

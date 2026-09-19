@@ -65,7 +65,7 @@ async def test_run_analysis_persists_moves_and_accuracy(db_session: AsyncSession
     async def record_progress(ply: int, total: int) -> None:
         progress_events.append((ply, total))
 
-    await run_analysis(db_session, analysis, game, on_progress=record_progress)
+    await run_analysis(db_session, analysis, game.pgn, on_progress=record_progress)
 
     assert analysis.status == "done"
     assert analysis.finished_at is not None
@@ -91,7 +91,7 @@ async def test_run_analysis_with_invalid_pgn_leaves_error_status(db_session: Asy
     db_session.add(analysis)
     await db_session.flush()
 
-    await run_analysis(db_session, analysis, game)
+    await run_analysis(db_session, analysis, game.pgn)
 
     assert analysis.status == "error"
     assert analysis.error is not None
@@ -108,7 +108,7 @@ async def test_run_analysis_uses_the_starting_position_of_the_pgn(
     db_session.add(analysis)
     await db_session.flush()
 
-    await run_analysis(db_session, analysis, game)
+    await run_analysis(db_session, analysis, game.pgn)
 
     assert analysis.status == "done"
     moves = await _load_analyzed_moves(db_session, analysis)
