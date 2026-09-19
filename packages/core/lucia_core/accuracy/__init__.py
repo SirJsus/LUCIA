@@ -21,9 +21,11 @@ _ACCURACY_C = -3.1669
 def win_percent(score: chess.engine.Score, ply: int = 30) -> float:
     """Probabilidad de victoria (0-100) para quien tiene esa jugada a favor.
 
-    `ply` afecta al modelo estadístico: en jugadas tempranas, la misma
-    ventaja en centipawns se traduce en menos probabilidad de victoria que
-    en un final (hay más partida por delante para que se complique).
+    `ply` se acepta y se propaga porque los modelos `sf*` de `python-chess` sí
+    lo usan (la misma ventaja en centipawns vale distinto en la jugada 6 que
+    en la 60), pero el modelo `lichess`, que es el que usamos, lo ignora:
+    depende solo de los centipawns, acotados a ±1000. De ahí que el cliente
+    web pueda replicar la fórmula sin saber en qué jugada está (ADR-0006).
     """
     return score.wdl(model="lichess", ply=ply).expectation() * 100
 
@@ -36,9 +38,9 @@ def move_accuracy(win_percent_before: float, win_percent_after: float) -> float:
     que un blunder adicional en una posición ya perdida no siga penalizando
     igual de fuerte.
     """
-    caida = max(0.0, win_percent_before - win_percent_after)
-    precision = _ACCURACY_A * math.exp(_ACCURACY_B * caida) + _ACCURACY_C
-    return min(100.0, max(0.0, precision))
+    win_percent_loss = max(0.0, win_percent_before - win_percent_after)
+    accuracy = _ACCURACY_A * math.exp(_ACCURACY_B * win_percent_loss) + _ACCURACY_C
+    return min(100.0, max(0.0, accuracy))
 
 
 def game_accuracy(move_accuracies: list[float], window: int = 2) -> float:
@@ -58,35 +60,37 @@ def game_accuracy(move_accuracies: list[float], window: int = 2) -> float:
     if len(move_accuracies) == 1:
         return move_accuracies[0]
 
-    pesos = _pesos_por_volatilidad(move_accuracies, window)
-    media = _media_ponderada(move_accuracies, pesos)
-    media_armonica = _media_armonica_ponderada(move_accuracies, pesos)
-    return min(100.0, max(0.0, (media + media_armonica) / 2))
+    weights = _volatility_weights(move_accuracies, window)
+    weighted_mean = _weighted_mean(move_accuracies, weights)
+    weighted_harmonic_mean = _weighted_harmonic_mean(move_accuracies, weights)
+    return min(100.0, max(0.0, (weighted_mean + weighted_harmonic_mean) / 2))
 
 
-def _pesos_por_volatilidad(valores: list[float], window: int) -> list[float]:
-    pesos = []
-    for i in range(len(valores)):
-        ventana = valores[max(0, i - window) : i + window + 1]
-        pesos.append(max(_desviacion_estandar(ventana), 0.5))  # piso para no pesar 0
-    return pesos
+def _volatility_weights(move_accuracies: list[float], window: int) -> list[float]:
+    weights = []
+    for i in range(len(move_accuracies)):
+        window_values = move_accuracies[max(0, i - window) : i + window + 1]
+        weights.append(max(_standard_deviation(window_values), 0.5))  # piso para no pesar 0
+    return weights
 
 
-def _desviacion_estandar(valores: list[float]) -> float:
-    media = sum(valores) / len(valores)
-    varianza = sum((v - media) ** 2 for v in valores) / len(valores)
-    return math.sqrt(varianza)
+def _standard_deviation(values: list[float]) -> float:
+    mean = sum(values) / len(values)
+    variance = sum((value - mean) ** 2 for value in values) / len(values)
+    return math.sqrt(variance)
 
 
-def _media_ponderada(valores: list[float], pesos: list[float]) -> float:
-    return sum(v * p for v, p in zip(valores, pesos, strict=True)) / sum(pesos)
+def _weighted_mean(values: list[float], weights: list[float]) -> float:
+    return sum(value * weight for value, weight in zip(values, weights, strict=True)) / sum(weights)
 
 
-def _media_armonica_ponderada(valores: list[float], pesos: list[float]) -> float:
+def _weighted_harmonic_mean(values: list[float], weights: list[float]) -> float:
     # Precisión 0 rompería la media armónica (división entre cero); en la
     # práctica una precisión de exactamente 0 es un blunder total, así que
     # se acota a un mínimo pequeño en vez de excluir la jugada.
-    valores_seguros = [max(v, 0.1) for v in valores]
-    suma_pesos = sum(pesos)
-    suma_inversos = sum(p / v for v, p in zip(valores_seguros, pesos, strict=True))
-    return suma_pesos / suma_inversos
+    nonzero_values = [max(value, 0.1) for value in values]
+    total_weight = sum(weights)
+    weighted_inverse_sum = sum(
+        weight / value for value, weight in zip(nonzero_values, weights, strict=True)
+    )
+    return total_weight / weighted_inverse_sum

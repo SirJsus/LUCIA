@@ -9,6 +9,7 @@ import datetime as dt
 
 from lucia_chesscom import ChessComClient, ChessComGame, parse_move_clocks
 from lucia_chesscom.sync import months_to_sync
+from lucia_core.openings import opening_of_pgn
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,25 +30,25 @@ async def sync_player(session: AsyncSession, client: ChessComClient, username: s
         (sync_state.last_synced_year, sync_state.last_synced_month) if sync_state else None
     )
 
-    archivos = await client.get_archives(username)
-    meses_pendientes = months_to_sync(archivos, last_synced)
+    available_archives = await client.get_archives(username)
+    pending_months = months_to_sync(available_archives, last_synced)
 
     games_upserted = 0
-    for year, month in meses_pendientes:  # secuencial a propósito (RF-1.4)
-        partidas = await client.get_month_games(username, year, month)
-        for partida in partidas:
-            await _upsert_game(session, player.id, year, month, partida)
+    for year, month in pending_months:  # secuencial a propósito (RF-1.4)
+        chesscom_games = await client.get_month_games(username, year, month)
+        for chesscom_game in chesscom_games:
+            await _upsert_game(session, player.id, year, month, chesscom_game)
             games_upserted += 1
 
-    if meses_pendientes:
-        era_nuevo = sync_state is None
-        sync_state = _actualizar_sync_state(sync_state, player.id, meses_pendientes[-1])
-        if era_nuevo:
+    if pending_months:
+        was_new = sync_state is None
+        sync_state = _update_sync_state(sync_state, player.id, pending_months[-1])
+        if was_new:
             session.add(sync_state)
 
     await session.commit()
     return SyncSummary(
-        username=username, months_synced=meses_pendientes, games_upserted=games_upserted
+        username=username, months_synced=pending_months, games_upserted=games_upserted
     )
 
 
@@ -59,23 +60,23 @@ async def _get_or_create_player(
     )
     player = result.scalar_one_or_none()
 
-    perfil = await client.get_player(username)  # RF-1.1: país, fecha de alta
+    profile = await client.get_player(username)  # RF-1.1: país, fecha de alta
     stats = await client.get_stats(username)  # RF-1.6: ratings por control de tiempo
-    joined_at = dt.datetime.fromtimestamp(perfil.joined, tz=dt.UTC)
+    joined_at = dt.datetime.fromtimestamp(profile.joined, tz=dt.UTC)
     ratings_json = stats.model_dump(mode="json", exclude_none=True)
 
     if player is None:
         player = Player(
             platform="chesscom",
             username=username,
-            country=perfil.country,
+            country=profile.country,
             joined_at=joined_at,
             ratings_json=ratings_json,
         )
         session.add(player)
         await session.flush()  # asigna player.id sin cerrar la transacción
     else:
-        player.country = perfil.country
+        player.country = profile.country
         player.joined_at = joined_at
         player.ratings_json = ratings_json
         player.fetched_at = dt.datetime.now(dt.UTC)
@@ -84,9 +85,9 @@ async def _get_or_create_player(
 
 
 async def _upsert_game(
-    session: AsyncSession, player_id: int, year: int, month: int, partida: ChessComGame
+    session: AsyncSession, player_id: int, year: int, month: int, chesscom_game: ChessComGame
 ) -> None:
-    platform_id = partida.uuid or partida.url
+    platform_id = chesscom_game.uuid or chesscom_game.url
     result = await session.execute(
         select(Game).where(Game.platform == "chesscom", Game.platform_id == platform_id)
     )
@@ -95,28 +96,33 @@ async def _upsert_game(
         game = Game(player_id=player_id, platform="chesscom", platform_id=platform_id)
         session.add(game)
 
-    game.pgn = partida.pgn
-    game.white_username = partida.white.username
-    game.white_rating = partida.white.rating
-    game.white_result = partida.white.result
-    game.black_username = partida.black.username
-    game.black_rating = partida.black.rating
-    game.black_result = partida.black.result
-    game.time_control = partida.time_control
-    game.time_class = partida.time_class
-    game.rules = partida.rules
-    game.rated = partida.rated
-    game.eco = partida.eco
-    game.clocks_json = parse_move_clocks(partida.pgn)
-    game.played_at = dt.datetime.fromtimestamp(partida.end_time, tz=dt.UTC)
+    game.pgn = chesscom_game.pgn
+    game.white_username = chesscom_game.white.username
+    game.white_rating = chesscom_game.white.rating
+    game.white_result = chesscom_game.white.result
+    game.black_username = chesscom_game.black.username
+    game.black_rating = chesscom_game.black.rating
+    game.black_result = chesscom_game.black.result
+    game.time_control = chesscom_game.time_control
+    game.time_class = chesscom_game.time_class
+    game.rules = chesscom_game.rules
+    game.rated = chesscom_game.rated
+    game.eco = chesscom_game.eco
+    # La apertura propia, deducida de las jugadas: chess.com no la trae en
+    # todas las partidas y nunca da el código ECO (RF-3.2).
+    opening = opening_of_pgn(chesscom_game.pgn)
+    game.opening_eco = opening.eco if opening else None
+    game.opening_name = opening.name if opening else None
+    game.clocks_json = parse_move_clocks(chesscom_game.pgn)
+    game.played_at = dt.datetime.fromtimestamp(chesscom_game.end_time, tz=dt.UTC)
     game.year = year
     game.month = month
 
 
-def _actualizar_sync_state(
-    sync_state: SyncState | None, player_id: int, ultimo_mes: tuple[int, int]
+def _update_sync_state(
+    sync_state: SyncState | None, player_id: int, latest_month: tuple[int, int]
 ) -> SyncState:
-    year, month = ultimo_mes
+    year, month = latest_month
     if sync_state is None:
         sync_state = SyncState(player_id=player_id, last_synced_at=dt.datetime.now(dt.UTC))
     sync_state.last_synced_year = year

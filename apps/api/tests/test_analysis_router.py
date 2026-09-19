@@ -7,24 +7,25 @@ from __future__ import annotations
 import datetime as dt
 from collections.abc import AsyncIterator
 
+import chess
 from fastapi.testclient import TestClient
 from lucia_api.db import get_session
-from lucia_api.db.models import Game, Player
+from lucia_api.db.models import Analysis, AnalyzedMove, Game, Player, PositionCache
 from lucia_api.main import app
 from lucia_api.worker import AnalysisWorker
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from .conftest import requiere_stockfish
+from .conftest import requires_stockfish
 
 PGN = '[White "a"]\n[Black "b"]\n[Result "0-1"]\n\n1. f3 e5 2. g4 Qh4# 0-1\n'
 
 
-async def _crear_partida(session: AsyncSession) -> int:
-    jugador = Player(platform="chesscom", username="prueba")
-    session.add(jugador)
+async def _create_game(session: AsyncSession) -> int:
+    player = Player(platform="chesscom", username="prueba")
+    session.add(player)
     await session.flush()
-    partida = Game(
-        player_id=jugador.id,
+    game = Game(
+        player_id=player.id,
         platform="chesscom",
         platform_id="partida-api-1",
         pgn=PGN,
@@ -42,16 +43,16 @@ async def _crear_partida(session: AsyncSession) -> int:
         year=2024,
         month=1,
     )
-    session.add(partida)
+    session.add(game)
     await session.commit()
-    return partida.id
+    return game.id
 
 
-@requiere_stockfish
-async def test_flujo_completo_post_analysis_y_websocket_de_progreso(
+@requires_stockfish
+async def test_full_flow_post_analysis_and_progress_websocket(
     db_session: AsyncSession, db_session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
-    game_id = await _crear_partida(db_session)
+    game_id = await _create_game(db_session)
 
     async def _session() -> AsyncIterator[AsyncSession]:
         yield db_session
@@ -64,38 +65,38 @@ async def test_flujo_completo_post_analysis_y_websocket_de_progreso(
 
     try:
         with TestClient(app) as http:
-            respuesta = http.post(
+            response = http.post(
                 "/analysis", json={"game_ids": [game_id], "engine": "stockfish", "depth": 8}
             )
-            assert respuesta.status_code == 200, respuesta.text
-            analysis_id = respuesta.json()[0]["id"]
-            assert respuesta.json()[0]["status"] == "queued"
+            assert response.status_code == 200, response.text
+            analysis_id = response.json()[0]["id"]
+            assert response.json()[0]["status"] == "queued"
 
-            eventos = []
+            events = []
             with http.websocket_connect(f"/ws/analysis/{analysis_id}") as ws:
                 while True:
-                    evento = ws.receive_json()
-                    eventos.append(evento)
-                    if evento["status"] in ("done", "error"):
+                    event = ws.receive_json()
+                    events.append(event)
+                    if event["status"] in ("done", "error"):
                         break
 
-            assert eventos[-1]["status"] == "done"
-            assert any(e["status"] == "running" for e in eventos)
+            assert events[-1]["status"] == "done"
+            assert any(e["status"] == "running" for e in events)
 
-            detalle = http.get(f"/analysis/{analysis_id}").json()
-            assert detalle["status"] == "done"
-            assert len(detalle["moves"]) == 4
-            assert detalle["moves"][2]["uci"] == "g2g4"
-            assert detalle["white_accuracy"] < 90
+            detail = http.get(f"/analysis/{analysis_id}").json()
+            assert detail["status"] == "done"
+            assert len(detail["moves"]) == 4
+            assert detail["moves"][2]["uci"] == "g2g4"
+            assert detail["white_accuracy"] < 90
     finally:
         app.dependency_overrides.clear()
 
 
-@requiere_stockfish
-async def test_websocket_conecta_despues_de_terminado_recibe_resultado_final(
+@requires_stockfish
+async def test_websocket_connecting_after_the_end_receives_the_final_result(
     db_session: AsyncSession, db_session_factory: async_sessionmaker[AsyncSession]
 ) -> None:
-    game_id = await _crear_partida(db_session)
+    game_id = await _create_game(db_session)
 
     async def _session() -> AsyncIterator[AsyncSession]:
         yield db_session
@@ -105,8 +106,8 @@ async def test_websocket_conecta_despues_de_terminado_recibe_resultado_final(
 
     try:
         with TestClient(app) as http:
-            respuesta = http.post("/analysis", json={"game_ids": [game_id], "depth": 8})
-            analysis_id = respuesta.json()[0]["id"]
+            response = http.post("/analysis", json={"game_ids": [game_id], "depth": 8})
+            analysis_id = response.json()[0]["id"]
 
             # Deja que el worker termine antes de conectar el WebSocket.
             with http.websocket_connect(f"/ws/analysis/{analysis_id}") as ws:
@@ -116,46 +117,238 @@ async def test_websocket_conecta_despues_de_terminado_recibe_resultado_final(
             # Segunda conexión, ya con el análisis terminado: debe recibir
             # el resultado final de una sola vez, sin esperar progreso.
             with http.websocket_connect(f"/ws/analysis/{analysis_id}") as ws:
-                evento = ws.receive_json()
-                assert evento["status"] == "done"
+                event = ws.receive_json()
+                assert event["status"] == "done"
     finally:
         app.dependency_overrides.clear()
 
 
-async def test_post_analysis_con_game_id_inexistente_da_404(db_session: AsyncSession) -> None:
+async def test_post_analysis_with_unknown_game_id_returns_404(db_session: AsyncSession) -> None:
     async def _session() -> AsyncIterator[AsyncSession]:
         yield db_session
 
     app.dependency_overrides[get_session] = _session
     try:
         with TestClient(app) as http:
-            respuesta = http.post("/analysis", json={"game_ids": [999999]})
-        assert respuesta.status_code == 404
+            response = http.post("/analysis", json={"game_ids": [999999]})
+        assert response.status_code == 404
     finally:
         app.dependency_overrides.clear()
 
 
-async def test_post_analysis_sin_game_ids_da_422(db_session: AsyncSession) -> None:
+async def test_post_analysis_without_game_ids_returns_422(db_session: AsyncSession) -> None:
     async def _session() -> AsyncIterator[AsyncSession]:
         yield db_session
 
     app.dependency_overrides[get_session] = _session
     try:
         with TestClient(app) as http:
-            respuesta = http.post("/analysis", json={"game_ids": []})
-        assert respuesta.status_code == 422
+            response = http.post("/analysis", json={"game_ids": []})
+        assert response.status_code == 422
     finally:
         app.dependency_overrides.clear()
 
 
-async def test_get_analysis_inexistente_da_404(db_session: AsyncSession) -> None:
+async def test_get_analysis_with_unknown_id_returns_404(db_session: AsyncSession) -> None:
     async def _session() -> AsyncIterator[AsyncSession]:
         yield db_session
 
     app.dependency_overrides[get_session] = _session
     try:
         with TestClient(app) as http:
-            respuesta = http.get("/analysis/999999")
-        assert respuesta.status_code == 404
+            response = http.get("/analysis/999999")
+        assert response.status_code == 404
     finally:
         app.dependency_overrides.clear()
+
+
+@requires_stockfish
+async def test_analysis_detail_serves_the_alternatives_of_each_move(
+    db_session: AsyncSession, db_session_factory: async_sessionmaker[AsyncSession]
+) -> None:
+    """RF-10.1: el análisis guarda las N mejores líneas de cada posición, y el
+    detalle las devuelve con su notación SAN, igual que el análisis en vivo."""
+    game_id = await _create_game(db_session)
+
+    async def _session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app.dependency_overrides[get_session] = _session
+    app.state.worker = AnalysisWorker(session_factory=db_session_factory)
+
+    try:
+        with TestClient(app) as http:
+            response = http.post(
+                "/analysis",
+                json={"game_ids": [game_id], "engine": "stockfish", "depth": 8, "multipv": 3},
+            )
+            analysis_id = response.json()[0]["id"]
+            with http.websocket_connect(f"/ws/analysis/{analysis_id}") as ws:
+                while ws.receive_json()["status"] not in ("done", "error"):
+                    pass
+
+            blunder = http.get(f"/analysis/{analysis_id}").json()["moves"][2]
+    finally:
+        app.dependency_overrides.clear()
+
+    assert blunder["uci"] == "g2g4"
+    alternatives = blunder["alternatives"]
+    assert len(alternatives) == 3
+    # Ordenadas de mejor a peor, y la primera es la que ya decía `best_move_uci`.
+    assert [line["rank"] for line in alternatives] == [1, 2, 3]
+    assert alternatives[0]["pv_uci"][0] == blunder["best_move_uci"]
+    # La SAN se deriva de `fen_before` al servir, no se guarda.
+    assert alternatives[0]["pv_san"][0]
+    # Son alternativas de verdad: jugadas distintas entre sí.
+    assert len({line["pv_uci"][0] for line in alternatives}) == 3
+
+
+async def _create_analysis_without_alternatives(
+    session: AsyncSession, *, cached_lines: list[dict], cache_depth: int = 8
+) -> int:
+    """Un análisis como los de antes de RF-10 —una jugada, sin
+    `alternatives_json`— cuya posición sí quedó en `position_cache` con
+    `cached_lines`. Devuelve su id."""
+    game_id = await _create_game(session)
+    analysis = Analysis(game_id=game_id, engine="stockfish", depth=8, multipv=2, status="done")
+    session.add(analysis)
+    await session.flush()
+    session.add(
+        AnalyzedMove(
+            analysis_id=analysis.id,
+            ply=0,
+            color="white",
+            san="f3",
+            uci="f2f3",
+            fen_before=chess.STARTING_FEN,
+            classification="mistake",
+            phase="opening",
+            move_accuracy=50.0,
+            win_percent_before=50.0,
+            win_percent_after=45.0,
+            best_move_uci="e2e4",
+            alternatives_json=None,
+        )
+    )
+    session.add(
+        PositionCache(
+            fen=chess.STARTING_FEN,
+            engine="stockfish",
+            depth=cache_depth,
+            multipv=2,
+            lines_json=cached_lines,
+        )
+    )
+    await session.commit()
+    return analysis.id
+
+
+async def _get_first_move(db_session: AsyncSession, analysis_id: int) -> dict:
+    async def _session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app.dependency_overrides[get_session] = _session
+    try:
+        with TestClient(app) as http:
+            return http.get(f"/analysis/{analysis_id}").json()["moves"][0]
+    finally:
+        app.dependency_overrides.clear()
+
+
+async def test_analysis_detail_recovers_alternatives_from_the_position_cache(
+    db_session: AsyncSession,
+) -> None:
+    """Un análisis anterior a RF-10 no guardó alternativas, pero sus posiciones
+    siguen en la caché: se recuperan de ahí en vez de re-analizar la partida."""
+    analysis_id = await _create_analysis_without_alternatives(
+        db_session,
+        cached_lines=[
+            {"score_cp": 30, "score_mate": None, "pv": ["e2e4", "e7e5"]},
+            {"score_cp": 25, "score_mate": None, "pv": ["d2d4", "d7d5"]},
+        ],
+    )
+
+    move = await _get_first_move(db_session, analysis_id)
+
+    assert [line["pv_uci"][0] for line in move["alternatives"]] == ["e2e4", "d2d4"]
+    assert [line["pv_san"][0] for line in move["alternatives"]] == ["e4", "d4"]
+    assert move["alternatives"][0]["score_cp"] == 30
+
+
+async def test_alternatives_are_not_recovered_from_a_different_configuration(
+    db_session: AsyncSession,
+) -> None:
+    """La clave de la caché incluye motor, límite y MultiPV: una línea calculada
+    con otra configuración no es la que produjo esta clasificación, así que no
+    se sirve como alternativa."""
+    analysis_id = await _create_analysis_without_alternatives(
+        db_session,
+        cached_lines=[{"score_cp": 30, "score_mate": None, "pv": ["e2e4"]}],
+        cache_depth=20,  # el análisis fue a profundidad 8
+    )
+
+    move = await _get_first_move(db_session, analysis_id)
+
+    assert move["alternatives"] == []
+
+
+async def test_analysis_detail_marks_the_critical_moments(db_session: AsyncSession) -> None:
+    """RF-2.8: las posiciones donde la partida se decidía salen con el análisis,
+    deducidas de lo ya guardado y sin volver a preguntarle al motor."""
+    game_id = await _create_game(db_session)
+    analysis = Analysis(game_id=game_id, engine="stockfish", depth=8, multipv=3, status="done")
+    db_session.add(analysis)
+    await db_session.flush()
+    db_session.add_all(
+        [
+            # Una jugada tranquila: ni cambia el signo ni había una sola opción.
+            AnalyzedMove(
+                analysis_id=analysis.id,
+                ply=0,
+                color="white",
+                san="f3",
+                uci="f2f3",
+                fen_before=chess.STARTING_FEN,
+                classification="good",
+                phase="opening",
+                move_accuracy=95.0,
+                win_percent_before=52.0,
+                win_percent_after=51.0,
+                alternatives_json=[
+                    {"score_cp": 20, "score_mate": None, "pv": ["e2e4"]},
+                    {"score_cp": 15, "score_mate": None, "pv": ["d2d4"]},
+                ],
+            ),
+            # Y una que da la vuelta a la partida.
+            AnalyzedMove(
+                analysis_id=analysis.id,
+                ply=2,
+                color="white",
+                san="g4",
+                uci="g2g4",
+                fen_before=chess.STARTING_FEN,
+                classification="blunder",
+                phase="opening",
+                move_accuracy=10.0,
+                win_percent_before=70.0,
+                win_percent_after=20.0,
+                alternatives_json=[{"score_cp": 200, "score_mate": None, "pv": ["e2e4"]}],
+            ),
+        ]
+    )
+    await db_session.commit()
+
+    async def _session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app.dependency_overrides[get_session] = _session
+    try:
+        with TestClient(app) as http:
+            detail = http.get(f"/analysis/{analysis.id}").json()
+    finally:
+        app.dependency_overrides.clear()
+
+    assert [moment["ply"] for moment in detail["critical_moments"]] == [2]
+    moment = detail["critical_moments"][0]
+    assert "swing" in moment["kinds"]
+    assert moment["best_alternative_san"] == "e4"

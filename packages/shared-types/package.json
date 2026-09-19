@@ -1,6 +1,6 @@
 {
   "name": "@lucia/shared-types",
-  "version": "0.2.0",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "main": "./src/index.ts",
@@ -8,6 +8,7 @@
   "scripts": {
     "generate": "openapi-typescript ../../openapi.json -o src/api.d.ts",
     "lint": "echo skip",
+    "test": "echo skip",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

@@ -1,10 +1,30 @@
+"""La aplicación FastAPI: monta los routers y levanta el worker de análisis.
+
+Es el único sitio donde se sabe qué endpoints existen —cada router trae los
+suyos, con su RF en la cabecera— y quien pone en `app.state.worker` la cola en
+proceso que atiende los análisis de partida (RF-2.4) y de tablero (RF-6.9),
+para que los routers la alcancen sin variables globales. De aquí sale también
+el `openapi.json` que `scripts/export-openapi.py` vuelca para generar los tipos
+del front (`make types`).
+"""
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
 from . import __version__
-from .routers import analysis, boards, engines, games, health, stats, sync
+from .routers import (
+    analysis,
+    boards,
+    engines,
+    games,
+    health,
+    pgn_import,
+    repertoire,
+    stats,
+    sync,
+)
 from .worker import AnalysisWorker
 
 
@@ -30,7 +50,9 @@ app = FastAPI(
 app.include_router(health.router)
 app.include_router(sync.router)
 app.include_router(games.router)
+app.include_router(pgn_import.router)
 app.include_router(analysis.router)
 app.include_router(engines.router)
 app.include_router(stats.router)
 app.include_router(boards.router)
+app.include_router(repertoire.router)

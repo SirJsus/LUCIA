@@ -45,7 +45,7 @@ class ChessComPlayerStats(BaseModel):
 
     Chess.com añade bloques nuevos con el tiempo (`chess_daily`,
     `chess_rapid`, `chess_blitz`, `chess_bullet`, `tactics`, `puzzle_rush`,
-    tableroque `chess960` variantes...). En vez de listar cada uno, se
+    `chess960` y otras variantes...). En vez de listar cada uno, se
     conserva el JSON crudo y se exponen los buckets de partida más usados
     como atajo tipado.
     """

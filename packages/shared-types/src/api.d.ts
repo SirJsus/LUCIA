@@ -47,8 +47,26 @@ export interface paths {
         };
         /**
          * List Games
-         * @description Filtros según RF-5.3. `color` sin `username` se ignora: "blancas" o
-         *     "negras" no significa nada sin decir de quién.
+         * @description Listado filtrado de partidas (RF-5.3).
+         *
+         *     **Tres de los filtros necesitan `username` y sin él se ignoran**: `color`,
+         *     `result` y `opponent`. "Blancas", "ganadas" o "contra fulano" no significan
+         *     nada sin decir de quién se habla; aplicarlos a medias daría un resultado
+         *     plausible y equivocado, que es peor que no filtrar.
+         *
+         *     `opening` busca por subcadena en el nombre de la apertura, para que
+         *     "sicilian" traiga todas las sicilianas, no solo la variante exacta. El
+         *     nombre es el de la tabla ECO propia (`lucia_core.openings`), así que las
+         *     partidas que no empiezan en la posición estándar no salen con ningún
+         *     filtro de apertura: no tienen apertura que nombrar.
+         *
+         *     `since` y `until` son fechas inclusivas por los dos lados: `until` cubre el
+         *     día entero, no hasta su medianoche.
+         *
+         *     La cabecera **`X-Total-Count`** trae cuántas partidas cumplen los filtros,
+         *     sin la paginación. Va en cabecera y no en el cuerpo para no envolver la
+         *     lista: con ella la pantalla puede decir "25 de 324" en vez de solo el
+         *     número de página, que no dice si el filtro dejó fuera media colección.
          */
         get: operations["list_games_games_get"];
         put?: never;
@@ -76,6 +94,36 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/import/pgn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import Pgn File
+         * @description Guarda en el historial las partidas del archivo (RF-1.5).
+         *
+         *     - `username`: a quién se le atribuyen; si se omite, `CHESSCOM_USERNAME`.
+         *     - `player_name_in_pgn`: **cómo aparece ese jugador dentro del PGN**. Un archivo de
+         *       torneo lo nombra "Durán, Jesús" y no con su usuario, así que sin esto la
+         *       partida se guarda pero no cuenta en el dashboard ni en los filtros por
+         *       color, resultado o rival, que casan por nombre. El PGN se guarda entero,
+         *       de modo que el nombre original no se pierde.
+         *
+         *     Las partidas repetidas no se duplican: se identifican por el contenido del
+         *     PGN, así que reimportar el mismo archivo reescribe las mismas filas.
+         */
+        post: operations["import_pgn_file_import_pgn_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/analysis": {
         parameters: {
             query?: never;
@@ -85,8 +133,9 @@ export interface paths {
         };
         /**
          * List Analyses
-         * @description Análisis existentes, opcionalmente los de una partida concreta. Sirve
-         *     para que el visor sepa si ya hay uno hecho en vez de volver a analizar.
+         * @description Análisis existentes, opcionalmente los de una partida o un tablero
+         *     concretos. Sirve para que el visor —y el tablero de análisis (RF-6.9)—
+         *     sepan si ya hay uno hecho en vez de volver a analizar.
          */
         get: operations["list_analyses_analysis_get"];
         put?: never;
@@ -108,11 +157,32 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Analyze Position
+         * Position Analysis
          * @description Analiza una posición suelta y devuelve las mejores líneas (RF-5.2 /
          *     RF-6.2). Para el tablero de análisis y la exploración en vivo.
          */
-        post: operations["analyze_position_analysis_position_post"];
+        post: operations["position_analysis_analysis_position_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/analysis/compare": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Compare
+         * @description Dónde discrepan dos análisis de la misma partida (RF-2.6), típicamente
+         *     uno de Stockfish y otro de Lc0.
+         */
+        get: operations["compare_analysis_compare_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -128,6 +198,34 @@ export interface paths {
         };
         /** Get Analysis */
         get: operations["get_analysis_analysis__analysis_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/analysis/{analysis_id}/pgn": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Analysis Pgn
+         * @description El PGN de la partida con las anotaciones del análisis (RF-5.5).
+         *
+         *     Se descarga como archivo —de ahí el `Content-Disposition`— porque lo que
+         *     se quiere hacer con él es abrirlo en lichess, ChessBase o SCID, no leerlo
+         *     en el navegador.
+         *
+         *     Solo se exporta un análisis **terminado**: uno a medias daría una partida
+         *     comentada hasta la jugada 20 y muda a partir de ahí, que se lee como un
+         *     archivo roto y no como un análisis en curso.
+         */
+        get: operations["get_analysis_pgn_analysis__analysis_id__pgn_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -229,16 +327,177 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/boards/{board_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Undo Board
+         * @description Devuelve el tablero a su estado anterior (RF-6.8).
+         *
+         *     409 y no 400 cuando no hay nada que deshacer: la petición es correcta, es
+         *     el estado del tablero el que no la admite.
+         */
+        post: operations["undo_board_boards__board_id__undo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/boards/{board_id}/redo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Redo Board */
+        post: operations["redo_board_boards__board_id__redo_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/boards/{board_id}/own-game": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Publish Own Game
+         * @description Publica el tablero en el historial como partida propia (RF-6.5).
+         *
+         *     A partir de aquí cuenta en el dashboard, en los patrones y en los filtros
+         *     del listado como cualquier otra partida. La misma llamada sirve para
+         *     corregir los datos y para poner al día las jugadas después de deshacer o
+         *     rehacer: reescribe la partida publicada en vez de crear otra.
+         */
+        put: operations["publish_own_game_boards__board_id__own_game_put"];
+        post?: never;
+        /**
+         * Withdraw Own Game
+         * @description Retira la marca de partida propia: el tablero deja de contar y su
+         *     partida se va del historial (RF-6.5). El tablero se queda como estaba.
+         */
+        delete: operations["withdraw_own_game_boards__board_id__own_game_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/boards/{board_id}/analysis": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Analyze Board
+         * @description Encola el análisis completo de la línea principal del tablero (RF-6.9).
+         *
+         *     Devuelve en cuanto está en la cola, con el id que el front usa para
+         *     seguir el progreso por `WS /ws/analysis/{id}`, igual que una partida. El
+         *     análisis **no cuenta en las estadísticas** salvo que el tablero esté
+         *     publicado como partida propia (RF-6.5), que es cuando nace con `game_id`.
+         */
+        post: operations["analyze_board_boards__board_id__analysis_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/repertoire": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Player Repertoire
+         * @description Dónde se sale el jugador de la teoría, con lo que ya está en la caché.
+         */
+        get: operations["player_repertoire_repertoire_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/repertoire/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Refresh Player Repertoire
+         * @description Pregunta a Lichess por las posiciones que falten, hasta `budget`.
+         *
+         *     Devuelve cuántas se preguntaron y cuántas siguen faltando, que es lo que
+         *     permite a la pantalla decir si hace falta volver a pulsar.
+         */
+        post: operations["refresh_player_repertoire_repertoire_refresh_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AnalysisComparisonOut */
+        AnalysisComparisonOut: {
+            /** Game Id */
+            game_id: number;
+            /** Analysis A */
+            analysis_a: number;
+            /** Analysis B */
+            analysis_b: number;
+            /** Engine A */
+            engine_a: string;
+            /** Engine B */
+            engine_b: string;
+            /** Total Moves */
+            total_moves: number;
+            /** Agreed Best Moves */
+            agreed_best_moves: number;
+            /** Best Move Agreement Percent */
+            best_move_agreement_percent: number;
+            /** Disagreements */
+            disagreements: components["schemas"]["MoveComparisonOut"][];
+        };
         /** AnalysisDetail */
         AnalysisDetail: {
             /** Id */
             id: number;
             /** Game Id */
-            game_id: number;
+            game_id: number | null;
+            /** Board Id */
+            board_id: number | null;
             /** Engine */
             engine: string;
             /** Depth */
@@ -255,6 +514,11 @@ export interface components {
             black_accuracy: number | null;
             /** Moves */
             moves: components["schemas"]["AnalyzedMoveOut"][];
+            /**
+             * Critical Moments
+             * @default []
+             */
+            critical_moments: components["schemas"]["CriticalMomentOut"][];
         };
         /** AnalysisRequest */
         AnalysisRequest: {
@@ -276,7 +540,9 @@ export interface components {
             /** Id */
             id: number;
             /** Game Id */
-            game_id: number;
+            game_id: number | null;
+            /** Board Id */
+            board_id: number | null;
             /** Engine */
             engine: string;
             /** Depth */
@@ -316,6 +582,30 @@ export interface components {
             win_percent_after: number;
             /** Best Move Uci */
             best_move_uci: string | null;
+            /**
+             * Alternatives
+             * @default []
+             */
+            alternatives: components["schemas"]["EngineLineOut"][];
+        };
+        /**
+         * BoardAnalysisRequest
+         * @description Lo que hace falta para analizar la línea principal de un tablero
+         *     (RF-6.9).
+         */
+        BoardAnalysisRequest: {
+            /** Pgn */
+            pgn: string;
+            /**
+             * Engine
+             * @default stockfish
+             * @enum {string}
+             */
+            engine: "stockfish" | "lc0";
+            /** Depth */
+            depth?: number | null;
+            /** Multipv */
+            multipv?: number | null;
         };
         /** BoardCreate */
         BoardCreate: {
@@ -332,11 +622,6 @@ export interface components {
             };
             /** Tags Json */
             tags_json?: string[] | null;
-            /**
-             * Is Own Game
-             * @default false
-             */
-            is_own_game: boolean;
         };
         /** BoardDetail */
         BoardDetail: {
@@ -364,6 +649,11 @@ export interface components {
             tree_json: {
                 [key: string]: unknown;
             };
+            /** Can Undo */
+            can_undo: boolean;
+            /** Can Redo */
+            can_redo: boolean;
+            own_game?: components["schemas"]["OwnGameLink"] | null;
         };
         /**
          * BoardSummary
@@ -398,14 +688,72 @@ export interface components {
         BoardUpdate: {
             /** Title */
             title?: string | null;
+            /** Root Fen */
+            root_fen?: string | null;
             /** Tree Json */
             tree_json?: {
                 [key: string]: unknown;
             } | null;
             /** Tags Json */
             tags_json?: string[] | null;
-            /** Is Own Game */
-            is_own_game?: boolean | null;
+            /** Pgn */
+            pgn?: string | null;
+        };
+        /** Body_import_pgn_file_import_pgn_post */
+        Body_import_pgn_file_import_pgn_post: {
+            /**
+             * File
+             * @description Archivo .pgn con una o varias partidas
+             */
+            file: string;
+            /** Username */
+            username?: string | null;
+            /** Player Name In Pgn */
+            player_name_in_pgn?: string | null;
+        };
+        /**
+         * CriticalMomentOut
+         * @description Una posición donde la partida se decidía (RF-2.8).
+         */
+        CriticalMomentOut: {
+            /** Ply */
+            ply: number;
+            /** Color */
+            color: string;
+            /** San */
+            san: string;
+            /** Kinds */
+            kinds: string[];
+            /** Win Percent Before */
+            win_percent_before: number;
+            /** Win Percent After */
+            win_percent_after: number;
+            /** Best Alternative San */
+            best_alternative_san: string | null;
+        };
+        /**
+         * DepartureOut
+         * @description Un punto donde el repertorio propio se separa del de los maestros.
+         */
+        DepartureOut: {
+            /** Ply */
+            ply: number;
+            /** San */
+            san: string;
+            /** Color */
+            color: string;
+            /** Master Moves */
+            master_moves: string[];
+            /** Games */
+            games: number;
+            /** Wins */
+            wins: number;
+            /** Draws */
+            draws: number;
+            /** Losses */
+            losses: number;
+            /** Score Percent */
+            score_percent: number;
         };
         /** EngineConfigOut */
         EngineConfigOut: {
@@ -427,11 +775,16 @@ export interface components {
             weights_path?: string | null;
             /** Weights Available */
             weights_available?: boolean | null;
+            /** Backend */
+            backend?: string | null;
+            /** Limit Kind */
+            limit_kind: string;
         };
         /**
          * EngineConfigUpdate
-         * @description Los rangos evitan configuraciones que colgarían la máquina (o el
-         *     análisis) sin darse cuenta: un `depth` de 60 no termina nunca.
+         * @description Los rangos evitan configuraciones que colgarían la máquina sin darse
+         *     cuenta. El de `depth` se comprueba aparte, en el endpoint, porque depende
+         *     de la unidad del motor (ver `LIMIT_RANGES`).
          */
         EngineConfigUpdate: {
             /** Threads */
@@ -443,7 +796,12 @@ export interface components {
             /** Multipv */
             multipv: number;
         };
-        /** EngineLineOut */
+        /**
+         * EngineLineOut
+         * @description Una línea del motor, igual la calcule en vivo `POST /analysis/position`
+         *     o venga guardada con una jugada analizada (RF-10.1): mismo formato en los
+         *     dos sitios, para que el front la dibuje igual.
+         */
         EngineLineOut: {
             /** Rank */
             rank: number;
@@ -455,6 +813,7 @@ export interface components {
             pv_uci: string[];
             /** Pv San */
             pv_san: string[];
+            wdl?: components["schemas"]["WdlOut"] | null;
         };
         /** EnginesConfigOut */
         EnginesConfigOut: {
@@ -490,6 +849,10 @@ export interface components {
              * Format: date-time
              */
             played_at: string;
+            /** Starts From Custom Position */
+            starts_from_custom_position: boolean;
+            /** Platform */
+            platform: string;
             /** Pgn */
             pgn: string;
             /** Clocks Json */
@@ -524,11 +887,34 @@ export interface components {
              * Format: date-time
              */
             played_at: string;
+            /** Starts From Custom Position */
+            starts_from_custom_position: boolean;
+            /** Platform */
+            platform: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
+        };
+        /** MistakeRateOut */
+        MistakeRateOut: {
+            /** Mistake Type */
+            mistake_type: string;
+            /** Per Hundred Moves */
+            per_hundred_moves: number;
+        };
+        /**
+         * MistakeTypeStatsOut
+         * @description Cuántos errores de cada tipo y por qué (RF-3.4).
+         */
+        MistakeTypeStatsOut: {
+            /** Mistake Type */
+            mistake_type: string;
+            /** Mistakes */
+            mistakes: number;
+            /** Blunders */
+            blunders: number;
         };
         /** MonthlyCountOut */
         MonthlyCountOut: {
@@ -539,15 +925,141 @@ export interface components {
             /** Games */
             games: number;
         };
+        /**
+         * MonthlyQualityOut
+         * @description Cómo se jugó en un mes (RF-3.7).
+         */
+        MonthlyQualityOut: {
+            /** Year */
+            year: number;
+            /** Month */
+            month: number;
+            /** Analyzed Games */
+            analyzed_games: number;
+            /** Moves */
+            moves: number;
+            /** Average Accuracy */
+            average_accuracy: number;
+            /** Blunders Per Hundred Moves */
+            blunders_per_hundred_moves: number;
+            /** Mistakes Per Hundred Moves */
+            mistakes_per_hundred_moves: components["schemas"]["MistakeRateOut"][];
+            /** Rating */
+            rating: number | null;
+        };
+        /** MoveComparisonOut */
+        MoveComparisonOut: {
+            /** Ply */
+            ply: number;
+            /** Color */
+            color: string;
+            /** San */
+            san: string;
+            /** Classification A */
+            classification_a: string;
+            /** Classification B */
+            classification_b: string;
+            /** Win Percent After A */
+            win_percent_after_a: number;
+            /** Win Percent After B */
+            win_percent_after_b: number;
+            /** Win Percent Gap */
+            win_percent_gap: number;
+            /** Best Move A */
+            best_move_a: string | null;
+            /** Best Move B */
+            best_move_b: string | null;
+            /** Same Best Move */
+            same_best_move: boolean;
+            wdl_after_a?: components["schemas"]["WdlOut"] | null;
+            wdl_after_b?: components["schemas"]["WdlOut"] | null;
+        };
         /** OpeningStatsOut */
         OpeningStatsOut: {
             /** Opening */
             opening: string;
+            /** Eco */
+            eco: string | null;
             /** Color */
             color: string;
             record: components["schemas"]["RecordOut"];
             /** Average Accuracy */
             average_accuracy: number | null;
+            /** Average Opening Exit Win Percent */
+            average_opening_exit_win_percent: number | null;
+        };
+        /**
+         * OwnGameLink
+         * @description La partida del historial en la que está publicado el tablero (RF-6.5).
+         *
+         *     Lleva los datos con los que se publicó para que la pantalla los vuelva a
+         *     enseñar tal cual al corregirlos, y el `game_id` para poder abrirla en el
+         *     visor como cualquier otra partida.
+         */
+        OwnGameLink: {
+            /**
+             * Player Color
+             * @enum {string}
+             */
+            player_color: "white" | "black";
+            /** Opponent Name */
+            opponent_name: string;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "win" | "draw" | "loss";
+            /**
+             * Played On
+             * Format: date
+             */
+            played_on: string;
+            /** Username */
+            username?: string | null;
+            /** Game Id */
+            game_id: number;
+        };
+        /**
+         * OwnGamePublishRequest
+         * @description Marcar el tablero como partida propia (RF-6.5): los datos que el
+         *     tablero no tiene, más las jugadas que sí.
+         */
+        OwnGamePublishRequest: {
+            /**
+             * Player Color
+             * @enum {string}
+             */
+            player_color: "white" | "black";
+            /** Opponent Name */
+            opponent_name: string;
+            /**
+             * Result
+             * @enum {string}
+             */
+            result: "win" | "draw" | "loss";
+            /**
+             * Played On
+             * Format: date
+             */
+            played_on: string;
+            /** Username */
+            username?: string | null;
+            /** Pgn */
+            pgn: string;
+        };
+        /**
+         * PgnImportSummary
+         * @description Qué pasó con cada partida del archivo.
+         */
+        PgnImportSummary: {
+            /** Games Imported */
+            games_imported: number;
+            /** Games Already Present */
+            games_already_present: number;
+            /** Skipped Game Reasons */
+            skipped_game_reasons: string[];
+            /** Games Matched To Player */
+            games_matched_to_player: number;
         };
         /** PhaseStatsOut */
         PhaseStatsOut: {
@@ -577,6 +1089,12 @@ export interface components {
             by_opening: components["schemas"]["OpeningStatsOut"][];
             /** By Phase */
             by_phase: components["schemas"]["PhaseStatsOut"][];
+            /** By Mistake Type */
+            by_mistake_type: components["schemas"]["MistakeTypeStatsOut"][];
+            /** By Time Left */
+            by_time_left: components["schemas"]["TimeBucketStatsOut"][];
+            time_trouble: components["schemas"]["TimeTroubleOut"] | null;
+            trends: components["schemas"]["TrendsOut"];
             /** Analyzed Games */
             analyzed_games: number;
             /** Average Accuracy */
@@ -610,6 +1128,30 @@ export interface components {
             /** Score Percent */
             score_percent: number;
         };
+        /** RefreshResultOut */
+        RefreshResultOut: {
+            /** Fetched */
+            fetched: number;
+            /** Remaining */
+            remaining: number;
+        };
+        /** RepertoireOut */
+        RepertoireOut: {
+            /** Departures */
+            departures: components["schemas"]["DepartureOut"][];
+            /** Games Compared */
+            games_compared: number;
+            /** Positions Known */
+            positions_known: number;
+            /** Positions Missing */
+            positions_missing: number;
+            /** Explorer Token Configured */
+            explorer_token_configured: boolean;
+            /** Positions Per Refresh */
+            positions_per_refresh: number;
+            /** Seconds Between Positions */
+            seconds_between_positions: number;
+        };
         /** SyncRequest */
         SyncRequest: {
             /** Username */
@@ -627,6 +1169,22 @@ export interface components {
             /** Games Upserted */
             games_upserted: number;
         };
+        /**
+         * TimeBucketStatsOut
+         * @description Calidad de juego con un reloj determinado (RF-3.5).
+         */
+        TimeBucketStatsOut: {
+            /** Max Seconds Left */
+            max_seconds_left: number | null;
+            /** Moves */
+            moves: number;
+            /** Average Accuracy */
+            average_accuracy: number;
+            /** Mistakes */
+            mistakes: number;
+            /** Blunders */
+            blunders: number;
+        };
         /** TimeClassStatsOut */
         TimeClassStatsOut: {
             /** Time Class */
@@ -634,6 +1192,39 @@ export interface components {
             record: components["schemas"]["RecordOut"];
             /** Current Rating */
             current_rating: number | null;
+        };
+        /** TimeTroubleOut */
+        TimeTroubleOut: {
+            /** Games In Time Trouble */
+            games_in_time_trouble: number;
+            /** Analyzed Games With Clocks */
+            analyzed_games_with_clocks: number;
+            /** Share Of Games */
+            share_of_games: number;
+        };
+        /**
+         * TrendChangeOut
+         * @description El último mes frente a los anteriores (RF-3.7).
+         */
+        TrendChangeOut: {
+            /** Baseline Months */
+            baseline_months: number;
+            /** Accuracy Change */
+            accuracy_change: number;
+            /** Mistake Rate Change */
+            mistake_rate_change: number;
+        };
+        /**
+         * TrendsOut
+         * @description Evolución del juego en el tiempo (RF-3.7), lo que el dashboard dibuja
+         *     en "Cómo evolucionas".
+         */
+        TrendsOut: {
+            /** By Month */
+            by_month: components["schemas"]["MonthlyQualityOut"][];
+            change: components["schemas"]["TrendChangeOut"] | null;
+            /** Rating Time Class */
+            rating_time_class: string | null;
         };
         /** ValidationError */
         ValidationError: {
@@ -647,6 +1238,24 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * WdlOut
+         * @description Probabilidad de victoria, tablas y derrota **de las blancas** según el
+         *     motor, en partes por mil (RF-2.6).
+         *
+         *     Es la opinión del motor, no la fórmula: `win_percent_*` sale de convertir
+         *     el centipeón con el modelo de Lichess y es igual para cualquier motor,
+         *     mientras que esto lo contesta cada uno por su cuenta y es donde Lc0 aporta
+         *     una segunda opinión de verdad. Los tres suman 1000.
+         */
+        WdlOut: {
+            /** Win */
+            win: number;
+            /** Draw */
+            draw: number;
+            /** Loss */
+            loss: number;
         };
     };
     responses: never;
@@ -717,8 +1326,13 @@ export interface operations {
             query?: {
                 username?: string | null;
                 color?: ("white" | "black") | null;
+                result?: ("win" | "draw" | "loss") | null;
+                opponent?: string | null;
+                opening?: string | null;
                 time_class?: string | null;
                 rated?: boolean | null;
+                since?: string | null;
+                until?: string | null;
                 limit?: number;
                 offset?: number;
             };
@@ -779,10 +1393,44 @@ export interface operations {
             };
         };
     };
+    import_pgn_file_import_pgn_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_import_pgn_file_import_pgn_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PgnImportSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_analyses_analysis_get: {
         parameters: {
             query?: {
                 game_id?: number | null;
+                board_id?: number | null;
             };
             header?: never;
             path?: never;
@@ -843,7 +1491,7 @@ export interface operations {
             };
         };
     };
-    analyze_position_analysis_position_post: {
+    position_analysis_analysis_position_post: {
         parameters: {
             query?: never;
             header?: never;
@@ -876,6 +1524,39 @@ export interface operations {
             };
         };
     };
+    compare_analysis_compare_get: {
+        parameters: {
+            query: {
+                analysis_a: number;
+                analysis_b: number;
+                threshold?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisComparisonOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     get_analysis_analysis__analysis_id__get: {
         parameters: {
             query?: never;
@@ -894,6 +1575,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AnalysisDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_analysis_pgn_analysis__analysis_id__pgn_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                analysis_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
                 };
             };
             /** @description Validation Error */
@@ -1142,6 +1854,232 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    undo_board_boards__board_id__undo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    redo_board_boards__board_id__redo_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    publish_own_game_boards__board_id__own_game_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["OwnGamePublishRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    withdraw_own_game_boards__board_id__own_game_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BoardDetail"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    analyze_board_boards__board_id__analysis_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                board_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BoardAnalysisRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalysisSummary"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    player_repertoire_repertoire_get: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RepertoireOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    refresh_player_repertoire_repertoire_refresh_post: {
+        parameters: {
+            query?: {
+                username?: string | null;
+                budget?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RefreshResultOut"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -7,8 +7,13 @@
 import type { EngineConfigOut, EngineConfigUpdate } from "@lucia/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { ErrorBox, Spinner } from "../../components/Feedback";
+import { Badge } from "../../components/Badge";
+import { Button } from "../../components/Button";
+import { FieldLabel } from "../../components/FieldLabel";
+import { ErrorBox, Spinner, SuccessBox, WarningBox } from "../../components/Feedback";
+import { FIELD_CLASSES, PANEL_CLASSES } from "../../components/styles";
 import { api } from "../../lib/api";
+import { formatEngineName } from "../../lib/format";
 
 export function EnginesPage() {
   const configQuery = useQuery({ queryKey: ["engines"], queryFn: api.getEnginesConfig });
@@ -61,26 +66,46 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["engines"] }),
   });
 
+  /** Cambiar un campo borra el resultado del guardado anterior: si no, el
+   * recuadro seguía diciendo "Configuración guardada" al lado de valores que
+   * ya no eran los guardados (criterio C-3). */
+  function updateForm(patch: Partial<EngineConfigUpdate>) {
+    saveMutation.reset();
+    setForm((current) => ({ ...current, ...patch }));
+  }
+
   return (
     <form
       onSubmit={(event) => {
         event.preventDefault();
         saveMutation.mutate();
       }}
-      className="space-y-4 rounded border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+      className={`space-y-4 p-4 ${PANEL_CLASSES}`}
     >
       <header className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="font-semibold capitalize">{config.name}</h2>
+          <h2 className="font-semibold">{formatEngineName(config.name)}</h2>
           <p className="mt-0.5 break-all font-mono text-xs opacity-60">{config.path}</p>
+          {config.backend && (
+            <p className="mt-0.5 text-xs opacity-60">backend: {config.backend}</p>
+          )}
         </div>
         <AvailabilityBadge available={config.available} />
       </header>
 
       {!config.available && (
-        <p className="rounded border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200">
+        <WarningBox>
           El binario no está en esa ruta. Ejecuta <code>make engines</code> para compilarlo.
-        </p>
+        </WarningBox>
+      )}
+
+      {config.limit_kind === "nodes" && (
+        <WarningBox>
+          Lc0 explora con MCTS, así que el esfuerzo se mide en <strong>nodos</strong>, no en
+          profundidad. En CPU con una red grande va muy lento (medido: ~200 nodos por posición
+          y minuto), así que sirve para consultar posiciones sueltas, no para analizar partidas
+          enteras. Con GPU (LC0_BACKEND=cuda) o una red pequeña cambia por completo.
+        </WarningBox>
       )}
 
       {config.weights_path && (
@@ -88,21 +113,21 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
           <p className="opacity-70">Red neuronal</p>
           <p className="break-all font-mono opacity-60">{config.weights_path}</p>
           {config.weights_available === false && (
-            <p className="mt-1 text-amber-700 dark:text-amber-300">
-              Falta el archivo de red; Lc0 no podrá analizar.
-            </p>
+            <div className="mt-1">
+              <WarningBox>Falta el archivo de red; Lc0 no podrá analizar.</WarningBox>
+            </div>
           )}
         </div>
       )}
 
       <div className="grid grid-cols-2 gap-3">
         <NumberField
-          label="Profundidad"
-          hint="1–40"
+          label={config.limit_kind === "nodes" ? "Nodos" : "Profundidad"}
+          hint={config.limit_kind === "nodes" ? "1–40 (¡ojo, ver abajo!)" : "1–40"}
           value={form.depth}
           min={1}
           max={40}
-          onChange={(depth) => setForm({ ...form, depth })}
+          onChange={(depth) => updateForm({ depth })}
         />
         <NumberField
           label="MultiPV"
@@ -110,7 +135,7 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
           value={form.multipv}
           min={1}
           max={10}
-          onChange={(multipv) => setForm({ ...form, multipv })}
+          onChange={(multipv) => updateForm({ multipv })}
         />
         <NumberField
           label="Hilos"
@@ -118,7 +143,7 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
           value={form.threads}
           min={1}
           max={64}
-          onChange={(threads) => setForm({ ...form, threads })}
+          onChange={(threads) => updateForm({ threads })}
         />
         <NumberField
           label="Hash (MB)"
@@ -127,23 +152,17 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
           min={16}
           max={8192}
           step={16}
-          onChange={(hash_mb) => setForm({ ...form, hash_mb })}
+          onChange={(hash_mb) => updateForm({ hash_mb })}
         />
       </div>
 
       {saveMutation.isError && <ErrorBox error={saveMutation.error} />}
 
       <div className="flex items-center gap-3">
-        <button
-          type="submit"
-          disabled={saveMutation.isPending}
-          className="rounded bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
-        >
+        <Button type="submit" variant="primary" disabled={saveMutation.isPending}>
           {saveMutation.isPending ? "Guardando…" : "Guardar"}
-        </button>
-        {saveMutation.isSuccess && (
-          <span className="text-sm text-emerald-700 dark:text-emerald-300">Guardado</span>
-        )}
+        </Button>
+        {saveMutation.isSuccess && <SuccessBox>Configuración guardada.</SuccessBox>}
       </div>
     </form>
   );
@@ -151,15 +170,9 @@ function EngineCard({ config }: { config: EngineConfigOut }) {
 
 function AvailabilityBadge({ available }: { available: boolean }) {
   return (
-    <span
-      className={`whitespace-nowrap rounded px-2 py-0.5 text-xs ${
-        available
-          ? "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200"
-          : "bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-200"
-      }`}
-    >
+    <Badge tone={available ? "success" : "danger"}>
       {available ? "disponible" : "no encontrado"}
-    </span>
+    </Badge>
   );
 }
 
@@ -181,8 +194,7 @@ function NumberField({
   onChange: (value: number) => void;
 }) {
   return (
-    <label className="text-sm">
-      <span className="block">{label}</span>
+    <FieldLabel label={label} hint={hint}>
       <input
         type="number"
         value={value}
@@ -190,9 +202,8 @@ function NumberField({
         max={max}
         step={step}
         onChange={(event) => onChange(Number(event.target.value))}
-        className="mt-1 w-full rounded border border-slate-300 bg-white px-2 py-1 dark:border-slate-700 dark:bg-slate-950"
+        className={`w-full ${FIELD_CLASSES}`}
       />
-      <span className="mt-0.5 block text-xs opacity-50">{hint}</span>
-    </label>
+    </FieldLabel>
   );
 }

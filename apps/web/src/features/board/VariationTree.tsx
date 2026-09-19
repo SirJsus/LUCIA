@@ -1,6 +1,20 @@
 /** Árbol de variantes navegable (RF-6.3): la línea principal en línea, las
- * variantes indentadas, con acciones de promover y borrar. */
-import type { TreeNode } from "./tree";
+ * variantes indentadas, con acciones de promover y borrar.
+ *
+ * Cuando el tablero se ha analizado (RF-6.9), las jugadas de la línea
+ * principal llevan además su insignia de clasificación, la misma que la
+ * lista de jugadas del visor: es el mismo dato y se enseña igual (criterio
+ * C-5 de docs/07-coherencia-ui.md). Las variantes no la llevan porque no se
+ * analizan; para eso está el motor en vivo.
+ */
+import type { AnalyzedMoveOut } from "@lucia/shared-types";
+import { ClassificationBadge } from "../../components/ClassificationBadge";
+import { EmptyState } from "../../components/Feedback";
+import { MoveButton } from "../../components/board/MoveButton";
+import { MOVE_LIST_HEIGHT_CLASS } from "../../components/styles";
+import { formatAccuracy } from "../../lib/format";
+import { moveNumberLabel, plyFromFen } from "../../lib/moves";
+import { type TreeNode } from "./tree";
 
 interface VariationTreeProps {
   root: TreeNode;
@@ -8,6 +22,8 @@ interface VariationTreeProps {
   onSelect: (nodeId: string) => void;
   onPromote: (nodeId: string) => void;
   onDelete: (nodeId: string) => void;
+  /** La jugada analizada de cada nodo, para los que la tengan (RF-6.9). */
+  analyzedByNodeId: Map<string, AnalyzedMoveOut>;
 }
 
 export function VariationTree({
@@ -16,24 +32,31 @@ export function VariationTree({
   onSelect,
   onPromote,
   onDelete,
+  analyzedByNodeId,
 }: VariationTreeProps) {
   if (root.children.length === 0) {
     return (
-      <p className="p-3 text-sm opacity-60">
-        Mueve una pieza en el tablero para empezar la variante.
-      </p>
+      <div className="p-3">
+        <EmptyState title="Sin variantes todavía">
+          Mueve una pieza en el tablero para empezar la variante.
+        </EmptyState>
+      </div>
     );
   }
 
   return (
-    <div className="max-h-[26rem] overflow-y-auto p-2 text-sm">
+    <div className={`${MOVE_LIST_HEIGHT_CLASS} overflow-y-auto p-2 text-sm`}>
       <Variation
         node={root}
-        ply={0}
+        // El tablero puede arrancar de un FEN o de un PGN con `[SetUp "1"]`:
+        // la numeración sale de la posición raíz, no de un 1. fijo, para que
+        // coincida con la del PGN que exporta "Copiar PGN" (`toPgn`).
+        ply={plyFromFen(root.fen)}
         currentId={currentId}
         onSelect={onSelect}
         onPromote={onPromote}
         onDelete={onDelete}
+        analyzedByNodeId={analyzedByNodeId}
       />
     </div>
   );
@@ -46,6 +69,7 @@ function Variation({
   onSelect,
   onPromote,
   onDelete,
+  analyzedByNodeId,
   depth = 0,
 }: {
   node: TreeNode;
@@ -54,56 +78,60 @@ function Variation({
   onSelect: (id: string) => void;
   onPromote: (id: string) => void;
   onDelete: (id: string) => void;
+  analyzedByNodeId: Map<string, AnalyzedMoveOut>;
   depth?: number;
 }) {
   if (node.children.length === 0) return null;
-  const [principal, ...variantes] = node.children;
+  const [mainChild, ...variations] = node.children;
 
   return (
     <>
       <MoveChip
-        node={principal}
+        node={mainChild}
         ply={ply}
-        isCurrent={principal.id === currentId}
+        isCurrent={mainChild.id === currentId}
         onSelect={onSelect}
         onPromote={onPromote}
         onDelete={onDelete}
         canPromote={depth > 0}
+        analyzed={analyzedByNodeId.get(mainChild.id)}
       />
 
-      {variantes.map((variante) => (
+      {variations.map((variation) => (
         <div
-          key={variante.id}
+          key={variation.id}
           className="my-1 border-l-2 border-slate-200 pl-2 opacity-90 dark:border-slate-700"
         >
           <MoveChip
-            node={variante}
+            node={variation}
             ply={ply}
-            isCurrent={variante.id === currentId}
+            isCurrent={variation.id === currentId}
             onSelect={onSelect}
             onPromote={onPromote}
             onDelete={onDelete}
             canPromote
           />
           <Variation
-            node={variante}
+            node={variation}
             ply={ply + 1}
             currentId={currentId}
             onSelect={onSelect}
             onPromote={onPromote}
             onDelete={onDelete}
+            analyzedByNodeId={analyzedByNodeId}
             depth={depth + 1}
           />
         </div>
       ))}
 
       <Variation
-        node={principal}
+        node={mainChild}
         ply={ply + 1}
         currentId={currentId}
         onSelect={onSelect}
         onPromote={onPromote}
         onDelete={onDelete}
+        analyzedByNodeId={analyzedByNodeId}
         depth={depth}
       />
     </>
@@ -118,6 +146,7 @@ function MoveChip({
   onPromote,
   onDelete,
   canPromote,
+  analyzed,
 }: {
   node: TreeNode;
   ply: number;
@@ -126,39 +155,63 @@ function MoveChip({
   onPromote: (id: string) => void;
   onDelete: (id: string) => void;
   canPromote: boolean;
+  analyzed?: AnalyzedMoveOut;
 }) {
   return (
     <span className="group mr-1 inline-flex items-center gap-1">
-      {ply % 2 === 0 && <span className="opacity-50">{Math.floor(ply / 2) + 1}.</span>}
-      <button
-        type="button"
-        onClick={() => onSelect(node.id)}
-        className={`rounded px-1 font-mono hover:bg-slate-100 dark:hover:bg-slate-800 ${
-          isCurrent ? "bg-indigo-100 font-medium dark:bg-indigo-900/60" : ""
-        }`}
-      >
+      {ply % 2 === 0 && <span className="opacity-50">{moveNumberLabel(ply)}</span>}
+      <MoveButton isCurrent={isCurrent} onClick={() => onSelect(node.id)} className="px-1">
         {node.san}
-      </button>
-      <span className="hidden gap-0.5 group-hover:inline-flex">
-        {canPromote && (
-          <button
-            type="button"
-            onClick={() => onPromote(node.id)}
-            title="Convertir en línea principal"
-            className="rounded px-1 text-xs opacity-60 hover:bg-slate-200 hover:opacity-100 dark:hover:bg-slate-700"
-          >
-            ▲
-          </button>
+        {analyzed && (
+          <ClassificationBadge
+            classification={analyzed.classification}
+            detail={`precisión ${formatAccuracy(analyzed.move_accuracy)}`}
+          />
         )}
-        <button
-          type="button"
+      </MoveButton>
+      {/* Promover y borrar estaban solo en `group-hover`: sin ratón no había
+          forma de llegar a ellas, y al tabular se caía en un botón invisible.
+          Ahora están siempre, atenuadas, y se realzan al señalar o al enfocar
+          (criterios C-1 y C-7 de docs/07-coherencia-ui.md). */}
+      <span className="inline-flex gap-0.5 opacity-40 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+        {canPromote && (
+          <ChipAction
+            onClick={() => onPromote(node.id)}
+            accessibleName={`Convertir ${node.san} en línea principal`}
+            symbol="▲"
+          />
+        )}
+        <ChipAction
           onClick={() => onDelete(node.id)}
-          title="Borrar esta jugada y lo que sigue"
-          className="rounded px-1 text-xs opacity-60 hover:bg-red-100 hover:opacity-100 dark:hover:bg-red-900/60"
-        >
-          ✕
-        </button>
+          accessibleName={`Eliminar ${node.san} y lo que sigue`}
+          symbol="✕"
+          className="hover:bg-red-100 dark:hover:bg-red-900/60"
+        />
       </span>
     </span>
+  );
+}
+
+function ChipAction({
+  onClick,
+  accessibleName,
+  symbol,
+  className = "hover:bg-slate-200 dark:hover:bg-slate-700",
+}: {
+  onClick: () => void;
+  accessibleName: string;
+  symbol: string;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={accessibleName}
+      title={accessibleName}
+      className={`rounded px-1 text-xs ${className}`}
+    >
+      {symbol}
+    </button>
   );
 }

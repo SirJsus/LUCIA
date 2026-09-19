@@ -8,27 +8,22 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
-from lucia_api.db.base import Base
+from lucia_api.db.base import Base, create_db_engine
 from lucia_chesscom import ChessComGame, ChessComPlayer, ChessComPlayerStats
-from sqlalchemy.ext.asyncio import (
-    AsyncEngine,
-    AsyncSession,
-    async_sessionmaker,
-    create_async_engine,
-)
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 # packages/core/tests/conftest.py -> tests -> api -> apps -> raíz del repo.
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 STOCKFISH_PATH = _PROJECT_ROOT / "engines" / "bin" / "stockfish"
 
-requiere_stockfish = pytest.mark.skipif(
+requires_stockfish = pytest.mark.skipif(
     not STOCKFISH_PATH.exists(),
     reason="Stockfish no está compilado; ejecuta 'make engines' para correr estos tests.",
 )
 
 
 @pytest.fixture(autouse=True)
-def _worker_limpio() -> Iterator[None]:
+def _clean_worker() -> Iterator[None]:
     """`app` es un singleton de módulo compartido entre tests. Sin esto, el
     segundo test que entra a `TestClient(app)` heredaría el `AnalysisWorker`
     (y su `asyncio.Queue`) del test anterior, atado a un event loop ya
@@ -50,8 +45,13 @@ async def db_engine(tmp_path: Path) -> AsyncIterator[AsyncEngine]:
     modelos que produce Alembic), sin tocar `data/lucia.db`. Expuesto aparte
     de `db_session` para que el worker en background pueda tener su propia
     fábrica de sesiones apuntando a la misma base temporal (ver
-    `db_session_factory`), tal como pasa en producción con `data/lucia.db`."""
-    engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'test.db'}")
+    `db_session_factory`), tal como pasa en producción con `data/lucia.db`.
+
+    Por `create_db_engine` y no por `create_async_engine` a secas: es lo que
+    enciende las claves foráneas de sqlite, y un motor de test sin ellas diría
+    que los borrados en cascada funcionan aunque en producción no lo
+    hicieran."""
+    engine = create_db_engine(f"sqlite+aiosqlite:///{tmp_path / 'test.db'}")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
@@ -94,7 +94,7 @@ def _make_game(
         {
             "url": f"https://www.chess.com/game/live/{uuid}",
             "uuid": uuid,
-            "pgn": pgn or _pgn_de_ejemplo(white, black),
+            "pgn": pgn or _sample_pgn(white, black),
             "time_control": "600",
             "end_time": end_time,
             "rated": True,
@@ -107,7 +107,7 @@ def _make_game(
     )
 
 
-def _pgn_de_ejemplo(white: str, black: str) -> str:
+def _sample_pgn(white: str, black: str) -> str:
     return (
         f'[White "{white}"]\n[Black "{black}"]\n[Result "1-0"]\n\n'
         "1. e4 {[%clk 0:09:58.1]} 1... e5 {[%clk 0:09:57.5]} 1-0\n"

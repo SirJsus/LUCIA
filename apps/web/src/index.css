@@ -10,9 +10,49 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Los controles nativos que la aplicación no pinta —el calendario de un
+   `input type="date"` en los filtros de Partidas, las flechas de un
+   `input type="number"` en Motores— los dibuja el navegador con su propia
+   paleta, y sin esto la dibuja siempre clara: icono oscuro sobre fondo oscuro
+   y desplegable de calendario blanco en tema oscuro. `color-scheme` es la
+   única forma de que sigan al tema (paridad claro/oscuro, criterio C-7). */
+:root {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
 /* Chessground se dimensiona con su contenedor; sin esto el tablero queda de
    1px de alto porque `cg-wrap` no tiene tamaño propio. */
 .cg-wrap {
   width: 100%;
   height: 100%;
+}
+
+/* Piezas fuera del tablero: la paleta del editor de posición (RF-6.1).
+   Reutiliza las imágenes de chessground —así la pieza de la paleta es
+   exactamente la que se verá en el tablero, criterio C-5— pero no su
+   colocación: dentro del tablero cada `piece` va en posición absoluta y mide
+   un octavo del ancho, y aquí tiene que llenar su botón. `pointer-events` se
+   devuelve al botón, que es quien escucha el clic y el arrastre. */
+.piece-palette {
+  width: 100%;
+  height: 100%;
+}
+
+.piece-palette piece {
+  /* `display` hace falta: `piece` no es una etiqueta de HTML, así que por
+     defecto es inline y el ancho y el alto no le aplican. Dentro del tablero
+     no se nota porque chessground la posiciona en absoluto, y eso es
+     justamente lo que aquí se deshace. */
+  display: block;
+  position: static;
+  width: 100%;
+  height: 100%;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  pointer-events: none;
 }

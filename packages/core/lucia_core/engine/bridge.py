@@ -17,12 +17,42 @@ class EngineBridge:
     async def open(self) -> None:
         _transport, engine = await chess.engine.popen_uci(str(self.config.path))
         self._engine = engine
-        opciones: dict[str, str | int | bool] = {
+        await self._engine.configure(self._options_to_apply())
+
+    def _options_to_apply(self) -> dict[str, str | int | bool]:
+        """Qué opciones UCI mandarle a este motor en concreto.
+
+        `Threads` y `Hash` son "estándar" de facto, pero no universales: Lc0
+        acepta `Threads` y no `Hash` (usa `NNCacheSize`, que además se mide en
+        posiciones, no en MB, así que no es un equivalente). Mandar una opción
+        que el motor no conoce aborta la conexión, así que las genéricas se
+        aplican solo si el motor las declara — eso también hace que enchufar
+        un motor UCI cualquiera funcione sin tocar código (RNF-9).
+
+        `UCI_ShowWDL` va por la misma vía y por la misma razón. Es lo que hace
+        que el motor informe de su probabilidad de victoria, tablas y derrota
+        (RF-2.6) en vez de solo del centipeón; lo declaran tanto Stockfish como
+        Lc0, pero no tiene por qué declararlo un motor cualquiera, y pedírselo
+        a quien no lo conoce abortaría la conexión. Sin él, `python-chess` no
+        recibe `wdl` en las líneas y `EngineLine.wdl` se queda en `None`, que
+        es justo lo que debe pasar con un motor que no sabe contestarlo.
+
+        `extra_options` es la excepción: se aplican siempre, sin filtrar,
+        porque las pidió explícitamente quien configuró el motor. Si no
+        existen, es un error de configuración y conviene que se note.
+        """
+        if self._engine is None:
+            raise RuntimeError("el motor no está abierto")
+
+        supported_options = self._engine.options
+        generic_options: dict[str, str | int | bool] = {
             "Threads": self.config.threads,
             "Hash": self.config.hash_mb,
+            "UCI_ShowWDL": True,
         }
-        opciones.update(self.config.extra_options)
-        await self._engine.configure(opciones)
+        options = {k: v for k, v in generic_options.items() if k in supported_options}
+        options.update(self.config.extra_options)
+        return options
 
     async def close(self) -> None:
         if self._engine is not None:
@@ -36,7 +66,7 @@ class EngineBridge:
     async def __aexit__(self, *exc_info: object) -> None:
         await self.close()
 
-    async def analyse(self, board: chess.Board) -> list[chess.engine.InfoDict]:
+    async def analyze(self, board: chess.Board) -> list[chess.engine.InfoDict]:
         """Analiza `board` y devuelve una línea por cada `multipv` configurado,
         ordenadas de mejor a peor (índice 0 = mejor jugada del motor)."""
         if self._engine is None:

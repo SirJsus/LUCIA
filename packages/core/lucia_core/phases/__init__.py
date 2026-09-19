@@ -78,16 +78,16 @@ def phases_by_ply(boards: list[chess.Board]) -> list[Phase]:
     partida tiene una apertura, un medio juego y un final, en ese orden. Aquí
     se toma la fase cruda de cada posición y se impide retroceder.
     """
-    orden: dict[Phase, int] = {"opening": 0, "middlegame": 1, "endgame": 2}
-    resultado: list[Phase] = []
-    maxima: Phase = "opening"
+    phase_order: dict[Phase, int] = {"opening": 0, "middlegame": 1, "endgame": 2}
+    phases: list[Phase] = []
+    furthest_phase: Phase = "opening"
 
     for ply, board in enumerate(boards):
-        actual = detect_phase(board, ply)
-        if orden[actual] > orden[maxima]:
-            maxima = actual
-        resultado.append(maxima)
-    return resultado
+        current_phase = detect_phase(board, ply)
+        if phase_order[current_phase] > phase_order[furthest_phase]:
+            furthest_phase = current_phase
+        phases.append(furthest_phase)
+    return phases
 
 
 def _is_endgame(board: chess.Board) -> bool:
@@ -110,7 +110,7 @@ def _developed_pieces(board: chess.Board, color: chess.Color) -> int:
     casilla de salida. El rey se ignora: enrocar no es desarrollar, y quedarse
     en e1 tampoco significa estar en apertura."""
     back_rank = 0 if color == chess.WHITE else 7
-    casillas_iniciales = {
+    starting_squares = {
         chess.square(file, back_rank): piece_type
         for file, piece_type in enumerate(
             [
@@ -127,9 +127,9 @@ def _developed_pieces(board: chess.Board, color: chess.Color) -> int:
         if piece_type is not None
     }
 
-    movidas = 0
-    for square, piece_type in casillas_iniciales.items():
+    developed_count = 0
+    for square, piece_type in starting_squares.items():
         piece = board.piece_at(square)
         if piece is None or piece.piece_type != piece_type or piece.color != color:
-            movidas += 1
-    return movidas
+            developed_count += 1
+    return developed_count

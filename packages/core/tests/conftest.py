@@ -11,7 +11,7 @@ import pytest
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
 STOCKFISH_PATH = _PROJECT_ROOT / "engines" / "bin" / "stockfish"
 
-requiere_stockfish = pytest.mark.skipif(
+requires_stockfish = pytest.mark.skipif(
     not STOCKFISH_PATH.exists(),
     reason="Stockfish no está compilado; ejecuta 'make engines' para correr estos tests.",
 )

@@ -6,7 +6,7 @@ from lucia_chesscom import ChessComClient, ChessComNotFoundError
 UA = "LUCIA-tests/0.1 (contacto: test@example.com)"
 
 
-def test_user_agent_generico_falla_rapido() -> None:
+def test_generic_user_agent_fails_fast() -> None:
     with pytest.raises(ValueError):
         ChessComClient(user_agent="")
     with pytest.raises(ValueError):
@@ -34,7 +34,7 @@ async def test_get_player() -> None:
 
 
 @pytest.mark.asyncio
-async def test_sigue_redirecciones_por_casing_del_username() -> None:
+async def test_follows_redirects_for_username_casing() -> None:
     # chess.com redirige (301) cuando el username no viene en su "casing"
     # canónico; encontrado en una prueba en vivo con "MagnusCarlsen".
     with respx.mock(base_url="https://api.chess.com/pub") as mock:
@@ -60,7 +60,7 @@ async def test_sigue_redirecciones_por_casing_del_username() -> None:
 
 
 @pytest.mark.asyncio
-async def test_get_archives_parsea_anio_mes() -> None:
+async def test_get_archives_parses_year_and_month() -> None:
     with respx.mock(base_url="https://api.chess.com/pub") as mock:
         mock.get("/player/hikaru/games/archives").mock(
             return_value=httpx.Response(
@@ -74,21 +74,21 @@ async def test_get_archives_parsea_anio_mes() -> None:
             )
         )
         async with ChessComClient(user_agent=UA) as client:
-            meses = await client.get_archives("hikaru")
-        assert meses == [(2024, 1), (2024, 2)]
+            months = await client.get_archives("hikaru")
+        assert months == [(2024, 1), (2024, 2)]
 
 
 @pytest.mark.asyncio
-async def test_get_month_games_404_devuelve_lista_vacia() -> None:
+async def test_get_month_games_404_returns_an_empty_list() -> None:
     with respx.mock(base_url="https://api.chess.com/pub") as mock:
         mock.get("/player/hikaru/games/2019/01").mock(return_value=httpx.Response(404))
         async with ChessComClient(user_agent=UA) as client:
-            partidas = await client.get_month_games("hikaru", 2019, 1)
-        assert partidas == []
+            games = await client.get_month_games("hikaru", 2019, 1)
+        assert games == []
 
 
 @pytest.mark.asyncio
-async def test_get_player_404_lanza_excepcion_propia() -> None:
+async def test_get_player_404_raises_its_own_exception() -> None:
     with respx.mock(base_url="https://api.chess.com/pub") as mock:
         mock.get("/player/no-existe-usuario").mock(return_value=httpx.Response(404))
         async with ChessComClient(user_agent=UA) as client:
@@ -97,17 +97,17 @@ async def test_get_player_404_lanza_excepcion_propia() -> None:
 
 
 @pytest.mark.asyncio
-async def test_reintenta_ante_429_respetando_retry_after(monkeypatch: pytest.MonkeyPatch) -> None:
-    dormidos: list[float] = []
+async def test_retries_on_429_respecting_retry_after(monkeypatch: pytest.MonkeyPatch) -> None:
+    slept_seconds: list[float] = []
 
-    async def fake_sleep(segundos: float) -> None:
-        dormidos.append(segundos)
+    async def fake_sleep(seconds: float) -> None:
+        slept_seconds.append(seconds)
 
     monkeypatch.setattr("lucia_chesscom.client.asyncio.sleep", fake_sleep)
 
     with respx.mock(base_url="https://api.chess.com/pub") as mock:
-        ruta = mock.get("/player/hikaru")
-        ruta.side_effect = [
+        route = mock.get("/player/hikaru")
+        route.side_effect = [
             httpx.Response(429, headers={"Retry-After": "2"}),
             httpx.Response(
                 200,
@@ -123,4 +123,4 @@ async def test_reintenta_ante_429_respetando_retry_after(monkeypatch: pytest.Mon
             player = await client.get_player("hikaru")
 
     assert player.username == "hikaru"
-    assert dormidos == [2.0]
+    assert slept_seconds == [2.0]

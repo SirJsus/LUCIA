@@ -1,13 +1,25 @@
 """Modelo de datos de LUCIA (ver docs/03-arquitectura.md § Modelo de datos).
 
-RF-1 (importación desde chess.com): `Player`, `Game`, `SyncState`.
+RF-1 (importación desde chess.com y de un PGN manual): `Player`, `Game`,
+`SyncState`.
 RF-2 (análisis con motores): `Analysis`, `AnalyzedMove`, `PositionCache`.
+RF-5.4 (configuración editable de los motores): `EngineSettings`.
+RF-6 (tablero de análisis): `Board` y `BoardVersion`, el historial lineal de
+deshacer y rehacer de RF-6.8.
+RF-3.6 (comparación de repertorio): `ExplorerPositionCache`, la caché de lo
+que se le preguntó al Opening Explorer de Lichess.
+
+Las columnas que no se explican solas llevan su porqué al lado; el mapa
+completo, con las relaciones y las reglas entre tablas, está en
+docs/03-arquitectura.md.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import re
 
+import chess
 from sqlalchemy import JSON, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -68,6 +80,16 @@ class Game(Base):
     rules: Mapped[str]
     rated: Mapped[bool]
     eco: Mapped[str | None] = mapped_column(default=None)
+    """Apertura tal como la reporta chess.com: una URL, y no en todas las
+    partidas. Se conserva como dato de origen; para agrupar y enseñar se usan
+    las dos columnas de abajo."""
+    opening_eco: Mapped[str | None] = mapped_column(default=None)
+    opening_name: Mapped[str | None] = mapped_column(default=None)
+    """Apertura deducida de las jugadas con la tabla ECO propia
+    (`lucia_core.openings`, RF-3.2): sale en toda partida que empiece en la
+    posición estándar, trae el código ECO —que chess.com no da— y reconoce
+    transposiciones. `None` en las que empiezan desde otra posición (odds
+    chess, Chess960), donde no hay apertura que nombrar."""
     clocks_json: Mapped[list | None] = mapped_column(JSON, default=None)
     """Reloj restante en segundos tras cada jugada (ver lucia_chesscom.parse_move_clocks)."""
 
@@ -81,6 +103,22 @@ class Game(Base):
     analyses: Mapped[list[Analysis]] = relationship(
         back_populates="game", cascade="all, delete-orphan"
     )
+
+    @property
+    def starts_from_custom_position(self) -> bool:
+        """Si la partida no arranca en la posición estándar.
+
+        chess.com marca esas partidas con `[SetUp "1"]` + `[FEN ...]` en el
+        PGN: odds chess, Chess960 y "partidas desde posición". Se mira con una
+        expresión regular sobre la cabecera y no con `chess.pgn.read_game`
+        porque el listado devuelve decenas de partidas por petición y aquí
+        solo hace falta el FEN inicial, no el árbol de jugadas.
+
+        La interfaz lo usa para avisar de que el tablero que se ve es el de la
+        partida y no un fallo (criterio C-6 de docs/07-coherencia-ui.md).
+        """
+        starting_fen = re.search(r'\[FEN "([^"]+)"\]', self.pgn)
+        return starting_fen is not None and starting_fen.group(1) != chess.STARTING_FEN
 
 
 class SyncState(Base):
@@ -97,16 +135,45 @@ class SyncState(Base):
 
 
 class Analysis(Base):
-    """Una corrida de análisis de motor sobre una partida (RF-2).
+    """Una corrida de análisis de motor sobre una partida (RF-2) o sobre la
+    línea principal de un tablero de análisis (RF-6.9).
 
     Puede haber varias por partida (distinto motor, profundidad o MultiPV);
     por eso no es una columna más de `Game` sino su propia tabla.
+
+    **Nunca cuelga de nada**: al menos una de las dos columnas está llena.
+    `board_id` dice de qué tablero salieron las jugadas; `game_id`, a qué
+    partida del historial se le atribuyen. Un análisis de partida solo tiene
+    la segunda y uno de tablero solo la primera, salvo que el tablero esté
+    publicado como partida propia (RF-6.5), donde tiene las dos: las jugadas
+    son del tablero y cuentan como las de esa partida (ADR-0014).
+
+    Son la misma corrida de motor sobre las mismas jugadas y dan el mismo
+    resultado, así que compartir tabla evita duplicar `analyzed_moves` y todo
+    lo que lee de ella (el visor, la exportación a PGN, los patrones).
     """
 
     __tablename__ = "analyses"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    game_id: Mapped[int] = mapped_column(ForeignKey("games.id"))
+    game_id: Mapped[int | None] = mapped_column(ForeignKey("games.id"), default=None)
+    board_id: Mapped[int | None] = mapped_column(
+        ForeignKey("boards.id", ondelete="CASCADE"), default=None
+    )
+    """El tablero del que salieron las jugadas (RF-6.9).
+
+    Por sí solo **no cuenta en las estadísticas** (RF-6.5): lo garantiza
+    `latest_analysis_ids`, que solo mira los análisis con `game_id`. Un
+    tablero publicado como partida propia lo llena además, y entonces sí
+    cuenta (`services/own_games.py`)."""
+    analyzed_pgn: Mapped[str | None] = mapped_column(default=None)
+    """La línea principal que se analizó, solo para los tableros.
+
+    Una partida no la necesita —su PGN está en `games.pgn` y no cambia—, pero
+    un tablero se sigue editando después de analizarlo: guardar aquí lo que
+    se analizó es lo que permite decir "este análisis es de una versión
+    anterior" en vez de enseñar clasificaciones que ya no corresponden a las
+    jugadas que hay en pantalla."""
     engine: Mapped[str]
     """"stockfish" | "lc0" (RF-2.6), o cualquier otro configurado en `EngineConfig`."""
     depth: Mapped[int]
@@ -121,7 +188,7 @@ class Analysis(Base):
     )
     finished_at: Mapped[dt.datetime | None] = mapped_column(DateTime(timezone=True), default=None)
 
-    game: Mapped[Game] = relationship(back_populates="analyses")
+    game: Mapped[Game | None] = relationship(back_populates="analyses")
     moves: Mapped[list[AnalyzedMove]] = relationship(
         back_populates="analysis",
         cascade="all, delete-orphan",
@@ -136,7 +203,11 @@ class AnalyzedMove(Base):
     __tablename__ = "analyzed_moves"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    analysis_id: Mapped[int] = mapped_column(ForeignKey("analyses.id"))
+    analysis_id: Mapped[int] = mapped_column(ForeignKey("analyses.id", ondelete="CASCADE"))
+    """Con `CASCADE` en la base y no solo en la relación de SQLAlchemy: borrar
+    un tablero se lleva sus análisis por la clave foránea, sin que el ORM los
+    llegue a cargar, y entonces nadie recorrería la relación para borrar estas
+    filas. Sin esto, borrar un tablero analizado falla."""
     ply: Mapped[int]
     color: Mapped[str]
     """"white" | "black": quién jugó esta jugada."""
@@ -151,8 +222,47 @@ class AnalyzedMove(Base):
     win_percent_before: Mapped[float]
     win_percent_after: Mapped[float]
     best_move_uci: Mapped[str | None] = mapped_column(default=None)
+    alternatives_json: Mapped[list | None] = mapped_column(JSON, default=None)
+    """Las N mejores líneas de la posición **anterior** a esta jugada (RF-10.1),
+    de mejor a peor: `[{rank, score_cp, score_mate, pv_uci}]`, con la puntuación
+    desde el punto de vista de las blancas, como todo lo que se guarda.
+
+    Es lo que permite al visor enseñar las alternativas de cada jugada, no solo
+    `best_move_uci`. `None` en los análisis anteriores a RF-10; para esos, el
+    router las recupera de `position_cache` cuando puede (ver
+    `services/analysis.py::alternatives_from_cache`).
+
+    La notación SAN no se guarda: depende de la posición y se deriva de
+    `fen_before` al servir, para no almacenar dos veces la misma jugada.
+
+    Por qué JSON aquí y no una tabla de líneas: ADR-0007."""
 
     analysis: Mapped[Analysis] = relationship(back_populates="moves")
+
+
+class ExplorerPositionCache(Base):
+    """Lo que la base de maestros de Lichess dice de una posición (RF-3.6).
+
+    Es una caché, no una fuente: se guarda para no volver a preguntar por la
+    misma posición —y para que comparar el repertorio siga funcionando sin
+    conexión, que es la única concesión que LUCIA hace a RNF-1 (ver ADR-0010)—.
+
+    La clave es el **EPD**, el FEN sin los contadores de jugada, por lo mismo
+    que en `lucia_core.openings`: la misma posición alcanzada por otro orden de
+    jugadas tiene la misma teoría detrás.
+    """
+
+    __tablename__ = "explorer_positions"
+
+    epd: Mapped[str] = mapped_column(primary_key=True)
+    masters_json: Mapped[dict] = mapped_column(JSON)
+    """Respuesta del explorador, ya recortada a lo que se usa: totales de la
+    posición y qué se juega en ella (`lucia_lichess.ExplorerPosition`)."""
+    fetched_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
+    )
+    """Cuándo se preguntó. La base de maestros cambia despacio, así que no
+    caduca sola; sirve para poder decidirlo más adelante sin migrar nada."""
 
 
 class EngineSettings(Base):
@@ -188,8 +298,11 @@ class Board(Base):
     lógica en el servidor solo daría dos sitios donde equivocarse. El servidor
     lo trata como un documento que guarda y devuelve.
 
-    `is_own_game` existe por RF-6.5: los tableros no cuentan para las
-    estadísticas salvo que el usuario marque que esa partida la jugó él.
+    Un tablero no cuenta para las estadísticas (RF-6.5) salvo que el usuario
+    marque que esa partida la jugó él, y entonces se **publica al historial**
+    como una fila de `games` a la que apunta `own_game_id`: así el dashboard,
+    los filtros y los patrones lo cuentan sin que ninguna de sus consultas
+    tenga que aprender qué es un tablero (ADR-0014).
     """
 
     __tablename__ = "boards"
@@ -202,11 +315,80 @@ class Board(Base):
     posición montada en el editor."""
     tree_json: Mapped[dict] = mapped_column(JSON)
     """Árbol de variantes con comentarios (ver `lucia_api.routers.boards`)."""
-    is_own_game: Mapped[bool] = mapped_column(default=False)
+    own_game_id: Mapped[int | None] = mapped_column(
+        ForeignKey("games.id", ondelete="SET NULL"), default=None
+    )
+    """La partida del historial en la que se publicó este tablero (RF-6.5), o
+    `None` si no está marcado como partida propia.
+
+    Es la **única** marca: un booleano aparte podría contradecir a la fila
+    publicada, y entonces el listado diría una cosa y el dashboard otra.
+    `SET NULL` porque borrar esa partida desde el historial es retirar la
+    marca, no borrar el tablero."""
+    current_version_id: Mapped[int | None] = mapped_column(default=None)
+    """En qué punto del historial está el tablero (RF-6.8).
+
+    No es "la última versión" sino "la que se está viendo": deshacer mueve
+    este puntero hacia atrás sin borrar nada, y así rehacer puede volver.
+    Guardarlo aquí y no en la pantalla es lo que hace que el deshacer
+    sobreviva a recargar.
+
+    Sin `ForeignKey` a propósito: `board_versions.board_id` ya apunta aquí, y
+    declarar las dos direcciones deja un ciclo de tablas que SQLite no puede
+    romper —no sabe añadir una restricción después de crear la tabla—. Las
+    versiones se borran en cascada con su tablero, así que el puntero no
+    puede quedar colgando.
+    """
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
     )
     updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
+    )
+
+    @property
+    def is_own_game(self) -> bool:
+        """Si el tablero está publicado como partida propia (RF-6.5).
+
+        Se deduce del enlace en vez de guardarse aparte para que no haya dos
+        versiones de la misma verdad. Las respuestas de la API lo exponen tal
+        cual, así que el front sigue viendo el mismo campo de siempre."""
+        return self.own_game_id is not None
+
+
+class BoardVersion(Base):
+    """Un estado por el que pasó un tablero de análisis (RF-6.8).
+
+    El historial es **lineal**, como el de un editor de texto: se apunta con
+    `Board.current_version_id` y editar después de deshacer borra lo que
+    quedaba por delante. Un árbol de versiones sería más potente y mucho más
+    difícil de explicar en una pantalla que ya tiene un árbol de variantes.
+
+    Se guarda el árbol entero y no un diff: un tablero pesa unos kilobytes,
+    y reconstruir un estado aplicando diferencias es la clase de código que
+    falla justo cuando hace falta.
+    """
+
+    __tablename__ = "board_versions"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    board_id: Mapped[int] = mapped_column(ForeignKey("boards.id", ondelete="CASCADE"))
+    root_fen: Mapped[str]
+    """Va con el árbol porque importar un PGN puede mover la posición de
+    partida (RF-6.7): sin esto, deshacer una importación dejaría el árbol
+    viejo colgando de la raíz nueva."""
+    tree_json: Mapped[dict] = mapped_column(JSON)
+    pgn: Mapped[str | None] = mapped_column(default=None)
+    """El mismo árbol en PGN, tal como lo compuso el front (`tree.ts::toPgn`).
+
+    Se guarda junto al árbol porque la API no sabe recorrerlo —quien sabe de
+    jugadas es chess.js— y al deshacer hace falta: un tablero publicado como
+    partida propia (RF-6.5) tiene que poner al día su fila del historial con
+    las jugadas que quedaron, y sin esto habría que pedírselas a la pantalla
+    en un segundo viaje. `None` en las versiones anteriores a RF-6.5 y en la
+    primera de un tablero recién creado, donde no se sabe cómo quedó: ahí el
+    análisis se desenlaza hasta el siguiente guardado."""
+    created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
     )
 
@@ -228,7 +410,7 @@ class PositionCache(Base):
     multipv: Mapped[int] = mapped_column(primary_key=True)
     lines_json: Mapped[list] = mapped_column(JSON)
     """Una entrada por línea de MultiPV, ver
-    `lucia_api.services.analysis._serializar_linea`."""
+    `lucia_api.services.analysis._serialize_line`."""
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
     )

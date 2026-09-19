@@ -43,6 +43,7 @@ momento (SemVer 2.0.0, `MAYOR.MENOR.PARCHE`):
 | `apps/api/pyproject.toml` | `[project].version` |
 | `packages/core/pyproject.toml` | `[project].version` |
 | `packages/chesscom/pyproject.toml` | `[project].version` |
+| `packages/lichess/pyproject.toml` | `[project].version` |
 | `apps/api/lucia_api/__init__.py` | `__version__` |
 | `packages/core/lucia_core/__init__.py` | `__version__` |
 | `package.json` (raíz) | `version` |

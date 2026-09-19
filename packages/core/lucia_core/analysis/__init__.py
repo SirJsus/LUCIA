@@ -22,19 +22,55 @@ from lucia_core.classification import (
     MoveClassification,
     classify_move,
 )
+from lucia_core.openings import identify_opening
 from lucia_core.phases import Phase, phases_by_ply
 
 OnPosition = Callable[[int, int], Awaitable[None]]
 """Callback de progreso: `on_position(ply_evaluado, total_de_jugadas)`."""
 
 
-class AnalysingEngine(Protocol):
+class AnalyzingEngine(Protocol):
     """Lo que `evaluate_positions` necesita de un motor: analizar una
     posición. No exige `EngineBridge` en concreto (`Protocol` estructural)
     para que `apps/api` pueda envolverlo con caché por FEN (RF-2.7) sin que
     `lucia_core` sepa nada de bases de datos."""
 
-    async def analyse(self, board: chess.Board) -> list[chess.engine.InfoDict]: ...
+    async def analyze(self, board: chess.Board) -> list[chess.engine.InfoDict]: ...
+
+
+@dataclass(frozen=True)
+class EngineLine:
+    """Una de las líneas que propone el motor para una posición: su evaluación
+    y la continuación que la sostiene.
+
+    Con MultiPV > 1 el motor devuelve varias, ordenadas de mejor a peor desde
+    el punto de vista de quien mueve. Guardarlas todas —y no solo la primera—
+    es lo que permite después enseñar las **alternativas** de cada jugada
+    (RF-10.1), en vez de un único "deberías haber jugado esto".
+    """
+
+    score: chess.engine.PovScore
+    pv: tuple[chess.Move, ...]
+    wdl: chess.engine.PovWdl | None = None
+    """Lo que el motor da como probabilidad de ganar, hacer tablas y perder
+    (RF-2.6), en partes por mil y desde el punto de vista de quien mueve.
+
+    **No es lo mismo que la probabilidad de victoria de `lucia_core.accuracy`**,
+    y por eso se guarda aparte: aquella la deduce una fórmula a partir del
+    centipeón —la misma para cualquier motor—, y esta la dice el motor. Es la
+    diferencia que RF-2.6 busca al pedirle a Lc0 una segunda opinión: en una
+    posición ganada pero de tablas técnicas, la fórmula ve ventaja y la red ve
+    tablas.
+
+    Es `None` cuando el motor no declara `UCI_ShowWDL` y cuando la línea viene
+    de un análisis anterior a que se le pidiera: una línea sin W/D/L es una
+    línea válida, no un error.
+    """
+
+    @property
+    def move(self) -> chess.Move | None:
+        """La jugada que propone esta línea: la primera de su continuación."""
+        return self.pv[0] if self.pv else None
 
 
 @dataclass(frozen=True)
@@ -46,8 +82,26 @@ class PositionEval:
     turn: chess.Color
     """De quién es el turno en esta posición (quién va a mover a continuación)."""
     score: chess.engine.PovScore
-    best_move: chess.Move | None
-    pv: tuple[chess.Move, ...]
+    """La evaluación de la mejor línea, o la deducida si la posición es terminal."""
+    lines: tuple[EngineLine, ...] = ()
+    """MultiPV completo, de mejor a peor. Vacío en una posición terminal, donde
+    no se consulta al motor porque no hay jugada que buscar."""
+
+    @property
+    def best_move(self) -> chess.Move | None:
+        """La jugada que recomienda el motor: la de su primera línea."""
+        return self.lines[0].move if self.lines else None
+
+    @property
+    def pv(self) -> tuple[chess.Move, ...]:
+        return self.lines[0].pv if self.lines else ()
+
+    @property
+    def wdl(self) -> chess.engine.PovWdl | None:
+        """La W/D/L de la mejor línea (RF-2.6): lo que el motor opina de esta
+        posición. `None` en una posición terminal, donde no se le pregunta, y
+        con un motor que no la informe."""
+        return self.lines[0].wdl if self.lines else None
 
 
 @dataclass(frozen=True)
@@ -67,6 +121,11 @@ class AnalyzedMove:
     win_percent_before: float
     win_percent_after: float
     best_move_uci: str | None
+    alternatives: tuple[EngineLine, ...] = ()
+    """Lo que el motor proponía en la posición **anterior** a esta jugada, de
+    mejor a peor (RF-10.1). Es el material de "lo que podías haber jugado en su
+    lugar" (RF-10.2): la primera es la que recomendaba, y las demás son las que
+    también valían. Con MultiPV 1 solo está la primera."""
 
 
 @dataclass(frozen=True)
@@ -77,7 +136,7 @@ class AnalyzedGame:
 
 
 async def evaluate_positions(
-    engine: AnalysingEngine,
+    engine: AnalyzingEngine,
     board: chess.Board,
     moves: list[chess.Move],
     on_position: OnPosition | None = None,
@@ -89,70 +148,109 @@ async def evaluate_positions(
     (RF-2.4) en un análisis largo, sin que este módulo sepa nada de colas ni
     de WebSockets.
     """
-    posiciones: list[PositionEval] = []
-    actual = board.copy()
+    position_evals: list[PositionEval] = []
+    current_board = board.copy()
     for ply in range(len(moves) + 1):
-        lineas = await engine.analyse(actual)
-        mejor = lineas[0]
-        pv = mejor.get("pv") or []
-        posiciones.append(
+        # En una posición terminal el resultado ya está decidido y no hay
+        # jugada que buscar. Además hay que evitar preguntarle al motor: Lc0 se
+        # queda colgado indefinidamente si se le pide `go` en una posición sin
+        # jugadas legales, lo que dejaba tieso el análisis de cualquier partida
+        # terminada en jaque mate.
+        lines: tuple[EngineLine, ...] = ()
+        if not current_board.is_game_over():
+            lines = tuple(
+                EngineLine(
+                    score=line["score"], pv=tuple(line.get("pv") or []), wdl=line.get("wdl")
+                )
+                for line in await engine.analyze(current_board)
+            )
+        position_evals.append(
             PositionEval(
                 ply=ply,
-                fen=actual.fen(),
-                turn=actual.turn,
-                score=mejor["score"],
-                best_move=pv[0] if pv else None,
-                pv=tuple(pv),
+                fen=current_board.fen(),
+                turn=current_board.turn,
+                score=lines[0].score if lines else _terminal_score(current_board),
+                lines=lines,
             )
         )
         if on_position is not None:
             await on_position(ply, len(moves))
         if ply < len(moves):
-            actual.push(moves[ply])
-    return posiciones
+            current_board.push(moves[ply])
+    return position_evals
+
+
+def _terminal_score(board: chess.Board) -> chess.engine.PovScore:
+    """Evaluación de una posición ya terminada, sin consultar al motor.
+
+    `Mate(0)` es la forma que tiene `python-chess` de decir "a quien le toca
+    mover ya está mateado". El resto de finales (ahogado, material
+    insuficiente, repetición, 50 jugadas) son tablas.
+    """
+    score = chess.engine.Mate(0) if board.is_checkmate() else chess.engine.Cp(0)
+    return chess.engine.PovScore(score, board.turn)
 
 
 async def analyze_game(
-    engine: AnalysingEngine,
+    engine: AnalyzingEngine,
     board: chess.Board,
     moves: list[chess.Move],
     thresholds: ClassificationThresholds | None = None,
     on_position: OnPosition | None = None,
 ) -> AnalyzedGame:
-    """Evalúa, clasifica y calcula la precisión de una partida completa."""
-    posiciones = await evaluate_positions(engine, board, moves, on_position)
+    """Evalúa, clasifica y calcula la precisión de una partida completa.
+
+    `board` es la posición de partida y `moves` la línea principal jugada
+    desde ella: quien llama debe pasar la posición real de la partida (en
+    `apps/api`, `pgn_game.board()`), no un `chess.Board()` recién creado, o
+    las jugadas de una partida con `[SetUp "1"]` + `[FEN ...]` se replicarán
+    sobre un tablero que no es el suyo.
+
+    Las jugadas que siguen en la tabla ECO se marcan como teoría y no se
+    puntúan como aciertos de quien las jugó (RF-2.2).
+    """
+    position_evals = await evaluate_positions(engine, board, moves, on_position)
 
     # Las fases se calculan sobre los tableros, no sobre las evaluaciones: no
     # hace falta el motor para saber si una posición es un final.
-    tableros: list[chess.Board] = []
-    recorrido = board.copy()
+    boards_by_ply: list[chess.Board] = []
+    replay_board = board.copy()
     for move in moves:
-        tableros.append(recorrido.copy())
-        recorrido.push(move)
-    fases = phases_by_ply(tableros)
+        boards_by_ply.append(replay_board.copy())
+        replay_board.push(move)
+    phases = phases_by_ply(boards_by_ply)
 
-    analizadas: list[AnalyzedMove] = []
-    actual = board.copy()
+    # Hasta dónde llega la teoría: las jugadas de esa racha inicial se
+    # etiquetan como "book" y no como acierto o error de quien las jugó.
+    book_plies = identify_opening(board, moves).book_plies
+
+    analyzed_moves: list[AnalyzedMove] = []
+    current_board = board.copy()
     for i, move in enumerate(moves):
-        antes, despues = posiciones[i], posiciones[i + 1]
-        clasificacion, win_antes, win_despues = classify_move(antes, despues, move, thresholds)
-        analizadas.append(
+        before, after = position_evals[i], position_evals[i + 1]
+        classification, win_before, win_after = classify_move(
+            before, after, move, thresholds, in_opening_book=i < book_plies
+        )
+        analyzed_moves.append(
             AnalyzedMove(
                 ply=i,
-                color=antes.turn,
-                san=actual.san(move),
+                color=before.turn,
+                san=current_board.san(move),
                 uci=move.uci(),
-                fen_before=antes.fen,
-                classification=clasificacion,
-                phase=fases[i],
-                accuracy=move_accuracy(win_antes, win_despues),
-                win_percent_before=win_antes,
-                win_percent_after=win_despues,
-                best_move_uci=antes.best_move.uci() if antes.best_move else None,
+                fen_before=before.fen,
+                classification=classification,
+                phase=phases[i],
+                accuracy=move_accuracy(win_before, win_after),
+                win_percent_before=win_before,
+                win_percent_after=win_after,
+                best_move_uci=before.best_move.uci() if before.best_move else None,
+                alternatives=before.lines,
             )
         )
-        actual.push(move)
+        current_board.push(move)
 
-    blancas = game_accuracy([m.accuracy for m in analizadas if m.color == chess.WHITE])
-    negras = game_accuracy([m.accuracy for m in analizadas if m.color == chess.BLACK])
-    return AnalyzedGame(moves=analizadas, white_accuracy=blancas, black_accuracy=negras)
+    white_accuracy = game_accuracy([m.accuracy for m in analyzed_moves if m.color == chess.WHITE])
+    black_accuracy = game_accuracy([m.accuracy for m in analyzed_moves if m.color == chess.BLACK])
+    return AnalyzedGame(
+        moves=analyzed_moves, white_accuracy=white_accuracy, black_accuracy=black_accuracy
+    )

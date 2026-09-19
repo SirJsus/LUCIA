@@ -1,15 +1,24 @@
 /** Lista de tableros de análisis guardados (RF-6.4), y su creación desde la
- * posición inicial, un FEN o un PGN pegado (RF-6.1). */
+ * posición inicial, un FEN, un PGN pegado o el editor de posición (RF-6.1).
+ *
+ * Las cuatro formas terminan en el mismo sitio: el campo "FEN o PGN", que
+ * `parseSource` convierte en la raíz y el árbol del tablero. El editor no es
+ * una segunda forma de crear, es un ayudante que escribe en ese campo. */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Chess } from "chess.js";
 import { useState } from "react";
+import { Badge } from "../../components/Badge";
+import { Button } from "../../components/Button";
+import { CustomPositionBadge } from "../../components/CustomPositionBadge";
+import { FieldLabel } from "../../components/FieldLabel";
 import { EmptyState, ErrorBox, Spinner } from "../../components/Feedback";
+import { buttonClasses, FIELD_CLASSES, PANEL_CLASSES } from "../../components/styles";
 import { api } from "../../lib/api";
 import { formatDate } from "../../lib/format";
-import { addMove, createRoot, type TreeNode } from "./tree";
-
-const STARTING_FEN = new Chess().fen();
+import { STANDARD_STARTING_FEN } from "./position";
+import { PositionEditor } from "./PositionEditor";
+import { createRoot, fromPgn, type TreeNode } from "./tree";
 
 export function BoardsPage() {
   const queryClient = useQueryClient();
@@ -17,6 +26,7 @@ export function BoardsPage() {
   const [title, setTitle] = useState("");
   const [source, setSource] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [isEditorOpen, setEditorOpen] = useState(false);
 
   const boardsQuery = useQuery({ queryKey: ["boards"], queryFn: api.listBoards });
 
@@ -33,6 +43,13 @@ export function BoardsPage() {
     mutationFn: api.deleteBoard,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["boards"] }),
   });
+
+  /** Qué tablero se está borrando ahora mismo: la mutación es una sola para
+   * toda la lista, así que sin mirar sus `variables` se marcarían todas las
+   * filas a la vez. */
+  function isDeleting(boardId: number): boolean {
+    return deleteMutation.isPending && deleteMutation.variables === boardId;
+  }
 
   function handleCreate(event: React.FormEvent) {
     event.preventDefault();
@@ -51,53 +68,80 @@ export function BoardsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-bold">Tableros de análisis</h1>
-      <p className="-mt-4 text-sm opacity-70">
-        Para partidas presenciales, posiciones de libro o ideas sueltas. No cuentan en tus
-        estadísticas.
-      </p>
+      {/* Título y frase de entrada van juntos, como en Motores: sueltos,
+          había que anular el `space-y-6` de la pantalla con un margen
+          negativo para que la frase no pareciera de otra sección. */}
+      <div>
+        <h1 className="text-2xl font-bold">Tableros de análisis</h1>
+        <p className="mt-1 text-sm opacity-70">
+          Para partidas presenciales, posiciones de libro o ideas sueltas. No cuentan en tus
+          estadísticas.
+        </p>
+      </div>
 
       <form
         onSubmit={handleCreate}
-        className="space-y-3 rounded border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900"
+        className={`space-y-3 p-4 ${PANEL_CLASSES}`}
       >
         <div className="flex flex-wrap gap-3">
-          <label className="text-sm">
-            <span className="mb-1 block opacity-70">Título</span>
+          <FieldLabel label="Título">
             <input
               value={title}
               onChange={(event) => setTitle(event.target.value)}
               placeholder="Mi partida del club"
-              className="w-64 rounded border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-950"
+              className={`w-64 ${FIELD_CLASSES}`}
             />
-          </label>
+          </FieldLabel>
         </div>
 
-        <label className="block text-sm">
-          <span className="mb-1 block opacity-70">
-            FEN o PGN de partida (opcional; vacío = posición inicial)
-          </span>
+        <FieldLabel
+          label="FEN o PGN de partida"
+          hint="Opcional: vacío empieza en la posición estándar."
+        >
           <textarea
             value={source}
             onChange={(event) => setSource(event.target.value)}
             rows={3}
             placeholder="rnbqkbnr/pppppppp/... o 1. e4 e5 2. Nf3"
-            className="w-full rounded border border-slate-300 bg-white px-2 py-1.5 font-mono text-xs dark:border-slate-700 dark:bg-slate-950"
+            className={`w-full font-mono text-xs ${FIELD_CLASSES}`}
           />
-        </label>
+        </FieldLabel>
 
-        {error && <p className="text-sm text-red-700 dark:text-red-300">{error}</p>}
+        {/* La cuarta forma de partir (RF-6.1), para quien no tiene un FEN a
+            mano: monta la posición sobre un tablero y escribe su FEN en el
+            campo de arriba. Va debajo del campo y no en otra pantalla porque
+            es un ayudante de ese campo, no otra manera de crear. */}
+        <div>
+          <Button
+            onClick={() => setEditorOpen(!isEditorOpen)}
+            title="Coloca las piezas sobre un tablero y usa esa posición"
+          >
+            {isEditorOpen ? "Cancelar" : "Editor de posición"}
+          </Button>
+        </div>
+        {isEditorOpen && (
+          <PositionEditor
+            initialFen={source.trim() || STANDARD_STARTING_FEN}
+            onUse={(fen) => {
+              setSource(fen);
+              setEditorOpen(false);
+              setError(null);
+            }}
+          />
+        )}
+
+        {/* El error de validación usa el mismo recuadro que el de la API:
+            antes uno era un párrafo rojo suelto y el otro un `ErrorBox`, a dos
+            líneas de distancia dentro del mismo formulario. */}
+        {error && <ErrorBox error={new Error(error)} />}
         {createMutation.isError && <ErrorBox error={createMutation.error} />}
 
-        <button
-          type="submit"
-          disabled={createMutation.isPending}
-          className="rounded bg-slate-900 px-3 py-1.5 text-sm text-white disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900"
-        >
+        <Button type="submit" variant="primary" disabled={createMutation.isPending}>
           {createMutation.isPending ? "Creando…" : "Crear tablero"}
-        </button>
+        </Button>
       </form>
 
+      {deleteMutation.isError && <ErrorBox error={deleteMutation.error} />}
       {boardsQuery.isPending && <Spinner />}
       {boardsQuery.isError && <ErrorBox error={boardsQuery.error} onRetry={boardsQuery.refetch} />}
 
@@ -110,30 +154,57 @@ export function BoardsPage() {
           {boardsQuery.data.map((board) => (
             <li
               key={board.id}
-              className="flex items-center justify-between gap-3 rounded border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900"
+              className={`flex items-center justify-between gap-3 px-3 py-2 ${PANEL_CLASSES}`}
             >
-              <Link
-                to="/boards/$boardId"
-                params={{ boardId: String(board.id) }}
-                className="flex-1 hover:underline"
-              >
+              <div className="flex-1">
                 <span className="font-medium">{board.title}</span>
                 {board.is_own_game && (
-                  <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-xs text-sky-800 dark:bg-sky-900/60 dark:text-sky-200">
-                    partida propia
+                  <span className="ml-2">
+                    <Badge
+                      tone="info"
+                      title="Está publicado como una partida más: cuenta en Partidas y en tus Estadísticas"
+                    >
+                      partida propia
+                    </Badge>
+                  </span>
+                )}
+                {/* Un tablero se crea desde un FEN casi siempre: decir de qué
+                    posición arranca es más útil aquí que en ningún otro sitio. */}
+                {board.root_fen !== STANDARD_STARTING_FEN && (
+                  <span className="ml-2">
+                    <CustomPositionBadge />
                   </span>
                 )}
                 <span className="ml-2 text-xs opacity-60">
                   actualizado {formatDate(board.updated_at)}
                 </span>
-              </Link>
-              <button
-                type="button"
-                onClick={() => deleteMutation.mutate(board.id)}
-                className="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-red-50 dark:border-slate-700 dark:hover:bg-red-950/50"
+              </div>
+              {/* Abrir un elemento se hace igual que en Partidas: un enlace con
+                  aspecto de botón al final de la fila, separado de eliminar. */}
+              <Link
+                to="/boards/$boardId"
+                params={{ boardId: String(board.id) }}
+                className={buttonClasses("secondary", "sm")}
               >
-                Eliminar
-              </button>
+                Ver tablero
+              </Link>
+              {/* Destruir siempre pregunta, aquí y en el árbol de variantes:
+                  no hay deshacer para ninguna de las dos. Y mientras la
+                  petición viaja lo dice, como el resto de escrituras de la
+                  aplicación (criterio C-3): la fila se quedaba igual y daba la
+                  sensación de que el botón no había hecho nada. */}
+              <Button
+                variant="danger"
+                size="sm"
+                disabled={isDeleting(board.id)}
+                onClick={() => {
+                  if (window.confirm(`¿Eliminar el tablero "${board.title}"? No se puede deshacer.`)) {
+                    deleteMutation.mutate(board.id);
+                  }
+                }}
+              >
+                {isDeleting(board.id) ? "Eliminando…" : "Eliminar"}
+              </Button>
             </li>
           ))}
         </ul>
@@ -148,35 +219,30 @@ interface ParsedSource {
 }
 
 /** Acepta un FEN, un PGN o nada (RF-6.1). Se intenta primero como FEN porque
- * es más específico: un PGN nunca se confunde con un FEN válido. */
+ * es más específico: un PGN nunca se confunde con un FEN válido.
+ *
+ * El PGN pasa por el mismo `fromPgn` que el panel "Importar PGN" del tablero
+ * (RF-6.7), no por `loadPgn` de chess.js: aquel conserva las variantes y los
+ * comentarios y este los descarta, y pegar el mismo archivo al crear o
+ * después no puede dar dos tableros distintos (criterio C-5 de
+ * docs/07-coherencia-ui.md). */
 function parseSource(source: string): ParsedSource | null {
-  const texto = source.trim();
-  if (!texto) return { rootFen: STARTING_FEN, tree: createRoot(STARTING_FEN) };
+  const trimmedSource = source.trim();
+  if (!trimmedSource) {
+    return { rootFen: STANDARD_STARTING_FEN, tree: createRoot(STANDARD_STARTING_FEN) };
+  }
 
   try {
-    const chess = new Chess(texto);
+    const chess = new Chess(trimmedSource);
     return { rootFen: chess.fen(), tree: createRoot(chess.fen()) };
   } catch {
     // no era un FEN; se intenta como PGN
   }
 
   try {
-    const chess = new Chess();
-    chess.loadPgn(texto);
-    const historial = chess.history({ verbose: true });
-    if (historial.length === 0) return null;
-
-    const rootFen = historial[0].before;
-    let tree = createRoot(rootFen);
-    let cursor = tree.id;
-    for (const move of historial) {
-      const result = addMove(tree, cursor, move.san);
-      if (!result) break;
-      tree = result.root;
-      cursor = result.nodeId;
-    }
-    return { rootFen, tree };
+    const parsed = fromPgn(trimmedSource);
+    return { rootFen: parsed.root.fen, tree: parsed.root };
   } catch {
-    return null;
+    return null; // tampoco es un PGN con jugadas legales
   }
 }

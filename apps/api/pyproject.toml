@@ -1,13 +1,15 @@
 [project]
 name = "lucia-api"
-version = "0.2.0"
+version = "0.4.0"
 description = "API FastAPI de LUCIA: orquesta motores, sincroniza chess.com y expone analisis."
 requires-python = ">=3.12"
 license = "GPL-3.0-or-later"
 dependencies = [
     "lucia-core",
     "lucia-chesscom",
+    "lucia-lichess",
     "fastapi>=0.115",
+    "python-multipart>=0.0.9",  # subida del archivo PGN (RF-1.5)
     "uvicorn[standard]>=0.30",
     "sqlalchemy[asyncio]>=2.0",
     "aiosqlite>=0.20",
@@ -17,7 +19,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "pytest-asyncio>=0.24", "httpx>=0.27", "ruff>=0.6"]
+# httpx2 y no httpx: es el cliente que pide el `TestClient` de starlette desde
+# la 1.6 (con httpx a secas avisa en cada corrida de pytest). Solo lo usan los
+# tests; los clientes de chess.com y lichess siguen con httpx, que es una
+# dependencia suya y no de aquí. BSD-3-Clause, compatible con GPL-3.0.
+dev = ["pytest>=8", "pytest-asyncio>=0.24", "httpx2>=2.13", "ruff>=0.6"]
 
 [build-system]
 requires = ["hatchling"]

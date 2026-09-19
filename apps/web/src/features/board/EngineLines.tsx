@@ -1,51 +1,63 @@
 /** Líneas del motor para la posición actual (RF-6.2), con evaluación desde el
- * punto de vista de las blancas, como es costumbre en ajedrez. */
+ * punto de vista de las blancas, como es costumbre en ajedrez.
+ *
+ * Lo propio de este panel son los **estados** del motor —apagado, buscando,
+ * con error, sin líneas y con líneas—, porque es la pantalla que más depende
+ * de él (criterio C-3 de docs/07-coherencia-ui.md). Las líneas en sí las pinta
+ * `EngineLineList`, que comparte con el visor: es el mismo dato, y desde
+ * RF-10.2 el visor también lo enseña.
+ */
 import type { EngineLine } from "@lucia/shared-types";
-import { formatScore } from "../../lib/score";
+import { EmptyState, ErrorBox, ProgressBox } from "../../components/Feedback";
+import { EngineLineList } from "../../components/board/EngineLineList";
+import { Panel } from "../../components/Panel";
+import { formatEngineName } from "../../lib/format";
 
 export function EngineLines({
   lines,
+  engineName,
+  isEngineOn,
   isLoading,
-  onPlayMove,
+  error,
+  onPlayLine,
+  onPreviewLine,
 }: {
   lines: EngineLine[] | undefined;
+  /** Qué motor firma estas líneas: sin decirlo, dos evaluaciones distintas de
+   * la misma posición no se pueden comparar (criterio C-5). */
+  engineName: string;
+  isEngineOn: boolean;
   isLoading: boolean;
-  onPlayMove: (san: string) => void;
+  error: unknown;
+  /** Jugadas (SAN) a jugar desde la posición actual, en orden. */
+  onPlayLine: (sanMoves: string[]) => void;
+  /** Continuación a dibujar en el tablero, o `null` para dejar de dibujarla. */
+  onPreviewLine: (pvUci: string[] | null) => void;
 }) {
+  // Qué le pasa al motor ahora mismo, si es que hay algo que contar. El panel
+  // se quedaba fuera de la pantalla al apagarlo, y "no hay panel" se confunde
+  // con "el motor no dice nada".
+  const status = !isEngineOn ? (
+    <EmptyState title="Motor apagado">
+      Enciéndelo en la cabecera para ver qué jugadas propone aquí.
+    </EmptyState>
+  ) : isLoading ? (
+    <ProgressBox label="Analizando la posición…" progress={null} />
+  ) : error ? (
+    <ErrorBox error={error} />
+  ) : !lines?.length ? (
+    <EmptyState title="Sin líneas para esta posición">
+      El motor no propone ninguna jugada aquí.
+    </EmptyState>
+  ) : null;
+
   return (
-    <div className="rounded border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
-      <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2 text-sm font-medium dark:border-slate-800">
-        <span>Motor</span>
-        {isLoading && <span className="text-xs font-normal opacity-60">analizando…</span>}
-      </div>
+    <Panel title={`Motor · ${formatEngineName(engineName)}`} bodyClassName="">
+      {status && <div className="p-3">{status}</div>}
 
-      {!lines?.length && !isLoading && (
-        <p className="px-3 py-3 text-sm opacity-60">Sin líneas para esta posición.</p>
+      {isEngineOn && !!lines?.length && (
+        <EngineLineList lines={lines} onPreviewLine={onPreviewLine} onPlayLine={onPlayLine} />
       )}
-
-      <ul className="divide-y divide-slate-100 text-sm dark:divide-slate-800">
-        {lines?.map((line) => (
-          <li key={line.rank} className="flex gap-2 px-3 py-2">
-            <span className="w-14 shrink-0 font-mono tabular-nums">{formatScore(line)}</span>
-            <span className="flex flex-wrap gap-x-1.5 gap-y-0.5">
-              {line.pv_san.slice(0, 12).map((san, index) => (
-                <button
-                  key={`${line.rank}-${index}`}
-                  type="button"
-                  // Solo la primera jugada es aplicable desde la posición
-                  // actual; el resto ya depende de las anteriores.
-                  disabled={index > 0}
-                  onClick={() => onPlayMove(san)}
-                  className="font-mono enabled:hover:underline disabled:opacity-70"
-                  title={index === 0 ? "Jugar esta jugada" : undefined}
-                >
-                  {san}
-                </button>
-              ))}
-            </span>
-          </li>
-        ))}
-      </ul>
-    </div>
+    </Panel>
   );
 }

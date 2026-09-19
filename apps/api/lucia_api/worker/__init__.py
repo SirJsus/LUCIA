@@ -1,4 +1,4 @@
-"""Cola de análisis en background (RF-2.4): un `asyncio.Queue` en proceso,
+"""Cola de análisis en background (RF-2.4, RF-6.9): un `asyncio.Queue` en proceso,
 sin Redis (ver ADR-0001/0005 y docs/04-stack-tecnologico.md — se extrae a
 `arq` + Redis si hace falta escalar). Un único consumidor procesa un análisis
 a la vez; el progreso se publica a quien esté escuchando por WebSocket.
@@ -51,19 +51,19 @@ class AnalysisWorker:
 
     def subscribe(self, analysis_id: int) -> asyncio.Queue[Event]:
         """Un WebSocket llama esto para recibir eventos de progreso."""
-        cola: asyncio.Queue[Event] = asyncio.Queue()
-        self._subscribers[analysis_id].append(cola)
-        return cola
+        subscriber_queue: asyncio.Queue[Event] = asyncio.Queue()
+        self._subscribers[analysis_id].append(subscriber_queue)
+        return subscriber_queue
 
-    def unsubscribe(self, analysis_id: int, cola: asyncio.Queue[Event]) -> None:
+    def unsubscribe(self, analysis_id: int, subscriber_queue: asyncio.Queue[Event]) -> None:
         with contextlib.suppress(ValueError):
-            self._subscribers[analysis_id].remove(cola)
+            self._subscribers[analysis_id].remove(subscriber_queue)
         if not self._subscribers[analysis_id]:
             self._subscribers.pop(analysis_id, None)
 
-    async def _publish(self, analysis_id: int, evento: Event) -> None:
-        for cola in self._subscribers.get(analysis_id, []):
-            await cola.put(evento)
+    async def _publish(self, analysis_id: int, event: Event) -> None:
+        for subscriber_queue in self._subscribers.get(analysis_id, []):
+            await subscriber_queue.put(event)
 
     async def _consume(self) -> None:
         while True:
@@ -78,16 +78,29 @@ class AnalysisWorker:
             analysis = await session.get(Analysis, analysis_id)
             if analysis is None:
                 return  # se borró entre encolar y procesar; nada que hacer
-            game = await session.get(Game, analysis.game_id)
-            if game is None:
+            pgn = await self._load_pgn_to_analyze(session, analysis)
+            if pgn is None:
                 analysis.status = "error"
-                analysis.error = "la partida ya no existe"
+                analysis.error = "lo que había que analizar ya no existe"
                 await session.commit()
                 await self._publish(analysis_id, {"status": "error", "error": analysis.error})
                 return
 
-            async def progreso(ply: int, total: int) -> None:
+            async def publish_progress(ply: int, total: int) -> None:
                 await self._publish(analysis_id, {"status": "running", "ply": ply, "total": total})
 
-            await run_analysis(session, analysis, game, on_progress=progreso)
+            await run_analysis(session, analysis, pgn, on_progress=publish_progress)
             await self._publish(analysis_id, {"status": analysis.status, "error": analysis.error})
+
+    async def _load_pgn_to_analyze(self, session: AsyncSession, analysis: Analysis) -> str | None:
+        """Las jugadas que hay que analizar, vengan de donde vengan.
+
+        Un análisis de tablero (RF-6.9) trae su PGN consigo —lo mandó el
+        front al pedirlo, porque el árbol lo interpreta chess.js y no la
+        API—; uno de partida lo lee de `games.pgn`, que no cambia. `None` si
+        la partida se borró entre encolar y procesar.
+        """
+        if analysis.analyzed_pgn is not None:
+            return analysis.analyzed_pgn
+        game = await session.get(Game, analysis.game_id)
+        return game.pgn if game is not None else None
