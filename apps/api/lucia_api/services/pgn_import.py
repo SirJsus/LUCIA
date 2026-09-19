@@ -29,12 +29,16 @@ import io
 
 import chess.pgn
 from lucia_chesscom import parse_move_clocks
-from lucia_core.openings import opening_of_pgn
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db.models import Game, Player
+from lucia_api.services.games import (
+    UNKNOWN_TIME_CLASS,
+    UNKNOWN_TIME_CONTROL,
+    set_pgn_and_opening,
+)
 
 #: Resultado del PGN traducido al vocabulario por bando que usa `games`
 #: (ver `lucia_api.services.games`). Una partida sin terminar ("*") no está
@@ -172,7 +176,7 @@ async def _upsert_game(
         session.add(game)
 
     white_result, black_result = SIDE_RESULTS_BY_PGN_RESULT[headers["Result"]]
-    game.pgn = pgn_text
+    set_pgn_and_opening(game, pgn_text)
     game.white_username = _resolve_side_username(
         headers.get("White", "?"), player_name_in_pgn, username
     )
@@ -183,14 +187,11 @@ async def _upsert_game(
     game.black_rating = _parse_rating(headers.get("BlackElo"))
     game.white_result = white_result
     game.black_result = black_result
-    game.time_control = headers.get("TimeControl") or "-"
-    game.time_class = "unknown"
+    game.time_control = headers.get("TimeControl") or UNKNOWN_TIME_CONTROL
+    game.time_class = UNKNOWN_TIME_CLASS
     game.rules = "chess"
     game.rated = False
     game.eco = headers.get("ECO")
-    opening = opening_of_pgn(pgn_text)
-    game.opening_eco = opening.eco if opening else None
-    game.opening_name = opening.name if opening else None
     game.clocks_json = parse_move_clocks(pgn_text)
     game.played_at = _parse_played_at(headers)
     game.year = game.played_at.year

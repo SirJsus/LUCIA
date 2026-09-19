@@ -36,7 +36,7 @@ alternativas y las convierte en `MoveContext`, el tipo que el núcleo sabe leer.
 
 Los momentos críticos salen en `GET /analysis/{id}`, que es donde se miran —una
 partida concreta, los dos bandos—, y los patrones agregados en
-`GET /stats/{username}`, que solo mira las jugadas del jugador.
+`GET /stats?username=…`, que solo mira las jugadas del jugador.
 
 ## Razones
 
@@ -62,7 +62,7 @@ partida concreta, los dos bandos—, y los patrones agregados en
 
 ## Consecuencias
 
-- **El coste crece con el historial.** `GET /stats/{username}` carga las jugadas
+- **El coste crece con el historial.** `GET /stats?username=…` carga las jugadas
   del jugador en todas sus partidas analizadas para pasárselas a los tres
   extractores; se cargan **una sola vez** por petición precisamente por eso. Si
   con un historial grande la petición se vuelve lenta, la salida es cachear el
@@ -99,3 +99,20 @@ partida concreta, los dos bandos—, y los patrones agregados en
 - `packages/core/lucia_core/insights/__init__.py` (las reglas),
   `apps/api/lucia_api/services/insights.py` (el puente con la base) y
   `apps/api/lucia_api/services/stats.py` (los agregados).
+
+## Corrección de hecho (2026-09-19)
+
+Este ADR nombraba el endpoint de estadísticas como `GET /stats/{username}`, en
+la decisión y en la primera consecuencia. **Ese endpoint no existió nunca**: es
+`GET /stats?username=…`, con el nombre en la cadena de consulta y opcional —sin
+él se resuelve al de `CHESSCOM_USERNAME`—, y así está en `routers/stats.py`
+desde el primer día (comprobado en el historial de git al auditar el cierre de
+la fase 2). Las dos menciones quedan corregidas arriba.
+
+Se corrige **en el propio archivo**, y no con un ADR nuevo, porque no se está
+cambiando ninguna decisión: lo que este documento decide —que los patrones se
+deducen al leer, sin tabla propia ni segunda pasada del motor— es exactamente
+lo mismo antes y después. La norma del proyecto de no editar un ADR publicado
+protege el registro de las **decisiones**, no obliga a conservar un dato de
+hecho equivocado que desinforma a quien lo lea. Queda esta nota para que la
+corrección no sea silenciosa, que es lo que esa norma sí busca evitar.

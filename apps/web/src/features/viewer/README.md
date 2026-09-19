@@ -7,7 +7,8 @@ descarga de la partida como PGN anotado (RF-5.5).
 
 Las piezas de tablero que comparte con el tablero de análisis (`Chessboard`,
 `EvalBar`, `BoardWithEvalBar`, `MoveNavigator`, `MoveButton`, `EngineLineList`,
-`boardConfig` y los atajos de `useMoveNavigationKeys`) ya no viven aquí, sino en
+`boardConfig`, la capa de ocupación de RF-7 y los atajos de
+`useMoveNavigationKeys`) ya no viven aquí, sino en
 `components/board/`; fuera de tablero comparte con él `EngineSelect` y
 `ClassificationBadge`, y desde RF-6.9 también el seguimiento del análisis en
 background (`lib/useTrackedAnalysis.ts`, con `useElapsedSeconds`), que estaba
@@ -93,6 +94,16 @@ original, que es justo lo que pide RF-5.2.
 La copia **nunca nace marcada como "partida propia"** (RF-6.5): esa marca
 publica el tablero en el historial, y esta partida ya está en él, así que
 marcarla la contaría dos veces en el dashboard.
+
+## Ocupación del tablero
+
+La capa de RF-7 (quién controla cada casilla, piezas colgadas, clavadas y rayos
+X) se enciende con la tecla `O` o desde su panel, bajo el tablero. Esta pantalla
+no calcula nada: le pasa a `useOccupancy` el FEN de la jugada en la que está
+parada y pone `OccupancyLayer` en el hueco `overlay` de `Chessboard`. Todo lo
+demás vive en `components/board/`, compartido con el tablero de análisis, y no
+pasa por la API ni por el motor. Cambiar de jugada suelta la casilla
+inspeccionada: era de la posición anterior.
 
 ## Momentos críticos
 

@@ -29,6 +29,7 @@ async def _create_game(
     rated: bool = True,
     days_ago: int = 0,
     pgn: str = PGN,
+    platform: str = "chesscom",
 ) -> Game:
     player = (
         await session.execute(select(Player).where(Player.username == white))
@@ -39,7 +40,7 @@ async def _create_game(
         await session.flush()
     game = Game(
         player_id=player.id,
-        platform="chesscom",
+        platform=platform,
         platform_id=platform_id,
         pgn=pgn,
         white_username=white,
@@ -327,3 +328,23 @@ async def test_list_games_reports_how_many_match_the_filters(
     assert len(page.json()) == 2
     assert page.headers["X-Total-Count"] == "5"
     assert filtered.headers["X-Total-Count"] == "0"
+
+
+async def test_the_listing_says_where_each_game_came_from(db_session: AsyncSession) -> None:
+    """El front necesita el origen para explicar los huecos: una partida
+    importada de un PGN no trae ratings ni ritmo, y cuatro columnas vacías sin
+    una palabra se leen como un fallo (fila 67 del inventario de
+    docs/07-coherencia-ui.md)."""
+    await _create_game(db_session, platform_id="s1", white="ana", black="beto")
+    await _create_game(db_session, platform_id="m1", white="ana", black="caro", platform="manual")
+    await _create_game(db_session, platform_id="b1", white="ana", black="dani", platform="board")
+    _override(db_session)
+    try:
+        with TestClient(app) as http:
+            response = http.get("/games")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    platforms = {game["black_username"]: game["platform"] for game in response.json()}
+    assert platforms == {"beto": "chesscom", "caro": "manual", "dani": "board"}

@@ -84,7 +84,8 @@ popd >/dev/null
 cp "$ENGINES/lc0/$LC0_BUILDDIR/lc0" "$BIN/lc0"
 
 echo "== Redes de Lc0 =="
-# Se descargan dos, porque el tamaño de la red decide si Lc0 es usable:
+# Se descargan tres, porque la red —su tamaño y su arquitectura— decide si Lc0
+# es usable y para qué:
 #
 #   default.pb.gz  la última red publicada (~300 MB). Fuerte, pero en CPU cada
 #                  evaluación es lentísima. Medido en un i7 con BLAS: 200 nodos

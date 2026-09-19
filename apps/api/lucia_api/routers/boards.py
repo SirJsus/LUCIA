@@ -306,9 +306,7 @@ async def withdraw_own_game(
     return await _board_detail(session, board)
 
 
-async def _follow_own_game_to(
-    session: AsyncSession, board: Board, restored: BoardVersion
-) -> None:
+async def _follow_own_game_to(session: AsyncSession, board: Board, restored: BoardVersion) -> None:
     """Tras deshacer o rehacer, la partida publicada sigue al tablero (RF-6.5).
 
     Deshacer cambia las jugadas, y el historial es lo que el usuario jugó: si

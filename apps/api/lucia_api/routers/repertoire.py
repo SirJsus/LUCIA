@@ -14,7 +14,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from lucia_lichess import LichessExplorerAuthError, LichessExplorerClient, LichessExplorerError
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db import get_session
@@ -35,6 +35,8 @@ MAX_REFRESH_BUDGET = 60
 
 class DepartureOut(BaseModel):
     """Un punto donde el repertorio propio se separa del de los maestros."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     ply: int
     san: str
@@ -80,10 +82,7 @@ async def player_repertoire(
     """Dónde se sale el jugador de la teoría, con lo que ya está en la caché."""
     comparison = await compare_repertoire(session, resolved_username(username))
     return RepertoireOut(
-        departures=[
-            DepartureOut(**vars(item), score_percent=item.score_percent)
-            for item in comparison.departures
-        ],
+        departures=[DepartureOut.model_validate(item) for item in comparison.departures],
         games_compared=comparison.games_compared,
         positions_known=comparison.positions_known,
         positions_missing=comparison.positions_missing,

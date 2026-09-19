@@ -1,11 +1,11 @@
 # `features/dashboard`
 
-Estadísticas de la práctica propia (RF-3.1 a RF-3.6): marcador y rating por
+Estadísticas de la práctica propia (RF-3.1 a RF-3.7): marcador y rating por
 control de tiempo, partidas por mes, rendimiento por apertura, pérdida de
 ventaja por fase, reparto de errores por tipo, calidad de juego según el reloj
-que quedaba y comparación del repertorio con la teoría de maestros. Todo se
-agrega en la API (`GET /stats/{username}`, y `GET /repertoire` para la última);
-aquí solo se presenta.
+que quedaba, evolución mes a mes y comparación del repertorio con la teoría de
+maestros. Todo se agrega en la API (`GET /stats?username=…`, y `GET /repertoire`
+para la última); aquí solo se presenta.
 
 Las tablas salen de `components/DataTable` y los gráficos de **Recharts**, que
 pinta ejes y tooltip con estilos en línea y por eso necesita la paleta como
@@ -32,6 +32,25 @@ ratón (criterio C-6 de
 [`docs/07-coherencia-ui.md`](../../../../../docs/07-coherencia-ui.md))—. El
 mismo archivo lo usa el visor para los momentos críticos, para que un tipo de
 error se llame igual en las dos pantallas.
+
+## Cómo evolucionas (RF-3.7)
+
+`TrendsSection` dibuja mes a mes la precisión, el rating y los errores por tipo,
+con la serie que la API devuelve en `stats.trends`; el tramo —mes natural— lo
+decide el backend, el mismo eje que "Partidas por mes" para que las dos se lean
+juntas. Aquí solo hay tres cosas propias de la pantalla:
+
+- **La frase de tendencia** (`formatTrendSentence` en `lib/insights.ts`) dice el
+  sentido con palabras y no con el signo: en precisión subir es mejorar y en
+  errores es empeorar, y un `+3` a secas no distingue las dos cosas.
+- **Los errores van por cada cien jugadas**, como los manda la API: el eje habla
+  de cómo se jugó, no de cuánto se jugó.
+- **El rating es el del control de tiempo más jugado y la pantalla dice cuál**
+  (`trends.rating_time_class`). Sin decirlo, la línea parecería "mi rating" y
+  sería la de una sola escala.
+
+Solo salen los meses con partidas analizadas, así que la sección tiene su propio
+vacío cuando no hay ninguna.
 
 ## El repertorio, la única sección que sale a internet (RF-3.6)
 

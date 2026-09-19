@@ -35,12 +35,19 @@ class FakeEngine:
         return self._lines
 
 
-def _line(cp: int = 40, mate: int | None = None) -> chess.engine.InfoDict:
+def _line(
+    cp: int = 40,
+    mate: int | None = None,
+    wdl: tuple[int, int, int] | None = None,
+) -> chess.engine.InfoDict:
     score = chess.engine.Mate(mate) if mate is not None else chess.engine.Cp(cp)
-    return {
+    line: chess.engine.InfoDict = {
         "score": chess.engine.PovScore(score, chess.WHITE),
         "pv": [chess.Move.from_uci("e2e4")],
     }
+    if wdl is not None:
+        line["wdl"] = chess.engine.PovWdl(chess.engine.Wdl(*wdl), chess.WHITE)
+    return line
 
 
 async def test_second_query_of_the_same_position_does_not_call_the_engine(
@@ -69,6 +76,38 @@ async def test_deserializes_the_cached_result_correctly(db_session: AsyncSession
 
     assert lines[0]["score"].white().score() == 123
     assert lines[0]["pv"][0] == chess.Move.from_uci("e2e4")
+
+
+async def test_caches_the_engine_win_draw_loss(db_session: AsyncSession) -> None:
+    """RF-2.6: la W/D/L del motor viaja en el mismo JSON que la puntuación, así
+    que una posición rescatada de la caché la conserva. Si no, reabrir una
+    partida analizada perdería justo la segunda opinión que la distingue."""
+    fake_engine = FakeEngine([_line(cp=20, wdl=(742, 163, 95))])
+    cached_engine = CachedEngineBridge(db_session, fake_engine, "lc0")
+    board = chess.Board()
+
+    await cached_engine.analyze(board)
+    lines = await cached_engine.analyze(board)  # esta viene de la caché
+
+    cached_wdl = lines[0]["wdl"].white()
+    assert (cached_wdl.wins, cached_wdl.draws, cached_wdl.losses) == (742, 163, 95)
+
+
+async def test_a_line_cached_before_rf_2_6_still_works(db_session: AsyncSession) -> None:
+    """Toda la caché escrita antes de pedirle la W/D/L al motor carece de esa
+    clave. Leerla tiene que seguir funcionando y dar simplemente "no la hay":
+    una línea sin W/D/L es válida, no un error."""
+    fake_engine = FakeEngine([_line(cp=55)])
+    cached_engine = CachedEngineBridge(db_session, fake_engine, "stockfish")
+    board = chess.Board()
+
+    await cached_engine.analyze(board)
+    cached_row = (await db_session.execute(select(PositionCache))).scalars().one()
+    assert "wdl" not in cached_row.lines_json[0]
+
+    lines = await cached_engine.analyze(board)
+    assert lines[0]["score"].white().score() == 55
+    assert lines[0].get("wdl") is None
 
 
 async def test_caches_mate_correctly(db_session: AsyncSession) -> None:

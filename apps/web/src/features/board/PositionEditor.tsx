@@ -13,8 +13,8 @@
  * arrastran para recolocarlas y se sueltan fuera del tablero para quitarlas.
  *
  * Lo del teclado no lo da chessground, que no hace enfocable ninguna casilla:
- * lo añade `SquareKeyboardGrid`, aquí abajo (criterio C-1 de
- * docs/07-coherencia-ui.md, fila 83).
+ * lo añade `SquareKeyboardGrid`, la rejilla que también usa la capa de
+ * ocupación (criterio C-1 de docs/07-coherencia-ui.md, fila 83).
  *
  * La posición se lleva en `position.ts`, que es lógica pura y está probada
  * aparte; aquí solo está la pantalla.
@@ -23,14 +23,20 @@ import type { Color, Role } from "chessground/types";
 import { createElement, useCallback, useRef, useState } from "react";
 import { Button } from "../../components/Button";
 import { Chessboard, type ChessboardApi } from "../../components/board/Chessboard";
+import {
+  chessgroundColor,
+  chessgroundRole,
+  pieceName,
+  type PieceColor,
+  type PieceRole,
+} from "../../components/board/pieces";
+import { SquareKeyboardGrid } from "../../components/board/SquareKeyboardGrid";
 import { FieldLabel } from "../../components/FieldLabel";
 import { WarningBox } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
 import { BOARD_HINT_CLASSES, FIELD_CLASSES } from "../../components/styles";
 import {
   CASTLING_FLAGS,
-  FILES,
-  RANKS,
   EMPTY_POSITION,
   enPassantSquares,
   fromFen,
@@ -40,7 +46,6 @@ import {
   type CastlingFlag,
   type EditablePosition,
   type PieceCode,
-  type PiecePlacement,
 } from "./position";
 
 /** Las piezas de la paleta, en dos filas: las blancas debajo y las negras
@@ -51,31 +56,17 @@ const PALETTE_ROWS: PieceCode[][] = [
   ["P", "N", "B", "R", "Q", "K"],
 ];
 
-/** Cada clase de pieza: cómo la dibuja chessground (`role`) y cómo se llama,
- * para el nombre accesible del botón —el dibujo no lo lee un lector de
- * pantalla y el color no se deduce de él (criterios C-6 y C-7)—.
- *
- * Los nombres van con su color ya concordado y no componiendo "nombre +
- * blanco": torre y dama son femeninas, y "Torre negro" delata que la frase la
- * armó una máquina.
- *
- * Se indexa por la letra en minúscula porque la mayúscula del FEN solo dice
- * el color, y de eso se ocupa `describePiece`. */
-const PIECE_KINDS: Record<string, { role: Role; white: string; black: string }> = {
-  p: { role: "pawn", white: "Peón blanco", black: "Peón negro" },
-  n: { role: "knight", white: "Caballo blanco", black: "Caballo negro" },
-  b: { role: "bishop", white: "Alfil blanco", black: "Alfil negro" },
-  r: { role: "rook", white: "Torre blanca", black: "Torre negra" },
-  q: { role: "queen", white: "Dama blanca", black: "Dama negra" },
-  k: { role: "king", white: "Rey blanco", black: "Rey negro" },
-};
-
 /** Lo que hace falta saber de una letra del FEN: el color lo dice la caja de
- * la letra, y el resto sale de `PIECE_KINDS`. */
+ * la letra y el resto sale de la tabla de piezas compartida, la misma que usa
+ * la capa de ocupación para nombrarlas (criterio C-5). */
 function describePiece(piece: PieceCode): { role: Role; color: Color; name: string } {
-  const kind = PIECE_KINDS[piece.toLowerCase()];
-  const color: Color = piece === piece.toUpperCase() ? "white" : "black";
-  return { role: kind.role, color, name: kind[color] };
+  const role = piece.toLowerCase() as PieceRole;
+  const color: PieceColor = piece === piece.toUpperCase() ? "w" : "b";
+  return {
+    role: chessgroundRole(role),
+    color: chessgroundColor(color),
+    name: pieceName(role, color),
+  };
 }
 
 /** Lo que se está poniendo al pulsar una casilla: una pieza, o la goma. */
@@ -159,16 +150,23 @@ export function PositionEditor({
           debajo. */}
       <div className="grid items-start gap-4 sm:grid-cols-[minmax(0,20rem)_minmax(0,1fr)]">
         <div className="space-y-2">
-          <div className="relative">
-            <Chessboard
-              fen={fen}
-              editable
-              onReady={(api) => (boardApi.current = api)}
-              onPositionChange={readBoard}
-              onSelectSquare={paintSquare}
-            />
-            <SquareKeyboardGrid pieces={position.pieces} onActivate={paintSquare} />
-          </div>
+          <Chessboard
+            fen={fen}
+            editable
+            onReady={(api) => (boardApi.current = api)}
+            onPositionChange={readBoard}
+            onSelectSquare={paintSquare}
+            overlay={
+              <SquareKeyboardGrid
+                orientation="white"
+                describeSquare={(square) => {
+                  const piece = position.pieces[square];
+                  return `${square}: ${piece ? describePiece(piece).name : "vacía"}`;
+                }}
+                onActivate={paintSquare}
+              />
+            }
+          />
           <p className={BOARD_HINT_CLASSES}>
             Elige una pieza y pulsa las casillas, o arrástrala desde la paleta. Arrastra fuera del
             tablero para quitar una pieza. Con teclado: tabula hasta el tablero, muévete con las
@@ -356,85 +354,4 @@ function PaletteButton({
       </span>
     </button>
   );
-}
-
-/** Una rejilla de casillas enfocables **encima** del tablero, para poder
- * montar la posición sin ratón (criterio C-1 de docs/07-coherencia-ui.md).
- *
- * Hace falta porque chessground no es accesible por teclado: no pone
- * `tabindex` en ninguna casilla ni escucha teclas. Esta capa no lo sustituye,
- * se le superpone.
- *
- * **No le quita el ratón a chessground**: la capa entera va con
- * `pointer-events-none`, así que los clics y los arrastres la atraviesan y
- * llegan al tablero de siempre. Lo único que aporta son paradas de foco y la
- * tecla Intro, que no dependen de los eventos de puntero.
- *
- * Una sola parada de tabulador y las flechas para moverse dentro, que es el
- * patrón de cualquier rejilla accesible: 64 paradas de tabulador harían
- * inservible el resto del formulario.
- */
-function SquareKeyboardGrid({
-  pieces,
-  onActivate,
-}: {
-  pieces: PiecePlacement;
-  onActivate: (square: string) => void;
-}) {
-  const [focused, setFocused] = useState("e4");
-
-  function moveFocus(event: React.KeyboardEvent, square: string) {
-    const fileIndex = FILES.indexOf(square[0] as (typeof FILES)[number]);
-    const rankIndex = RANKS.indexOf(square[1] as (typeof RANKS)[number]);
-    const steps: Record<string, [file: number, rank: number]> = {
-      ArrowLeft: [-1, 0],
-      ArrowRight: [1, 0],
-      // `RANKS` va del 8 al 1, así que subir en el tablero es restar índice.
-      ArrowUp: [0, -1],
-      ArrowDown: [0, 1],
-    };
-    const step = steps[event.key];
-    if (!step) return;
-    event.preventDefault();
-    const next = `${FILES[clamp(fileIndex + step[0], FILES.length)]}${
-      RANKS[clamp(rankIndex + step[1], RANKS.length)]
-    }`;
-    setFocused(next);
-    event.currentTarget.parentElement?.querySelector<HTMLButtonElement>(`[data-square="${next}"]`)
-      ?.focus();
-  }
-
-  return (
-    <div
-      role="grid"
-      aria-label="Casillas del tablero"
-      className="pointer-events-none absolute inset-0 grid grid-cols-8 grid-rows-8"
-    >
-      {RANKS.flatMap((rank) =>
-        FILES.map((file) => {
-          const square = `${file}${rank}`;
-          const piece = pieces[square];
-          return (
-            <button
-              key={square}
-              type="button"
-              role="gridcell"
-              data-square={square}
-              tabIndex={square === focused ? 0 : -1}
-              onFocus={() => setFocused(square)}
-              onKeyDown={(event) => moveFocus(event, square)}
-              onClick={() => onActivate(square)}
-              aria-label={`${square}: ${piece ? describePiece(piece).name : "vacía"}`}
-              className="focus-visible:ring-opacity-90 rounded-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:outline-none"
-            />
-          );
-        }),
-      )}
-    </div>
-  );
-}
-
-/** Mantiene un índice dentro de la rejilla: en el borde, se queda. */
-function clamp(index: number, length: number): number {
-  return Math.min(Math.max(index, 0), length - 1);
 }

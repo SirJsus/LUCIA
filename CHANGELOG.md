@@ -11,11 +11,20 @@ SemVer para la serie `0.x`).
 
 ## [Sin publicar]
 
+Nada todavía: `0.4.0` acaba de cerrar el apéndice de la fase 2 y lo siguiente
+arranca la fase 3.
+
 Camino a v1.0.0 — ver progreso en [docs/05-roadmap.md](docs/05-roadmap.md) y
 alcance congelado en [docs/02-requerimientos.md](docs/02-requerimientos.md).
-De la **fase 2** queda un solo ítem: la capa de ocupación del tablero (RF-7.1
-a 7.7). Cerrarlo cierra la fase y toca subir el minor a `0.3.0`. Después, las
-fases 3 y 4.
+Con `0.3.0` quedaron cerradas las **fases 0, 1 y 2**, y con `0.4.0` su
+**apéndice**: entre las tres fases y el apéndice están entregados RF-1, RF-2
+—RF-2.6 incluido, ya entero—, RF-5, RF-6, RF-10, los siete puntos P1 de RF-7 y
+todo RF-3 salvo su RF-3.8. Para el corte de `1.0.0` faltan dos fases enteras:
+la **fase 3** (entrenamiento: RF-4 —puzzles desde los propios errores,
+sparring, drill de aperturas y plan semanal—, donde además se enchufará la capa
+de ocupación en esa tercera pantalla) y la **fase 4** (RF-3.8 · rivales
+recurrentes, RF-7.8 y RF-7.9, explicaciones en lenguaje natural, empaquetado y
+soporte de macOS/Windows).
 
 Fuera de ese camino, en Post 1.0: **RF-8 · Personalización de interfaz**
 (Fase 5), **RF-11 · Partidas con ventaja (odds) contra el motor** (Fase 6,
@@ -23,12 +32,146 @@ planteado el 2026-09-07: necesitaba antes el editor de posición de RF-6.1 —ya
 entregado— y el sparring calibrado de RF-4.3, que sigue pendiente en la fase
 3), **RF-9 · Comparación de evaluaciones entre motores** (ampliación de
 RF-2.6, sin fase propia) y **RNF-11 · Coherencia de interfaz**, criterio
-permanente cuyos incumplimientos concretos se arreglan dentro de 1.0: de las
-87 filas que su inventario en
-[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) lleva abiertas, 83 están
-cerradas y quedan **cuatro** —la 65 y la 67, de la importación de PGN
-(RF-1.5), y la 68 y la 70, del enlace de exportación (RF-5.5)—, pendientes
-para el próximo corte.
+permanente cuyos incumplimientos concretos se arreglan dentro de 1.0: las **90
+filas** que su inventario en
+[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) ha llegado a tener están
+**todas cerradas** desde el 2026-09-19, la primera vez que queda vacío.
+
+## [0.4.0] - 2026-09-19
+
+**Cierra el apéndice de la fase 2 del roadmap**, los siete puntos que destapó
+auditar el mapa, la documentación y el código de la fase entera después del
+corte de `0.3.0`, el mismo día. Sube el minor y no el patch por tres motivos
+que no caben en un parche: entrega una prestación que faltaba (**RF-2.6**, la
+probabilidad W/D/L del motor), cambia el contrato de la API —`EngineLineOut` y
+`MoveComparisonOut` ganan campos, todos **opcionales**, así que nada de lo que
+ya consumía la API se rompe— y cambia el esquema (migración `3208b0d0f467`) y
+el comportamiento por defecto de Lc0 para quien no tenga `.env`. **No hay
+alcance nuevo**: RF-2.6 era alcance congelado entregado a medias y RF-3.8 solo
+cambia de fase; nada baja a Post 1.0 ni sube a 1.0.
+
+### Añadido
+
+- **La probabilidad W/D/L del motor (RF-2.6)**, que era la mitad del
+  requerimiento que nunca se había entregado: hasta ahora la comparación entre
+  motores solo usaba la probabilidad de victoria derivada del centipeón con el
+  modelo de Lichess, que es una fórmula común a los dos y por tanto no dice en
+  qué discrepan. Ahora se le pide a cada motor la suya con `UCI_ShowWDL` —por
+  la misma vía filtrada que `Threads` y `Hash`, así que un motor que no la
+  declare sigue funcionando sin ella— y se enseña con `WdlBar` en la lista de
+  líneas del motor y en el panel de comparación. **Sin migración**: viaja en el
+  JSON que ya guardaba las líneas, en una clave opcional, así que la caché y
+  los análisis anteriores se siguen leyendo igual. Lo destapó la auditoría de
+  cierre de la fase 2; ver su apéndice en
+  [docs/05-roadmap.md](docs/05-roadmap.md).
+
+### Cambiado
+
+- **RF-3.8 (análisis de rivales recurrentes) pasa a la fase 4.** Era alcance
+  congelado de v1.0 desde el corte del 2026-09-05 y se había quedado sin ítem
+  en ninguna fase: el mapa lo daba por "pendiente (fase 2)" mientras esa fase
+  se cerraba sin él. Sigue dentro del alcance de 1.0 —no baja a Post 1.0— y no
+  bloquea la fase 3, porque lo que necesita para montarse ya está entregado.
+
+### Corregido
+
+- **Las cuatro incoherencias de interfaz que quedaban abiertas** (RNF-11, filas
+  65, 67, 68 y 70): la cabecera de Partidas ya no reparte el título y dos
+  formularios en la misma fila; el listado y el visor dicen de dónde vino cada
+  partida con `GameSourceBadge`, para que los huecos de un PGN importado se
+  expliquen; y "Exportar PGN anotado" está siempre —deshabilitado y con el
+  motivo cuando no hay análisis— y su descarga pasa por el cliente, así que un
+  409 o un 404 salen en un `ErrorBox` en vez de guardarse como si fueran el
+  archivo. **El inventario de `docs/07-coherencia-ui.md` queda vacío por primera
+  vez.**
+- **ADR-0008 citaba un endpoint que nunca existió** (`GET /stats/{username}`;
+  el real es `GET /stats?username=…`), en su decisión y en su primera
+  consecuencia. Corregido en el propio archivo, con una nota fechada que
+  explica el cambio: la norma de no editar un ADR publicado protege el registro
+  de las decisiones, y la de ADR-0008 no cambia. Se barrieron los dieciséis
+  ADR cruzando endpoints, rutas e identificadores contra el código: era el
+  único error de hecho.
+- **`analyzed_moves` tenía dos claves foráneas sobre `analysis_id`**, una
+  `NO ACTION` y otra `CASCADE`: la migración `c8f3a2b91e47` añadió la segunda
+  sin quitar la primera, porque dentro de un `batch_alter_table` alembic
+  reconstruye la tabla a partir de lo que refleja de la base. No era un fallo
+  vivo —el borrado en cascada funcionaba—, pero ensuciaba cada `alembic check`
+  y lo habría arrastrado la siguiente migración que tocara la tabla. La nueva
+  migración `3208b0d0f467` reconstruye la tabla desde una definición dada
+  (`copy_from`) y la deja con una sola.
+- **Los valores por defecto de Lc0 eran la peor combinación posible.** El
+  código traía la red transformer (`default.pb.gz`, que OpenCL rechaza y en CPU
+  da 2,5 nodos/s) y el backend `blas`, mientras que `.env.example` recomendaba
+  otra cosa: quien clonara el repo sin copiar el `.env` tenía un Lc0
+  inservible. Ahora la red por defecto es la T74 convolucional —la que el
+  propio repo llamaba "la recomendada"— y el backend va **vacío**, para que lo
+  elija Lc0 entre los que se le compilaron. Medido con la T74, 3.000 nodos: en
+  vacío 1,23 s, con `opencl` 1,12 s, con `blas` 14,88 s. De paso se corrige la
+  advertencia del código, que atribuía al backend ("~20x más lento sin
+  especificarlo") lo que en realidad costaba la red.
+
+### Eliminado
+
+- **`polars` y `zustand`, declaradas como dependencia y nunca importadas.**
+  polars estaba en `packages/core` desde el primer día porque
+  [ADR-0005](docs/adr/0005-sqlite-local-first.md) daba por hecho que las
+  agregaciones se harían con él; todo RF-3 acabó escrito en SQL. Zustand
+  estaba en `apps/web` para un estado global que nunca hizo falta. Fuera de
+  los manifiestos y de los dos lockfiles. Invertir lo que decía ADR-0005
+  llevó ADR propio:
+  [ADR-0016](docs/adr/0016-agregaciones-en-sql-sin-polars.md).
+
+## [0.3.0] - 2026-09-19
+
+**Cierra la fase 2 del roadmap**, y por eso sube el minor y no el patch: la
+capa de ocupación del tablero era su último ítem pendiente. Con ella entregada
+quedan cubiertos los siete puntos P1 de **RF-7**, congelados en el alcance de
+v1.0 desde el corte del **2026-09-05**. No hay requerimientos nuevos en esta
+versión ni cambio de alcance: RF-7.8 y RF-7.9 son P2 y siguen donde estaban,
+en la fase 4.
+
+### Añadido
+
+- **Capa de ocupación del tablero (RF-7.1 a RF-7.7)**, activable con la tecla
+  `O` o desde su panel, sin salir de lo que se esté haciendo, en el visor
+  (RF-5) y en el tablero de análisis (RF-6); en el entrenamiento (RF-4) se
+  enchufará cuando esa pantalla exista, en la fase 3. Vive entera en
+  `apps/web/src/components/board/`: `occupancy.ts` (el cálculo, con pruebas
+  propias en `__tests__/occupancy.test.ts`), `useOccupancy.ts` (el estado y el
+  atajo), `OccupancyLayer.tsx` (lo que se pinta sobre el tablero) y
+  `OccupancyPanel.tsx` (el control, la inspección y la leyenda). Cubre:
+  - Sub-modo **mapa de calor** con el balance de atacantes directos por
+    casilla e intensidad proporcional (RF-7.1) y sub-modo **cobertura
+    directa** del bando con el turno, con conmutador al otro bando, filtrado
+    al señalar una pieza y fijado al hacer clic (RF-7.2).
+  - **Inspección por casilla** con atacantes y defensores de los dos bandos
+    ordenados por valor de pieza (RF-7.3) y marcado de **piezas colgadas**
+    (RF-7.4).
+  - **Rayos X dibujados aparte** y nunca sumados al balance del mapa de calor
+    (RF-7.5) y **piezas clavadas** contando como atacante pero marcadas
+    distinto (RF-7.6).
+  - Las **reglas de conteo** de RF-7.7: el rey cuenta como atacante, los
+    peones cuentan por sus capturas en diagonal y no por su avance, y la
+    casilla de captura al paso cuenta como atacada por el peón que podría
+    capturar ahí.
+
+  Las decisiones que el texto del requerimiento no fijaba están razonadas en
+  la nota "Cómo se cumplieron los siete puntos P1" de
+  [docs/02-requerimientos.md](docs/02-requerimientos.md) y en la entrada del
+  roadmap. En resumen: los alcances se generan aquí y no con `attackers()` de
+  chess.js —que solo devuelve casillas de origen y no puede dar la clavada de
+  los dos bandos, porque solo calcula las jugadas legales del que tiene el
+  turno—, la casilla bajo el puntero se mide por geometría sobre el rectángulo
+  del tablero en vez de preguntársela a chessground, y los conectores se
+  limitan a la pieza señalada o fijada. **No hay ADR nuevo**: es una capa de
+  lectura sobre la posición que ya está en pantalla, sin endpoint, sin esquema
+  y sin motor, así que no hay decisión de arquitectura que registrar.
+
+### Cambiado
+
+- Tres filas nuevas del inventario de **RNF-11** (la 88, la 89 y la 90),
+  abiertas por esta pantalla y cerradas el mismo día; ver
+  [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md).
 
 ## [0.2.5] - 2026-09-18
 

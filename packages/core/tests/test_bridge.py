@@ -59,7 +59,24 @@ async def test_only_sends_options_the_engine_declares() -> None:
         options = engine._options_to_apply()
 
     assert "Threads" in options  # Stockfish sí la declara
-    assert set(options) <= set(engine.config.extra_options) | {"Threads", "Hash"}
+    assert set(options) <= set(engine.config.extra_options) | {
+        "Threads",
+        "Hash",
+        "UCI_ShowWDL",
+    }
+
+
+@requires_stockfish
+async def test_asks_the_engine_for_its_win_draw_loss() -> None:
+    """RF-2.6: la W/D/L la informa el motor solo si se le enciende
+    `UCI_ShowWDL`, y sin ella `python-chess` no la trae en las líneas. Es lo
+    que distingue la opinión del motor de la fórmula sobre el centipeón."""
+    async with EngineBridge(_config(multipv=1)) as engine:
+        assert engine._options_to_apply()["UCI_ShowWDL"] is True
+        engine_lines = await engine.analyze(chess.Board())
+
+    wdl = engine_lines[0]["wdl"].white()
+    assert wdl.wins + wdl.draws + wdl.losses == 1000
 
 
 @requires_stockfish

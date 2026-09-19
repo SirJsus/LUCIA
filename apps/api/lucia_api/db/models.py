@@ -1,7 +1,17 @@
 """Modelo de datos de LUCIA (ver docs/03-arquitectura.md § Modelo de datos).
 
-RF-1 (importación desde chess.com): `Player`, `Game`, `SyncState`.
+RF-1 (importación desde chess.com y de un PGN manual): `Player`, `Game`,
+`SyncState`.
 RF-2 (análisis con motores): `Analysis`, `AnalyzedMove`, `PositionCache`.
+RF-5.4 (configuración editable de los motores): `EngineSettings`.
+RF-6 (tablero de análisis): `Board` y `BoardVersion`, el historial lineal de
+deshacer y rehacer de RF-6.8.
+RF-3.6 (comparación de repertorio): `ExplorerPositionCache`, la caché de lo
+que se le preguntó al Opening Explorer de Lichess.
+
+Las columnas que no se explican solas llevan su porqué al lado; el mapa
+completo, con las relaciones y las reglas entre tablas, está en
+docs/03-arquitectura.md.
 """
 
 from __future__ import annotations

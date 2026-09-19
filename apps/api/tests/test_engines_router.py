@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 from lucia_api.db import get_session
 from lucia_api.main import app
-from lucia_api.services.engines import get_effective_config
+from lucia_api.services.engines import EffectiveEngineConfig, get_effective_config
+from lucia_api.settings import Settings
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -138,3 +140,58 @@ async def test_lc0_accepts_thousands_of_nodes_and_stockfish_does_not(
     assert lc0_response.json()["depth"] == 1600
     assert stockfish_response.status_code == 422
     assert "depth" in stockfish_response.json()["detail"]
+
+
+def test_an_empty_backend_is_not_sent_to_lc0() -> None:
+    """El defecto de `LC0_BACKEND` es vacío, y vacío tiene que significar "no
+    le mandes la opción" para que Lc0 elija entre los backends que compiló. Si
+    se colara como `Backend=""`, el motor abortaría al arrancar: es un `combo`
+    y la cadena vacía no es uno de sus valores."""
+    config = EffectiveEngineConfig(
+        name="lc0",
+        threads=1,
+        hash_mb=256,
+        depth=1600,
+        multipv=1,
+        path=Path("./engines/bin/lc0"),
+        weights_path=Path("./engines/networks/744706-conv.pb.gz"),
+        backend="",
+    )
+
+    uci_options = config.uci_extra_options()
+
+    assert "Backend" not in uci_options
+    assert uci_options["WeightsFile"].endswith("744706-conv.pb.gz")
+
+
+def test_a_backend_chosen_on_purpose_does_reach_lc0() -> None:
+    """Lo contrario: quien lo fije en `.env` porque sabe más que Lc0 sobre su
+    máquina tiene que verlo llegar."""
+    config = EffectiveEngineConfig(
+        name="lc0",
+        threads=1,
+        hash_mb=256,
+        depth=1600,
+        multipv=1,
+        path=Path("./engines/bin/lc0"),
+        weights_path=Path("./engines/networks/744706-conv.pb.gz"),
+        backend="cuda",
+    )
+
+    assert config.uci_extra_options()["Backend"] == "cuda"
+
+
+def test_the_declared_lc0_defaults_work_without_an_env_file() -> None:
+    """Lo que se comprueba es el defecto **del código**, no el `.env` de esta
+    máquina: se leen los campos declarados, porque instanciar `Settings` toma
+    el `.env` del repo y entonces la prueba pasaría por el motivo equivocado.
+
+    La red por defecto no puede ser la transformer (`default.pb.gz`): OpenCL la
+    rechaza y en CPU da 2,5 nodos/s, así que quien clone el repo sin copiar el
+    `.env` se encontraría un Lc0 inservible. Y el backend por defecto tiene que
+    ser vacío, para que lo elija Lc0 entre los que compiló.
+    """
+    declared_fields = Settings.model_fields
+
+    assert Path(declared_fields["lc0_weights"].default).name == "744706-conv.pb.gz"
+    assert declared_fields["lc0_backend"].default == ""

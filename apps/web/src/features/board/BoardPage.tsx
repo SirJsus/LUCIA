@@ -26,6 +26,9 @@ import { BoardWithEvalBar } from "../../components/board/BoardWithEvalBar";
 import { MoveNavigator } from "../../components/board/MoveNavigator";
 import { useMoveNavigationKeys } from "../../components/board/useMoveNavigationKeys";
 import { arrowsFromEngineLines, arrowsFromPreviewLine } from "../../components/board/boardConfig";
+import { OccupancyLayer } from "../../components/board/OccupancyLayer";
+import { OccupancyPanel } from "../../components/board/OccupancyPanel";
+import { useOccupancy } from "../../components/board/useOccupancy";
 import { ErrorBox, ProgressBox, Spinner, SuccessBox, WarningBox } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
 import {
@@ -294,6 +297,10 @@ export function BoardPage() {
       ),
     [mainLineMoves, boardAnalysis],
   );
+
+  // La capa de ocupación (RF-7) se calcula sobre la posición del nodo actual,
+  // igual que en el visor de partidas.
+  const occupancyController = useOccupancy(currentFen);
 
   const legalMoves = useMemo(() => movesByOrigin(currentFen), [currentFen]);
   const turnColor = currentFen.split(" ")[1] === "b" ? "black" : "white";
@@ -648,6 +655,9 @@ export function BoardPage() {
             legalMoves={legalMoves}
             turnColor={turnColor}
             onMove={handleBoardMove}
+            overlay={<OccupancyLayer controller={occupancyController} orientation={orientation} />}
+            onSelectSquare={occupancyController.selectSquare}
+            onHoverSquare={occupancyController.hoverSquare}
             whiteWinPercent={
               engineOn && bestLine && !isEvaluationStale
                 ? whiteWinPercentFromScore(bestLine)
@@ -673,8 +683,11 @@ export function BoardPage() {
           <p className={BOARD_HINT_CLASSES}>
             Arrastra una pieza para añadir la jugada. ← → recorren la línea, Inicio y Fin van a
             sus extremos. Ctrl+Z deshace y Ctrl+Y (o Ctrl+Mayús+Z) rehace. Señala una jugada del
-            panel del motor para verla sobre el tablero.
+            panel del motor para verla sobre el tablero. Con O se enciende y se apaga la capa
+            de ocupación.
           </p>
+
+          <OccupancyPanel controller={occupancyController} />
         </div>
 
         <aside className="space-y-3">

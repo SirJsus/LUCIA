@@ -16,6 +16,7 @@
 import type { EngineLine } from "@lucia/shared-types";
 import { formatScore } from "../../lib/score";
 import { Badge } from "../Badge";
+import { WdlBar } from "../WdlBar";
 import { MoveButton } from "./MoveButton";
 
 /** Cuántas jugadas de cada línea se enseñan. Más allá, la continuación deja de
@@ -40,11 +41,19 @@ export function EngineLineList({
   onPlayLine?: (sanMoves: string[]) => void;
 }) {
   const canPlayLines = onPlayLine !== undefined;
+  // La W/D/L la contesta el motor y no siempre está (RF-2.6): con Stockfish y
+  // Lc0 sí, con otro motor UCI puede que no, y los análisis guardados antes de
+  // pedírsela tampoco la traen.
+  const showsWdl = lines.some((line) => line.wdl);
 
   return (
     <>
       <div className="flex gap-2 border-b border-slate-200 px-3 py-1.5 text-xs opacity-60 dark:border-slate-800">
         <span className="w-14 shrink-0">Evaluación</span>
+        {/* La columna solo se anuncia si hay algo debajo: un motor que no
+            informe W/D/L, o un análisis anterior a que se le pidiera, dejaría
+            el encabezado prometiendo una columna vacía (criterio C-3). */}
+        {showsWdl && <span className="w-24 shrink-0">Gana / tablas / pierde</span>}
         <span>
           Línea propuesta · pulsa una jugada para{" "}
           {canPlayLines ? "llevar el tablero hasta ahí" : "verla sobre el tablero"}
@@ -64,6 +73,9 @@ export function EngineLineList({
             >
               {formatScore(line)}
             </span>
+            {showsWdl && (
+              <span className="w-24 shrink-0">{line.wdl && <WdlBar wdl={line.wdl} />}</span>
+            )}
             <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
               {line.pv_san.slice(0, MAX_SHOWN_MOVES).map((san, index) => {
                 const previewUpToHere = () => onPreviewLine(line.pv_uci.slice(0, index + 1));

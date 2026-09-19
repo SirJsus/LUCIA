@@ -37,6 +37,15 @@ class GameSummary(BaseModel):
     """La partida no empieza en la posición estándar (odds chess, Chess960,
     partidas desde posición). Sale del PGN, no de una columna: ver
     `Game.starts_from_custom_position`."""
+    platform: str
+    """De dónde salió la partida: `"chesscom"` si la trajo el sincronizador
+    (RF-1.2), `"manual"` si vino de un archivo PGN (RF-1.5) y `"board"` si es
+    un tablero de análisis publicado como partida propia (RF-6.5, ADR-0014).
+
+    El front lo necesita para explicar los huecos: una partida importada a mano
+    no trae ratings, ritmo ni control de tiempo, y sin decir de dónde viene,
+    cuatro columnas vacías al lado de sus vecinas llenas se leen como un fallo
+    de la aplicación (fila 67 del inventario de docs/07-coherencia-ui.md)."""
 
 
 class GameDetail(GameSummary):

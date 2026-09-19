@@ -69,6 +69,23 @@ class AnalysisSummary(BaseModel):
     black_accuracy: float | None
 
 
+class WdlOut(BaseModel):
+    """Probabilidad de victoria, tablas y derrota **de las blancas** según el
+    motor, en partes por mil (RF-2.6).
+
+    Es la opinión del motor, no la fórmula: `win_percent_*` sale de convertir
+    el centipeón con el modelo de Lichess y es igual para cualquier motor,
+    mientras que esto lo contesta cada uno por su cuenta y es donde Lc0 aporta
+    una segunda opinión de verdad. Los tres suman 1000.
+    """
+
+    model_config = ConfigDict(from_attributes=True)
+
+    win: int
+    draw: int
+    loss: int
+
+
 class EngineLineOut(BaseModel):
     """Una línea del motor, igual la calcule en vivo `POST /analysis/position`
     o venga guardada con una jugada analizada (RF-10.1): mismo formato en los
@@ -81,6 +98,9 @@ class EngineLineOut(BaseModel):
     score_mate: int | None
     pv_uci: list[str]
     pv_san: list[str]
+    wdl: WdlOut | None = None
+    """Ausente en las líneas de un motor que no declare `UCI_ShowWDL` y en las
+    guardadas antes de RF-2.6: el front tiene que saber dibujarse sin ella."""
 
 
 class AnalyzedMoveOut(BaseModel):
@@ -105,6 +125,8 @@ class AnalyzedMoveOut(BaseModel):
 
 class CriticalMomentOut(BaseModel):
     """Una posición donde la partida se decidía (RF-2.8)."""
+
+    model_config = ConfigDict(from_attributes=True)
 
     ply: int
     color: str
@@ -208,6 +230,8 @@ async def list_analyses(
 
 
 class MoveComparisonOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     ply: int
     color: str
     san: str
@@ -219,9 +243,20 @@ class MoveComparisonOut(BaseModel):
     best_move_a: str | None
     best_move_b: str | None
     same_best_move: bool
+    wdl_after_a: WdlOut | None = None
+    wdl_after_b: WdlOut | None = None
+    """Lo que cada motor da como W/D/L de la posición que deja la jugada
+    (RF-2.6): en qué discrepan, y no solo cuánto. Ausentes en la última jugada
+    y en los análisis anteriores a RF-2.6."""
 
 
+# Los dos se arman desde `services.comparison.AnalysisComparison` con
+# `model_validate`: los nombres coinciden, y `win_percent_gap`,
+# `same_best_move` y `best_move_agreement_percent` son propiedades calculadas
+# que `from_attributes` lee como un campo más.
 class AnalysisComparisonOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     game_id: int
     analysis_a: int
     analysis_b: int
@@ -247,32 +282,7 @@ async def compare(
     except ComparisonError as error:
         raise HTTPException(status_code=422, detail=str(error)) from error
 
-    return AnalysisComparisonOut(
-        game_id=comparison.game_id,
-        analysis_a=comparison.analysis_a,
-        analysis_b=comparison.analysis_b,
-        engine_a=comparison.engine_a,
-        engine_b=comparison.engine_b,
-        total_moves=comparison.total_moves,
-        agreed_best_moves=comparison.agreed_best_moves,
-        best_move_agreement_percent=comparison.best_move_agreement_percent,
-        disagreements=[
-            MoveComparisonOut(
-                ply=disagreement.ply,
-                color=disagreement.color,
-                san=disagreement.san,
-                classification_a=disagreement.classification_a,
-                classification_b=disagreement.classification_b,
-                win_percent_after_a=disagreement.win_percent_after_a,
-                win_percent_after_b=disagreement.win_percent_after_b,
-                win_percent_gap=disagreement.win_percent_gap,
-                best_move_a=disagreement.best_move_a,
-                best_move_b=disagreement.best_move_b,
-                same_best_move=disagreement.same_best_move,
-            )
-            for disagreement in comparison.disagreements
-        ],
-    )
+    return AnalysisComparisonOut.model_validate(comparison)
 
 
 async def _load_analysis_with_moves(
@@ -321,15 +331,7 @@ async def get_analysis(
         **AnalysisSummary.model_validate(analysis).model_dump(),
         moves=moves_out,
         critical_moments=[
-            CriticalMomentOut(
-                ply=moment.ply,
-                color=moment.color,
-                san=moment.san,
-                kinds=list(moment.kinds),
-                win_percent_before=moment.win_percent_before,
-                win_percent_after=moment.win_percent_after,
-                best_alternative_san=moment.best_alternative_san,
-            )
+            CriticalMomentOut.model_validate(moment)
             for moment in analysis_critical_moments(moves, cached_alternatives)
         ],
     )

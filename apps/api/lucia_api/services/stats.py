@@ -52,7 +52,13 @@ from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db.models import Analysis, AnalyzedMove, Game
-from lucia_api.services.games import is_player, outcome_of, player_color, player_side
+from lucia_api.services.games import (
+    UNKNOWN_TIME_CLASS,
+    is_player,
+    outcome_of,
+    player_color,
+    player_side,
+)
 from lucia_api.services.insights import latest_analysis_ids, player_move_contexts
 
 
@@ -325,13 +331,6 @@ async def _trends_summary(
     )
 
 
-#: Ritmo con el que se guarda una partida importada de un PGN que no dice a
-#: qué se jugó (RF-1.5). No puede ser el control de la serie de rating: esas
-#: partidas tampoco traen `WhiteElo`, así que la línea saldría vacía y con un
-#: hueco por nombre.
-UNKNOWN_TIME_CLASS = "unknown"
-
-
 def _most_played_time_class(time_class_stats: list[TimeClassStats]) -> str | None:
     """El control de tiempo con más partidas, que es el de la línea de rating,
     o `None` si no hay ninguno del que se pueda hablar.
@@ -340,6 +339,9 @@ def _most_played_time_class(time_class_stats: list[TimeClassStats]) -> str | Non
     bullet bajaría una media que mezclara escalas y parecería una caída de
     rating que no ocurrió.
     """
+    # Las partidas sin ritmo conocido (RF-1.5, RF-6.5) quedan fuera de la
+    # serie de rating: tampoco traen `WhiteElo`, así que la línea saldría
+    # vacía y con un hueco por nombre.
     known = [item for item in time_class_stats if item.time_class != UNKNOWN_TIME_CLASS]
     if not known:
         return None

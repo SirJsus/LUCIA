@@ -3,7 +3,7 @@
   "info": {
     "title": "L.U.C.I.A. API",
     "description": "Logic & Ultimate Chess Insight Algorithm",
-    "version": "0.2.5"
+    "version": "0.4.0"
   },
   "paths": {
     "/health": {
@@ -2368,6 +2368,16 @@
             },
             "type": "array",
             "title": "Pv San"
+          },
+          "wdl": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WdlOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -2459,6 +2469,10 @@
             "type": "boolean",
             "title": "Starts From Custom Position"
           },
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
           "pgn": {
             "type": "string",
             "title": "Pgn"
@@ -2491,6 +2505,7 @@
           "eco",
           "played_at",
           "starts_from_custom_position",
+          "platform",
           "pgn",
           "clocks_json"
         ],
@@ -2557,6 +2572,10 @@
           "starts_from_custom_position": {
             "type": "boolean",
             "title": "Starts From Custom Position"
+          },
+          "platform": {
+            "type": "string",
+            "title": "Platform"
           }
         },
         "type": "object",
@@ -2573,7 +2592,8 @@
           "rated",
           "eco",
           "played_at",
-          "starts_from_custom_position"
+          "starts_from_custom_position",
+          "platform"
         ],
         "title": "GameSummary"
       },
@@ -2773,6 +2793,26 @@
           "same_best_move": {
             "type": "boolean",
             "title": "Same Best Move"
+          },
+          "wdl_after_a": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WdlOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "wdl_after_b": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WdlOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -3525,6 +3565,30 @@
           "type"
         ],
         "title": "ValidationError"
+      },
+      "WdlOut": {
+        "properties": {
+          "win": {
+            "type": "integer",
+            "title": "Win"
+          },
+          "draw": {
+            "type": "integer",
+            "title": "Draw"
+          },
+          "loss": {
+            "type": "integer",
+            "title": "Loss"
+          }
+        },
+        "type": "object",
+        "required": [
+          "win",
+          "draw",
+          "loss"
+        ],
+        "title": "WdlOut",
+        "description": "Probabilidad de victoria, tablas y derrota **de las blancas** según el\nmotor, en partes por mil (RF-2.6).\n\nEs la opinión del motor, no la fórmula: `win_percent_*` sale de convertir\nel centipeón con el modelo de Lichess y es igual para cualquier motor,\nmientras que esto lo contesta cada uno por su cuenta y es donde Lc0 aporta\nuna segunda opinión de verdad. Los tres suman 1000."
       }
     }
   }

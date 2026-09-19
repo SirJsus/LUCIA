@@ -2,7 +2,10 @@
 
 Plataforma personal de entrenamiento de ajedrez. Usa **Stockfish** y **Lc0 (Leela Chess Zero)** como "cerebro", importa tu perfil e historial de **chess.com**, y construye encima análisis, estadísticas y entrenamiento que en las plataformas comerciales están detrás de un muro de pago.
 
-> Estado: esqueleto inicial. Ver [docs/05-roadmap.md](docs/05-roadmap.md).
+> Estado: fases 0 a 2 del roadmap cerradas (importación, análisis con motor,
+> estadísticas, tablero de análisis y ocupación del tablero); quedan
+> entrenamiento (fase 3) y empaquetado (fase 4) para la v1.0.0. Ver
+> [docs/05-roadmap.md](docs/05-roadmap.md) y [CHANGELOG.md](CHANGELOG.md).
 
 ## Estructura del monorepo
 
@@ -55,7 +58,8 @@ desde chess.com e importación de un archivo PGN de otra fuente —OTB, lichess�
 evaluación, análisis con progreso en vivo, exportación de la partida a PGN
 anotado —con comentarios y variantes, para abrirla en lichess o ChessBase— y
 "Abrir como tablero", que la lleva al tablero de análisis como copia
-desacoplada), **Tableros** (análisis libre desde FEN o PGN, con árbol de
+desacoplada), **Tableros** (análisis libre desde la posición inicial, un FEN,
+un PGN pegado o el editor de posición pieza a pieza, con árbol de
 variantes, motor en vivo, deshacer / rehacer que sobrevive a recargar y
 análisis completo de la línea principal en background; el PGN entra y sale
 con sus variantes y comentarios, y un tablero que sea una partida tuya —una
@@ -65,6 +69,11 @@ ratings, aperturas con su código ECO, en qué fase se pierde más ventaja, de q
 tipo son los errores, qué pasa cuando baja el reloj, si mejoras mes a mes y
 dónde te sales de la teoría de maestros) y **Motores** (profundidad, MultiPV, hilos y hash,
 editables).
+
+Sobre cualquier tablero —el del visor y el de análisis— se enciende con la
+tecla `O` la **capa de ocupación** (RF-7): quién controla cada casilla, qué
+piezas están colgadas o clavadas y qué rayos X hay detrás. Se calcula en el
+navegador, sin motor y sin red.
 
 Todo funciona sin conexión salvo dos cosas, y las dos las pides tú: importar
 partidas de chess.com y traer teoría de aperturas nueva del Opening Explorer de

@@ -1,5 +1,10 @@
 /** Cómo se nombran en la interfaz los patrones que extrae
- * `lucia_core.insights` (RF-2.8, RF-3.4, RF-3.5).
+ * `lucia_core.insights` (RF-2.8, RF-3.4, RF-3.5) y cómo se cuenta en palabras
+ * su evolución (RF-3.7, `formatTrendSentence`).
+ *
+ * Lo usan el visor (momentos críticos) y el dashboard (tipos de error, tramos
+ * de reloj y la frase de tendencia), que son las dos pantallas donde el mismo
+ * patrón tiene que llamarse igual.
  *
  * Los identificadores llegan de la API en inglés (`time`, `only_move`…);
  * aquí se traducen una sola vez, con su explicación, para que "táctico" o

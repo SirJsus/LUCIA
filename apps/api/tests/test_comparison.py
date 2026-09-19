@@ -53,7 +53,14 @@ async def _create_analysis(
     moves: list[tuple[int, str, float, str | None, str]],
     status: str = "done",
 ) -> Analysis:
-    """`moves` = (ply, san, win_percent_after, best_move_uci, classification)."""
+    """`moves` = (ply, san, win_percent_after, best_move_uci, classification).
+
+    Cada jugada guarda una línea cuyo W/D/L se deriva de su propio
+    `win_percent_after`, que es la forma barata de tener un dato distinto por
+    motor sin escribirlo a mano en cada caso. Recuerda que las líneas de una
+    jugada son las de la posición **anterior** a ella (RF-10.1), así que la
+    W/D/L de la jugada `ply` la aporta la fila `ply + 1`.
+    """
     analysis = Analysis(game_id=game_id, engine=engine, depth=10, multipv=1, status=status)
     session.add(analysis)
     await session.flush()
@@ -72,6 +79,14 @@ async def _create_analysis(
                 win_percent_before=50.0,
                 win_percent_after=win_after,
                 best_move_uci=best,
+                alternatives_json=[
+                    {
+                        "score_cp": 20,
+                        "score_mate": None,
+                        "pv": ["e2e4"],
+                        "wdl": [round(win_after * 10), 1000 - round(win_after * 10), 0],
+                    }
+                ],
             )
         )
     await session.commit()
@@ -107,6 +122,47 @@ async def test_finds_where_the_engines_disagree(db_session: AsyncSession) -> Non
     assert disagreement.same_best_move is False
     assert disagreement.classification_a == "best"
     assert disagreement.classification_b == "inaccuracy"
+
+
+async def test_each_engine_brings_its_own_win_draw_loss(db_session: AsyncSession) -> None:
+    """RF-2.6: la diferencia de probabilidad de victoria dice cuánto se separan
+    los motores; su W/D/L dice en qué. Es la mitad del requerimiento que faltaba
+    y viaja en las líneas ya guardadas, sin columna nueva."""
+    game = await _create_game(db_session)
+    sf = await _create_analysis(
+        db_session,
+        game.id,
+        "stockfish",
+        [(0, "e4", 88.0, "e2e4", "best"), (1, "e5", 90.0, "e7e5", "best")],
+    )
+    lc0 = await _create_analysis(
+        db_session,
+        game.id,
+        "lc0",
+        [(0, "e4", 45.0, "e2e4", "best"), (1, "e5", 40.0, "c7c5", "inaccuracy")],
+    )
+
+    comparison = await compare_analyses(db_session, sf.id, lc0.id)
+    first_move = next(item for item in comparison.disagreements if item.ply == 0)
+
+    # La W/D/L de la jugada 0 es la que guardó la jugada 1 de cada análisis:
+    # Stockfish ve la posición casi ganada y Lc0 le da mayoría de tablas, que
+    # es exactamente el desacuerdo que la probabilidad de victoria no expresa.
+    assert (first_move.wdl_after_a.win, first_move.wdl_after_a.draw) == (900, 100)
+    assert (first_move.wdl_after_b.win, first_move.wdl_after_b.draw) == (400, 600)
+
+
+async def test_the_last_move_has_no_win_draw_loss(db_session: AsyncSession) -> None:
+    """La W/D/L de una jugada sale de la posición siguiente, y la última no
+    tiene: se queda en `None` en vez de inventarse un reparto."""
+    game = await _create_game(db_session)
+    sf = await _create_analysis(db_session, game.id, "stockfish", [(0, "e4", 90.0, "e2e4", "best")])
+    lc0 = await _create_analysis(db_session, game.id, "lc0", [(0, "e4", 30.0, "c7c5", "mistake")])
+
+    comparison = await compare_analyses(db_session, sf.id, lc0.id)
+
+    assert comparison.disagreements[0].wdl_after_a is None
+    assert comparison.disagreements[0].wdl_after_b is None
 
 
 async def test_small_differences_do_not_count_as_disagreement(

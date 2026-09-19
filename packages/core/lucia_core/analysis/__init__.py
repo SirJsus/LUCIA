@@ -51,6 +51,21 @@ class EngineLine:
 
     score: chess.engine.PovScore
     pv: tuple[chess.Move, ...]
+    wdl: chess.engine.PovWdl | None = None
+    """Lo que el motor da como probabilidad de ganar, hacer tablas y perder
+    (RF-2.6), en partes por mil y desde el punto de vista de quien mueve.
+
+    **No es lo mismo que la probabilidad de victoria de `lucia_core.accuracy`**,
+    y por eso se guarda aparte: aquella la deduce una fórmula a partir del
+    centipeón —la misma para cualquier motor—, y esta la dice el motor. Es la
+    diferencia que RF-2.6 busca al pedirle a Lc0 una segunda opinión: en una
+    posición ganada pero de tablas técnicas, la fórmula ve ventaja y la red ve
+    tablas.
+
+    Es `None` cuando el motor no declara `UCI_ShowWDL` y cuando la línea viene
+    de un análisis anterior a que se le pidiera: una línea sin W/D/L es una
+    línea válida, no un error.
+    """
 
     @property
     def move(self) -> chess.Move | None:
@@ -80,6 +95,13 @@ class PositionEval:
     @property
     def pv(self) -> tuple[chess.Move, ...]:
         return self.lines[0].pv if self.lines else ()
+
+    @property
+    def wdl(self) -> chess.engine.PovWdl | None:
+        """La W/D/L de la mejor línea (RF-2.6): lo que el motor opina de esta
+        posición. `None` en una posición terminal, donde no se le pregunta, y
+        con un motor que no la informe."""
+        return self.lines[0].wdl if self.lines else None
 
 
 @dataclass(frozen=True)
@@ -137,7 +159,9 @@ async def evaluate_positions(
         lines: tuple[EngineLine, ...] = ()
         if not current_board.is_game_over():
             lines = tuple(
-                EngineLine(score=line["score"], pv=tuple(line.get("pv") or []))
+                EngineLine(
+                    score=line["score"], pv=tuple(line.get("pv") or []), wdl=line.get("wdl")
+                )
                 for line in await engine.analyze(current_board)
             )
         position_evals.append(

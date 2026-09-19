@@ -11,6 +11,7 @@
  * motor y movía el tablero con la misma pulsación.
  */
 import { useEffect } from "react";
+import { isTypingTarget } from "../../lib/keyboard";
 import type { MoveNavigatorProps } from "./MoveNavigator";
 
 type MoveNavigationHandlers = Pick<
@@ -26,13 +27,7 @@ export function useMoveNavigationKeys({
 }: MoveNavigationHandlers) {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement ||
-        event.target instanceof HTMLSelectElement
-      ) {
-        return;
-      }
+      if (isTypingTarget(event.target)) return;
       const actions: Record<string, () => void> = {
         ArrowLeft: onPrevious,
         ArrowRight: onNext,

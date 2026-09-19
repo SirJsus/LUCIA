@@ -1,7 +1,7 @@
 {
   "name": "@lucia/web",
   "private": true,
-  "version": "0.2.5",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,8 +19,7 @@
     "chessground": "^9.1.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "recharts": "^2.12.7",
-    "zustand": "^5.0.0"
+    "recharts": "^2.12.7"
   },
   "devDependencies": {
     "@eslint/js": "^9.11.0",

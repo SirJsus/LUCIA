@@ -16,11 +16,32 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./data/lucia.db"
     stockfish_path: Path = Path("./engines/bin/stockfish")
     lc0_path: Path = Path("./engines/bin/lc0")
-    lc0_weights: Path = Path("./engines/networks/default.pb.gz")
-    lc0_backend: str = "blas"
-    """Backend de cómputo de Lc0. Sin especificarlo, Lc0 elige uno por su
-    cuenta y puede ser ~20x más lento (medido: 74 s contra ~4 s la misma
-    búsqueda). "blas" va bien en CPU; con GPU NVIDIA, "cuda"."""
+    lc0_weights: Path = Path("./engines/networks/744706-conv.pb.gz")
+    """Red neuronal de Lc0. La T74 convolucional que descarga
+    `scripts/setup-engines.sh`, que es la recomendada del proyecto: fuerte y
+    aceptada por OpenCL. El defecto era `default.pb.gz` —la red grande, de
+    arquitectura transformer—, que OpenCL rechaza y en CPU da 2,5 nodos/s, así
+    que quien clonara el repo sin copiar `.env` tenía un Lc0 inservible."""
+
+    lc0_backend: str = ""
+    """Backend de cómputo de Lc0. **Vacío a propósito: es el mejor defecto.**
+
+    Vacío no significa "sin backend": significa no mandarle la opción, y
+    entonces Lc0 elige entre los que tenga compilados —que son los que el
+    instalador detectó en la máquina: CUDA si había `nvcc`, si no OpenCL, si no
+    CPU—. Elige bien, y forzar uno por nombre solo puede empeorarlo: pedirle
+    uno que no compiló es un error duro (`invalid value for combo option
+    'Backend'`), que es lo que le pasaría a `cuda` en una máquina sin CUDA.
+
+    Medido con la red T74, 3.000 nodos desde la posición inicial, en una GTX
+    1060: sin especificar 1,23 s; `opencl` 1,12 s; `blas` 14,88 s. O sea que el
+    defecto anterior, `blas`, era **doce veces más lento** que dejar elegir a
+    Lc0, y la advertencia que este comentario traía —"sin especificarlo puede
+    ser ~20x más lento"— atribuía al backend lo que en realidad costaba la red
+    transformer.
+
+    Se sigue pudiendo forzar desde `.env` (`LC0_BACKEND`) cuando se sepa más
+    que Lc0 sobre la máquina concreta."""
     analysis_depth: int = 18
     analysis_multipv: int = 3
     lichess_token: str = ""

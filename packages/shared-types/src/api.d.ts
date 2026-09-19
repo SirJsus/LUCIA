@@ -813,6 +813,7 @@ export interface components {
             pv_uci: string[];
             /** Pv San */
             pv_san: string[];
+            wdl?: components["schemas"]["WdlOut"] | null;
         };
         /** EnginesConfigOut */
         EnginesConfigOut: {
@@ -850,6 +851,8 @@ export interface components {
             played_at: string;
             /** Starts From Custom Position */
             starts_from_custom_position: boolean;
+            /** Platform */
+            platform: string;
             /** Pgn */
             pgn: string;
             /** Clocks Json */
@@ -886,6 +889,8 @@ export interface components {
             played_at: string;
             /** Starts From Custom Position */
             starts_from_custom_position: boolean;
+            /** Platform */
+            platform: string;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -966,6 +971,8 @@ export interface components {
             best_move_b: string | null;
             /** Same Best Move */
             same_best_move: boolean;
+            wdl_after_a?: components["schemas"]["WdlOut"] | null;
+            wdl_after_b?: components["schemas"]["WdlOut"] | null;
         };
         /** OpeningStatsOut */
         OpeningStatsOut: {
@@ -1231,6 +1238,24 @@ export interface components {
             input?: unknown;
             /** Context */
             ctx?: Record<string, never>;
+        };
+        /**
+         * WdlOut
+         * @description Probabilidad de victoria, tablas y derrota **de las blancas** según el
+         *     motor, en partes por mil (RF-2.6).
+         *
+         *     Es la opinión del motor, no la fórmula: `win_percent_*` sale de convertir
+         *     el centipeón con el modelo de Lichess y es igual para cualquier motor,
+         *     mientras que esto lo contesta cada uno por su cuenta y es donde Lc0 aporta
+         *     una segunda opinión de verdad. Los tres suman 1000.
+         */
+        WdlOut: {
+            /** Win */
+            win: number;
+            /** Draw */
+            draw: number;
+            /** Loss */
+            loss: number;
         };
     };
     responses: never;

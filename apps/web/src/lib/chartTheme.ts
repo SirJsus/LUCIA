@@ -18,6 +18,10 @@ export interface ChartTheme {
   tooltipStyle: React.CSSProperties;
   /** Color de las marcas y etiquetas de los ejes. */
   axisColor: string;
+  /** Estilo de las etiquetas de los ejes, el mismo tamaño en todos los
+   * gráficos: cada uno con el suyo daba ejes de distinto cuerpo en la misma
+   * pantalla (criterio C-2 de docs/07-coherencia-ui.md). */
+  axisTickStyle: { fontSize: number; fill: string };
   /** Color de la serie principal (curva de evaluación, barras). */
   seriesColor: string;
   /** Color de lo que hay que destacar sobre la serie. */
@@ -42,6 +46,7 @@ const LIGHT_THEME: ChartTheme = {
     color: "#0f172a",
   },
   axisColor: "#475569",
+  axisTickStyle: { fontSize: 11, fill: "#475569" },
   seriesColor: "#6366f1",
   highlightColor: "#ef4444",
   ratingColor: "#10b981",
@@ -63,6 +68,7 @@ const DARK_THEME: ChartTheme = {
     color: "#e2e8f0",
   },
   axisColor: "#94a3b8",
+  axisTickStyle: { fontSize: 11, fill: "#94a3b8" },
   seriesColor: "#818cf8",
   highlightColor: "#f87171",
   ratingColor: "#34d399",

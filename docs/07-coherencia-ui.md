@@ -37,9 +37,14 @@ desde RF-5.5. El editor de posición pieza a pieza —lo que faltaba de RF-6.1,
 del mismo 2026-09-18— abrió las filas 83 a 85 y las tres se cerraron ese mismo
 día. Marcar un tablero como partida propia (RF-6.5), del mismo día, dejó de ser
 una casilla y pasó a ser un formulario de cuatro campos, y abrió las filas 86 y
-87, cerradas también ese mismo día. Vacío es como debería encontrarse este
-documento siempre que se lea, así que cuatro filas abiertas son cuatro cosas
-que arreglar, no un estado estable.
+87, cerradas también ese mismo día. La capa de ocupación del tablero (RF-7.1 a
+RF-7.7), del 2026-09-19, abrió las filas 88 a 90, cerradas también ese mismo
+día. Ese mismo 2026-09-19, recorriendo el apéndice de la fase 2, se cerraron las
+**cuatro que quedaban abiertas** —la 65 y la 67 de Partidas, la 68 y la 70 del
+control de exportar del visor—, algunas desde el 2026-09-17. Vacío es como
+debería encontrarse este documento siempre que se lea, y por primera vez lo
+está: eso no lo convierte en un estado alcanzado, sino en el estado del que se
+parte la próxima vez.
 
 **Qué es cada mitad de este documento.** Los criterios C-1 a C-7 son
 **RNF-11**, que vive en la sección Post 1.0 de
@@ -70,25 +75,24 @@ antes de comitear cambios de front — ver [Cómo se verifica](#cómo-se-verific
 | C-6 | **Legible sin saber de ajedrez.** Todo número del motor va acompañado de etiqueta, leyenda o representación visual. `+0.35` solo, sin más, no comunica nada a quien no lee evaluaciones. |
 | C-7 | **Accesibilidad mínima.** Foco visible, `aria-label` en los botones que son solo icono, y ningún significado transmitido únicamente por color. |
 
-## Inventario de incoherencias abiertas (al 2026-09-18)
+## Inventario de incoherencias abiertas (al 2026-09-19)
 
-Quedan seis, todas de presentación: qué enseñar y dónde, no cómo escribirlo.
-Dos son de la pantalla de Partidas, dos del control de exportar del visor y dos
-del formulario de partida propia del tablero de análisis. Los números no se
-renumeran al cerrar una fila —son la referencia con la que se habla de ella en
-un commit—, así que faltan la 64, la 66 y las 71 a 85.
+**Ninguna.** Es como debería encontrarse siempre este inventario, y por primera
+vez desde que se abrió lo está: las últimas cuatro —la 65 y la 67 de la pantalla
+de Partidas, la 68 y la 70 del control de exportar del visor— se cerraron el
+2026-09-19, al recorrer el apéndice de la fase 2. Los números no se renumeran al
+cerrar una fila, que es la referencia con la que se habla de ella en un commit.
+
+La tabla se queda aquí, vacía, porque el sitio donde se apunta un incumplimiento
+nuevo no debería haber que inventarlo.
 
 | # | Incoherencia | Dónde | Criterio |
 | --- | --- | --- | --- |
-| 65 | La cabecera de Partidas reparte con `justify-between` el título y **dos** formularios, y el de importar tiene tres controles: al envolverse, el título se queda solo en una fila y las dos formas de traer partidas quedan a distinta altura. Ninguna otra pantalla tiene dos formularios en la cabecera. | `apps/web/src/features/games/GamesPage.tsx` (la fila de la cabecera, `flex flex-wrap items-end justify-between`) | C-2 |
-| 67 | El listado no dice de dónde vino una partida. Una importada de un PGN enseña hueco en los dos ratings, en el control de tiempo y en el ritmo, y nada explica por qué le faltan cuatro datos que sus vecinas sí tienen; las partidas que no empiezan en la posición estándar sí llevan insignia (`CustomPositionBadge`). | `apps/web/src/features/games/GamesPage.tsx` (tabla), `apps/web/src/features/viewer/GameViewerPage.tsx` (cabecera) | C-6 |
-| 68 | "Exportar PGN anotado" no existe hasta que hay un análisis terminado: quien abre una partida sin analizar no ve el control en ninguna parte y no puede saber que existe, ni que analizar es lo que lo trae. La aplicación ya resuelve esto al revés en la barra de filtros de Partidas (fila 56): el control se enseña deshabilitado y se dice por qué. | `apps/web/src/features/viewer/GameViewerPage.tsx` (cabecera, `analysis?.status === "done" && …`) | C-3 |
-| 70 | La descarga no tiene desenlace en pantalla: la hace el navegador, así que si `GET /analysis/{id}/pgn` responde 409 (análisis no terminado) o 404 (partida borrada desde otra pestaña), el navegador guarda el cuerpo del error como si fuera el archivo y la pantalla no dice nada. El resto de acciones del visor sí tienen `ErrorBox`. | `apps/web/src/features/viewer/GameViewerPage.tsx` (el `<a download>`), `apps/api/lucia_api/routers/analysis.py` (`get_analysis_pgn`) | C-3 |
 
 ## Lo que se cerró
 
-Las 83 filas cerradas de este inventario —todas menos las cuatro de arriba— se
-cerraron en once pasadas, y aquí queda el rastro de qué se hizo, para que un
+Las 90 filas de este inventario, que están todas cerradas, se cerraron en doce
+pasadas, y aquí queda el rastro de qué se hizo, para que un
 `git blame` no sea la única forma de averiguarlo.
 
 **2026-09-06 · legibilidad del análisis.** Apareció la barra de evaluación, el
@@ -699,6 +703,107 @@ identificador del requerimiento dentro —"Cuenta en tus estadísticas (RF-6.5)"
 en la insignia del listado y la misma coletilla en el pie de "Precisión"—. Los
 RF viven en `docs/02-requerimientos.md`, no en la pantalla.
 
+**2026-09-19 · las cuatro que quedaban, al recorrer el apéndice de la fase 2.**
+Las heredadas de la importación de PGN (RF-1.5) y de la exportación a PGN
+anotado (RF-5.5), que llevaban abiertas desde el 2026-09-17:
+
+- **Fila 65 (C-2) · la cabecera de Partidas deja de repartir tres cosas en una
+  fila.** El título va en su propia línea y los dos formularios en la de abajo,
+  alineados por su base. Con `justify-between` y tres hijos, al envolverse en
+  una ventana estrecha el título se quedaba solo arriba y las dos formas de
+  traer partidas acababan a distinta altura, cuando son lo mismo y se leen
+  juntas.
+- **Fila 67 (C-6) · el listado dice de dónde vino cada partida.** `GameSummary`
+  expone ya `platform`, y `components/GameSourceBadge.tsx` marca lo que se sale
+  de la norma: "PGN importado" (RF-1.5) y "tablero propio" (RF-6.5), con el
+  motivo del hueco en el `title`. Las de chess.com no llevan insignia, que son
+  la inmensa mayoría y marcarlas todas sería ruido. Misma insignia y mismo orden
+  en el listado y en la cabecera del visor, junto a `CustomPositionBadge`, con
+  la que convive: un PGN importado puede además empezar en una posición dada.
+- **Fila 68 (C-3) · "Exportar PGN anotado" existe siempre**, deshabilitado y
+  diciendo qué falta cuando no hay análisis terminado. Antes no aparecía hasta
+  que lo había, así que quien abría una partida sin analizar no podía saber que
+  la exportación existe ni que analizar es lo que la trae. Es lo que ya hacía la
+  barra de filtros con sus tres campos (fila 56).
+- **Fila 70 (C-3) · la descarga tiene desenlace en pantalla.** Dejó de ser un
+  `<a download>` apuntando a la API —donde un 409 o un 404 se guardaban como si
+  fueran el archivo, en silencio— y pasa por `api.getAnalysisPgn`, que comprueba
+  la respuesta y solo entonces guarda (`lib/download.ts`), respetando el nombre
+  que propone el servidor en su `Content-Disposition`. El error sale en el mismo
+  `ErrorBox` que el resto de acciones del visor.
+
+**2026-09-19 · la capa de ocupación del tablero (RF-7.1 a RF-7.7).** La primera
+capa que se dibuja **encima** del tablero en las dos pantallas que lo tienen, con
+su panel de control y su leyenda. La revisión abrió las filas 88 a 90 —las tres
+cerradas el mismo día— y dejó nueve arreglos mecánicos más, sin nada que
+decidir:
+
+- **C-1 · las flechas de la rejilla de casillas no mueven además la partida.**
+  `SquareKeyboardGrid` nació en el editor de posición, donde nadie más escucha
+  el teclado; en el visor y en el tablero de análisis escucha
+  `useMoveNavigationKeys` en `window`, así que con el foco en una casilla una
+  flecha movía el foco **y** la partida a la jugada siguiente —que además
+  descarta la casilla elegida—. La rejilla para la pulsación antes de que suba
+  a la ventana. Es el mismo choque que ya se corrigió con el desplegable de
+  motor en el barrido del 2026-09-08.
+- **C-2 · encender y apagar se dice con los mismos dos verbos.** El botón del
+  panel decía "Activar" / "Desactivar" mientras el único otro interruptor de la
+  aplicación —el del motor, en la cabecera de la misma pantalla— dice "Encender
+  motor" / "Apagar motor", y el propio panel escribía "se enciende" dos líneas
+  más abajo. Con el rótulo diciendo ya en qué estado está, el `aria-pressed`
+  sobraba: se queda como está en la paleta del editor, donde el rótulo no
+  cambia.
+- **C-1 · el atajo se anuncia entero.** La frase bajo el tablero decía "Con O se
+  enciende la capa de ocupación" y la tecla también la apaga, que es lo que hay
+  que saber para deshacer el descubrimiento.
+- **C-3 / C-4 · encendida y sin posición legible no es lo mismo que apagada.**
+  `computeOccupancy` devuelve `null` cuando no puede leer el FEN, y el panel
+  caía en la misma rama que estando apagado: enseñaba "se enciende aquí o con la
+  tecla O" con el botón puesto en "Apagar". Es un `ErrorBox`, como el resto de
+  fallos de las dos pantallas.
+- **C-6 · la leyenda solo explica lo que está en pantalla.** La fila de la pieza
+  colgada se pintaba siempre, también con "Piezas colgadas" desmarcado, mientras
+  que la del rayo X ya era condicional: la leyenda nombraba un borde rojo que no
+  estaba en ninguna casilla.
+- **C-7 · paridad claro/oscuro.** Dos bordes se quedaron con el color por
+  defecto de Tailwind, que es el mismo gris claro en los dos temas: el de la
+  tecla `<kbd>` —el primero de la aplicación— y el de la muestra "sin control" de
+  la leyenda. Llevan ya el par `slate-300` / `dark:slate-700` del resto de
+  bordes.
+- **C-2 · los dos separadores del mismo panel, del mismo color.** Uno iba a
+  `slate-100` y el otro a `slate-200`, que es el de la cabecera de `Panel`.
+- **C-5 / C-2 · el editor de posición y la capa nombran las piezas con la misma
+  tabla.** `PIECE_KINDS`, que vivía en `PositionEditor`, es ya
+  `components/board/pieces.ts`, de donde salen también los nombres del panel de
+  ocupación; y la rejilla enfocable dejó de estar copiada dentro del editor
+  para ser `components/board/SquareKeyboardGrid.tsx`, que usan las dos capas.
+- **El único valor fuera de la escala, justificado por escrito.** El número de
+  atacantes que se pinta en cada casilla va en `text-[0.55rem]`: una casilla
+  mide un octavo del tablero y `text-xs`, el escalón más pequeño de la escala,
+  taparía la pieza que hay debajo. Queda dicho en el código, que es donde se va
+  a leer.
+
+Y las tres filas que sí había que decidir:
+
+- **Fila 88 · las tres marcas se apagan igual (C-2).** "Qué se marca" apagaba
+  las piezas colgadas y los rayos X, pero el borde a rayas de las clavadas
+  estaba siempre. Ahora son tres casillas y un solo estado, `marks`, en vez de
+  dos banderas sueltas y una marca fija: tres cosas de la misma clase no pueden
+  comportarse de dos maneras en el mismo panel.
+- **Fila 89 · cada marca dice qué va a salir antes de encenderla (C-6).**
+  "Rayos X" y "Piezas colgadas" son los rótulos más técnicos de la pantalla y su
+  única explicación estaba en la leyenda, que solo aparece cuando la marca ya
+  está encendida. Las tres llevan su frase de ayuda bajo la casilla, como los
+  filtros de Partidas desde la fila 57.
+- **Fila 90 · el panel se queda bajo el tablero, y aquí queda escrito por qué
+  (C-2).** Los demás paneles de esas dos pantallas viven en el lateral, pero
+  ninguno de ellos es la leyenda de algo que se esté pintando en el tablero:
+  este lo es, y leer "borde a rayas ámbar" a dos columnas de distancia de la
+  casilla que lo lleva obliga a cruzar la vista en cada consulta. Está en el
+  mismo sitio en las dos pantallas, que es lo que C-2 pide de verdad; la
+  jerarquía "contenido a la izquierda, paneles a la derecha" cede ante la
+  proximidad cuando el panel explica un dibujo.
+
 **Y un nombre que se revisó y se deja como está.** Que la acción se llame
 "Exportar PGN anotado" y no "Exportar PGN", teniendo Partidas un "Importar
 PGN", no es asimetría gratuita: lo que sale no es el PGN que entró, sino el
@@ -743,6 +848,6 @@ Antes de comitear cualquier cambio que toque `apps/web`:
    igual — o cambiar las dos a la vez.
 3. Si aparece una incoherencia que no se arregla en el mismo commit, añadirla
    al inventario de arriba —`# · Incoherencia · Dónde · Criterio`, numerando
-   desde el 88— en vez de dejarla suelta. Una fila se borra cuando se arregla,
+   desde el 91— en vez de dejarla suelta. Una fila se borra cuando se arregla,
    y las demás no se renumeran: el número es la referencia con la que se habla
    de ella en un commit o en una revisión.

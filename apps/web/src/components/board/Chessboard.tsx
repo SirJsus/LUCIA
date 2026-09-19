@@ -7,11 +7,21 @@
  *
  * La configuración se arma en `buildBoardConfig`, aparte, porque hay que
  * tener cuidado con las claves `undefined` (ver su docstring).
+ *
+ * **Qué casilla está debajo del puntero se calcula aquí, con geometría**, y no
+ * se le pregunta a chessground. Sus eventos de selección solo existen cuando
+ * el tablero es manipulable, y el visor de partidas lo tiene en modo lectura;
+ * además no hay evento alguno para "el ratón pasa por encima", que es lo que
+ * necesita el sub-modo de cobertura de RF-7.2. Midiendo sobre el rectángulo
+ * del tablero las dos pantallas responden igual, y como los manejadores van en
+ * el contenedor —que recibe los eventos que suben desde el tablero— chessground
+ * sigue recibiendo el ratón intacto para arrastrar piezas.
  */
 import { Chessground } from "chessground";
 import type { Api } from "chessground/api";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { buildBoardConfig, type EngineArrow } from "./boardConfig";
+import { squaresInReadingOrder } from "./squares";
 
 export type { Api as ChessboardApi };
 
@@ -40,9 +50,19 @@ export interface ChessboardProps {
    * el tablero entero con `getFen()` de la API, que es más simple que
    * reconstruirlo a partir de tres eventos distintos. */
   onPositionChange?: () => void;
-  /** Al pulsar una casilla en modo editor: es como se coloca una pieza sin
-   * arrastrarla, que es lo único que funciona con teclado y con el dedo. */
+  /** Al pulsar una casilla: así se coloca una pieza sin arrastrarla en el
+   * editor (RF-6.1) y así se elige la casilla que se inspecciona en la capa de
+   * ocupación (RF-7.3). Un arrastre no cuenta como pulsación —se suelta en
+   * otra casilla—, que es lo que distingue colocar de mover. */
   onSelectSquare?: (square: string) => void;
+  /** Casilla sobre la que está el ratón, o `null` al salir del tablero. La
+   * cobertura de una pieza se filtra al señalarla (RF-7.2). */
+  onHoverSquare?: (square: string | null) => void;
+  /** Lo que se dibuja **encima** del tablero, ocupándolo entero: la rejilla de
+   * casillas enfocables del editor y la capa de ocupación. Va aquí y no en
+   * quien llama para que todas las capas se coloquen igual sobre el mismo
+   * cuadrado. */
+  overlay?: ReactNode;
   /** Recibe la API imperativa de chessground al montarse. Hace falta para lo
    * que no cabe en propiedades: soltar una pieza arrastrada desde la bandeja
    * (`dragNewPiece`) y releer las piezas (`getFen`). */
@@ -60,19 +80,28 @@ export function Chessboard({
   editable = false,
   onPositionChange,
   onSelectSquare,
+  onHoverSquare,
+  overlay,
   onReady,
 }: ChessboardProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<Api | null>(null);
+  // Dónde empezó la pulsación, para distinguirla de un arrastre: si se suelta
+  // en otra casilla, el usuario estaba moviendo una pieza, no eligiendo.
+  const pressedSquare = useRef<string | null>(null);
+  // La última casilla señalada, para avisar solo cuando cambia: el puntero
+  // dispara decenas de eventos al cruzar una casilla y quien escucha lo
+  // guardaría en un estado, redibujando la pantalla en cada uno.
+  const hoveredSquare = useRef<string | null>(null);
   // Los callbacks se guardan en una ref porque chessground se configura una
   // sola vez: sin esto, los handlers quedarían congelados en los del primer
   // render. Se reasigna en cada render para que apunten siempre a los últimos.
-  const handlers = useRef({ onMove, onPositionChange, onSelectSquare });
-  handlers.current = { onMove, onPositionChange, onSelectSquare };
+  const handlers = useRef({ onMove, onPositionChange });
+  handlers.current = { onMove, onPositionChange };
 
   useEffect(() => {
-    if (!containerRef.current) return;
-    apiRef.current = Chessground(containerRef.current, {
+    if (!boardRef.current) return;
+    apiRef.current = Chessground(boardRef.current, {
       ...buildBoardConfig({ fen, orientation, engineArrows, lastMoveUci, legalMoves, turnColor }),
       viewOnly: !editable && !handlers.current.onMove,
       coordinates: true,
@@ -90,10 +119,7 @@ export function Chessboard({
       // Soltar una pieza fuera del tablero la quita, que es como se borra sin
       // tener que elegir la goma en la paleta.
       draggable: { enabled: true, deleteOnDropOff: editable },
-      events: {
-        change: () => handlers.current.onPositionChange?.(),
-        select: (key) => handlers.current.onSelectSquare?.(key),
-      },
+      events: { change: () => handlers.current.onPositionChange?.() },
     });
     onReady?.(apiRef.current);
     return () => {
@@ -110,5 +136,51 @@ export function Chessboard({
     );
   }, [fen, orientation, engineArrows, lastMoveUci, legalMoves, turnColor]);
 
-  return <div ref={containerRef} className="aspect-square w-full" />;
+  function squareUnderPointer(event: { clientX: number; clientY: number }): string | null {
+    const bounds = boardRef.current?.getBoundingClientRect();
+    return bounds ? squareFromPoint(bounds, event.clientX, event.clientY, orientation) : null;
+  }
+
+  function reportHoveredSquare(square: string | null) {
+    if (square === hoveredSquare.current) return;
+    hoveredSquare.current = square;
+    onHoverSquare?.(square);
+  }
+
+  return (
+    <div
+      className="relative aspect-square w-full"
+      onPointerDown={(event) => (pressedSquare.current = squareUnderPointer(event))}
+      onPointerUp={(event) => {
+        const releasedSquare = squareUnderPointer(event);
+        if (releasedSquare && releasedSquare === pressedSquare.current)
+          onSelectSquare?.(releasedSquare);
+      }}
+      onPointerMove={(event) => reportHoveredSquare(squareUnderPointer(event))}
+      onPointerLeave={() => reportHoveredSquare(null)}
+    >
+      <div ref={boardRef} className="size-full" />
+      {overlay}
+    </div>
+  );
+}
+
+/** Qué casilla cae bajo un punto de la pantalla, o `null` si cae fuera del
+ * tablero. El tablero es un cuadrado de ocho por ocho, así que basta con la
+ * fracción del ancho y del alto: eso da la columna y la fila que se ven, y
+ * `squaresInReadingOrder` dice qué casilla es cada una desde este lado. */
+function squareFromPoint(
+  bounds: DOMRect,
+  clientX: number,
+  clientY: number,
+  orientation: "white" | "black",
+): string | null {
+  const fractionAcross = (clientX - bounds.left) / bounds.width;
+  const fractionDown = (clientY - bounds.top) / bounds.height;
+  if (fractionAcross < 0 || fractionAcross >= 1 || fractionDown < 0 || fractionDown >= 1) {
+    return null;
+  }
+  const column = Math.floor(fractionAcross * 8);
+  const row = Math.floor(fractionDown * 8);
+  return squaresInReadingOrder(orientation)[row * 8 + column];
 }

@@ -6,6 +6,7 @@ import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
 import { Button } from "../../components/Button";
 import { CustomPositionBadge } from "../../components/CustomPositionBadge";
+import { GameSourceBadge } from "../../components/GameSourceBadge";
 import { FieldLabel } from "../../components/FieldLabel";
 import { EmptyState, ErrorBox, Spinner, SuccessBox, WarningBox } from "../../components/Feedback";
 import { DataTable } from "../../components/DataTable";
@@ -104,67 +105,75 @@ export function GamesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      {/* El título va en su propia línea y los dos formularios en la de abajo,
+          alineados por su base. Antes los tres se repartían una sola fila con
+          `justify-between`: al envolverse en una ventana estrecha, el título se
+          quedaba solo arriba y las dos formas de traer partidas acababan a
+          distinta altura, cuando son lo mismo y se leen juntas (fila 65 del
+          inventario de docs/07-coherencia-ui.md, criterio C-2). */}
+      <div className="space-y-3">
         <h1 className="text-2xl font-bold">Partidas</h1>
 
-        <form
-          className="flex items-end gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            syncMutation.mutate();
-          }}
-        >
-          <FieldLabel label="Sincronizar desde chess.com">
-            <input
-              value={syncUsername}
-              onChange={(event) => setSyncUsername(event.target.value)}
-              placeholder="usuario (o el de .env)"
-              className={`w-56 ${FIELD_CLASSES}`}
-            />
-          </FieldLabel>
-          <Button type="submit" variant="primary" disabled={syncMutation.isPending}>
-            {syncMutation.isPending ? "Sincronizando…" : "Sincronizar"}
-          </Button>
-        </form>
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
+          <form
+            className="flex items-end gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              syncMutation.mutate();
+            }}
+          >
+            <FieldLabel label="Sincronizar desde chess.com">
+              <input
+                value={syncUsername}
+                onChange={(event) => setSyncUsername(event.target.value)}
+                placeholder="usuario (o el de .env)"
+                className={`w-56 ${FIELD_CLASSES}`}
+              />
+            </FieldLabel>
+            <Button type="submit" variant="primary" disabled={syncMutation.isPending}>
+              {syncMutation.isPending ? "Sincronizando…" : "Sincronizar"}
+            </Button>
+          </form>
 
-        {/* Segunda vía para traer partidas: un archivo PGN de otra fuente
-            (RF-1.5). Va junto a "Sincronizar" y no en otra pantalla porque las
-            dos hacen lo mismo —llenar este listado— y se esperan en el mismo
-            sitio (criterio C-2 de docs/07-coherencia-ui.md). */}
-        <form
-          className="flex items-end gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const file = pgnFileInput.current?.files?.[0];
-            if (file) importPgnMutation.mutate(file);
-          }}
-        >
-          <FieldLabel label="Importar PGN (OTB, lichess)">
-            <input
-              ref={pgnFileInput}
-              type="file"
-              // Sin `required`, pulsar "Importar" sin archivo no hacía nada ni
-              // decía por qué; con él, el navegador lo pide (criterio C-3).
-              required
-              accept=".pgn,application/x-chess-pgn,text/plain"
-              className={`w-64 ${FIELD_CLASSES} file:mr-2 file:rounded file:border-0 file:bg-slate-200 file:px-2 file:py-0.5 file:text-xs dark:file:bg-slate-700 dark:file:text-slate-100`}
-            />
-          </FieldLabel>
-          <FieldLabel label="Mi nombre en el PGN" hint={PLAYER_NAME_IN_PGN_HINT}>
-            <input
-              value={playerNameInPgn}
-              onChange={(event) => setPlayerNameInPgn(event.target.value)}
-              placeholder="Durán, Jesús"
-              className={`w-44 ${FIELD_CLASSES}`}
-            />
-          </FieldLabel>
-          {/* Secundario: la acción principal de la pantalla es
-              "Sincronizar", y solo hay una por pantalla
-              (components/Button.tsx). */}
-          <Button type="submit" disabled={importPgnMutation.isPending}>
-            {importPgnMutation.isPending ? "Importando…" : "Importar"}
-          </Button>
-        </form>
+          {/* Segunda vía para traer partidas: un archivo PGN de otra fuente
+              (RF-1.5). Va junto a "Sincronizar" y no en otra pantalla porque las
+              dos hacen lo mismo —llenar este listado— y se esperan en el mismo
+              sitio (criterio C-2 de docs/07-coherencia-ui.md). */}
+          <form
+            className="flex items-end gap-2"
+            onSubmit={(event) => {
+              event.preventDefault();
+              const file = pgnFileInput.current?.files?.[0];
+              if (file) importPgnMutation.mutate(file);
+            }}
+          >
+            <FieldLabel label="Importar PGN (OTB, lichess)">
+              <input
+                ref={pgnFileInput}
+                type="file"
+                // Sin `required`, pulsar "Importar" sin archivo no hacía nada ni
+                // decía por qué; con él, el navegador lo pide (criterio C-3).
+                required
+                accept=".pgn,application/x-chess-pgn,text/plain"
+                className={`w-64 ${FIELD_CLASSES} file:mr-2 file:rounded file:border-0 file:bg-slate-200 file:px-2 file:py-0.5 file:text-xs dark:file:bg-slate-700 dark:file:text-slate-100`}
+              />
+            </FieldLabel>
+            <FieldLabel label="Mi nombre en el PGN" hint={PLAYER_NAME_IN_PGN_HINT}>
+              <input
+                value={playerNameInPgn}
+                onChange={(event) => setPlayerNameInPgn(event.target.value)}
+                placeholder="Durán, Jesús"
+                className={`w-44 ${FIELD_CLASSES}`}
+              />
+            </FieldLabel>
+            {/* Secundario: la acción principal de la pantalla es
+                "Sincronizar", y solo hay una por pantalla
+                (components/Button.tsx). */}
+            <Button type="submit" disabled={importPgnMutation.isPending}>
+              {importPgnMutation.isPending ? "Importando…" : "Importar"}
+            </Button>
+          </form>
+        </div>
       </div>
 
       {syncMutation.isError && <ErrorBox error={syncMutation.error} />}
@@ -348,11 +357,14 @@ export function GamesPage() {
                 <td className={TABLE_CELL_CLASSES}>
                   {game.white_username}{" "}
                   <span className="opacity-60">({formatRating(game.white_rating)})</span>
-                  {game.starts_from_custom_position && (
-                    <span className="ml-1.5">
-                      <CustomPositionBadge />
-                    </span>
-                  )}
+                  {/* Las dos insignias van con las blancas, que es la primera
+                      columna con nombre: son propiedades de la partida entera,
+                      no de un bando, y repetirlas en las dos columnas las haría
+                      parecer del jugador (criterio C-6). */}
+                  <span className="ml-1.5 inline-flex gap-1">
+                    <GameSourceBadge platform={game.platform} />
+                    {game.starts_from_custom_position && <CustomPositionBadge />}
+                  </span>
                 </td>
                 <td className={TABLE_CELL_CLASSES}>
                   {game.black_username}{" "}

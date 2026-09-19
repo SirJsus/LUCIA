@@ -44,6 +44,7 @@ export type BoardDetail = Schemas["BoardDetail"];
 export type OwnGameLink = Schemas["OwnGameLink"];
 export type OwnGamePublishRequest = Schemas["OwnGamePublishRequest"];
 export type EngineLine = Schemas["EngineLineOut"];
+export type Wdl = Schemas["WdlOut"];
 export type AnalysisComparison = Schemas["AnalysisComparisonOut"];
 export type MoveComparison = Schemas["MoveComparisonOut"];
 

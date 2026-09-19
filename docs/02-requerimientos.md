@@ -105,6 +105,74 @@ clasifica por lo que hizo. A diferencia de las demás categorías, esta no sale
 de un umbral: la decide una consulta a la tabla, y por eso el umbral que sí
 interviene es el de "esto ya es una imprecisión", el mismo de siempre.
 
+**Con qué reglas se cumplió RF-2.6, Lc0 como segunda opinión**
+(**2026-09-06**). El texto pide "probabilidad W/D/L, contraste con Stockfish en
+posiciones donde discrepan". Esta es la lectura que se le dio, y lo que quedó
+fuera. Vive en `lucia_core.engine.bridge`, `lucia_api.services.engines`,
+`lucia_api.services.comparison` y `apps/web/src/features/viewer/EngineComparison.tsx`;
+que cada motor se configure en sus propios términos está razonado en
+[ADR-0015](adr/0015-cada-motor-con-su-unidad-de-esfuerzo-y-sus-opciones.md).
+
+- **El contraste llegó el 2026-09-06; la W/D/L del motor, el 2026-09-19.**
+  Durante trece días esto se dio por cumplido con la mitad: los dos motores se
+  comparaban en la unidad común —la probabilidad de victoria que RF-2.3 deriva
+  de la puntuación con el modelo de Lichess— con el argumento de que una W/D/L
+  que solo reportara uno de los dos no se podría poner al lado de la del otro.
+  El argumento era falso en su premisa: **los dos la reportan**, sin más que
+  encenderles `UCI_ShowWDL`. Lo destapó la auditoría al cerrar la fase 2 (ver
+  su apéndice en [05-roadmap.md](05-roadmap.md)).
+
+  Y hacía falta, porque no es el mismo dato: la probabilidad de victoria sale
+  de una fórmula sobre el centipeón, igual para cualquier motor, así que dos
+  motores que discrepan en centipeones discrepan ahí por definición y no dice
+  **en qué**. La W/D/L la contesta cada uno. Desde la posición inicial
+  Stockfish da 159/837/4 y Lc0 330/429/241: las dos probabilidades de victoria
+  rondan el 50 % y no distinguen nada, mientras que el reparto dice que uno ve
+  tablas casi seguras y el otro una partida abierta. Ese es el caso que el
+  requerimiento perseguía —la posición que el cálculo puntúa como ganada y la
+  red ve como tablas técnicas— y que la unidad común no sabe enseñar.
+
+  No necesitó columna nueva: viaja en el JSON de las líneas del motor
+  (`position_cache.lines_json`, `analyzed_moves.alternatives_json`) en una
+  clave que puede faltar, así que lo guardado antes sigue leyéndose sin ella.
+  Se enseña con `components/WdlBar.tsx` en la lista de líneas y en la
+  comparación entre motores.
+- **Se contrastan dos análisis terminados de la misma partida**
+  (`GET /analysis/compare`), no dos motores a la vez sobre la marcha: hay que
+  analizarla con cada uno. Se dicen dos cosas —en qué porcentaje de jugadas
+  coinciden en la mejor jugada y en cuáles se separan al valorar—, y solo se
+  listan las separaciones de al menos **10 puntos** de probabilidad de
+  victoria: por debajo es ruido, dos motores nunca dan el mismo número exacto.
+- **A cada motor se le pide el esfuerzo en su unidad**: profundidad en
+  Stockfish (alfa-beta, "profundidad 18" significa algo concreto) y nodos en
+  Lc0 (MCTS, donde la profundidad es un promedio del árbol y pedir una
+  concreta cuesta un número imprevisible de evaluaciones de red). No es una
+  preferencia configurable: se deriva del motor
+  (`EffectiveEngineConfig.limit_kind`), y la validación del formulario de
+  RF-5.4 cambia de rango con él.
+- **Las opciones UCI genéricas se filtran contra las que declara cada motor.**
+  Lc0 no tiene `Hash` y mandársela aborta la conexión, que es la razón por la
+  que nunca había llegado a funcionar. Esto es lo que sostiene RNF-9 en el
+  núcleo: `EngineBridge` habla con cualquier motor UCI sin saber cuál es
+  (añadir un tercero al producto sigue pidiendo su ruta en `.env` y su nombre
+  en `ENGINE_NAMES`).
+- **La red forma parte de la identidad del motor en la caché** (RF-2.7): la
+  clave de `position_cache` guarda `lc0/744706-conv.pb.gz` y no `lc0`, porque
+  la misma posición con otra red da otra evaluación.
+- **Las posiciones terminales no se consultan.** En jaque mate o ahogado no
+  hay jugada que devolver: Stockfish responde igual, pero Lc0 se queda
+  esperando para siempre y dejaba tieso el análisis de cualquier partida
+  terminada en mate. Su evaluación se deduce (`_terminal_score`).
+- **Qué red se usa importa más que el motor.** Con la red grande (transformer)
+  OpenCL no arranca y la CPU da 2,5 nodos/s; con una convolucional T74, ~4.000
+  nodos/s. El instalador descarga tres —la T74, la grande y una Maia para el
+  sparring de RF-4.3— y la recomendada es la T74, que desde el **2026-09-19**
+  es también la que el código carga por defecto: hasta entonces `Settings`
+  traía la grande, así que un clon sin `.env` tenía un Lc0 inservible. El
+  backend, en cambio, **no se fija**: se deja elegir a Lc0 entre los que se le
+  compilaron. Medidas y detalle en el ítem de RF-2.6 y en el apéndice de la
+  fase 2 de [05-roadmap.md](05-roadmap.md).
+
 ### RF-3 · Estadísticas e insight
 
 | ID | Requerimiento | Prioridad |
@@ -533,6 +601,30 @@ Capa de visualización activable con una tecla sobre **cualquier tablero** (viso
 | RF-7.8 | Persistencia de preferencias: sub-modo y filtros activos se recuerdan entre sesiones. | P2 |
 | RF-7.9 | "Casillas críticas según motor": superponer las casillas que más aparecen en las mejores líneas de Stockfish. Único punto de RF-7 que requiere motor. | P2 |
 
+**Cómo se cumplieron los siete puntos P1** (**2026-09-19**). RF-7 dice qué se
+tiene que ver, no dónde ni con qué cálculo; esta es la lectura que se le dio.
+Vive entero en `apps/web/src/components/board/` —`occupancy.ts` (el cálculo,
+con pruebas propias), `useOccupancy` (el estado y la tecla `O`),
+`OccupancyLayer` (lo que se pinta sobre el tablero) y `OccupancyPanel` (el
+control, la inspección y la leyenda)—, así que se comporta igual en el visor y
+en el tablero de análisis; el entrenamiento (RF-4) lo enchufará cuando exista.
+
+- **Los alcances se generan aquí y no con `attackers()` de chess.js**, que solo
+  devuelve casillas de origen: hacen falta además la pieza que ataca (para
+  ordenar por valor, RF-7.3), el rayo X separado del conteo (RF-7.5) y la
+  clavada de los dos bandos (RF-7.6), que chess.js no puede dar porque solo
+  calcula las jugadas legales del que tiene el turno. Las reglas de conteo de
+  RF-7.7 salen de generarlo así, sin casos especiales. A chess.js se le pide
+  solo leer el FEN.
+- **Los conectores de RF-7.2 son de la pieza señalada o fijada.** Dibujar los
+  del bando entero a plena intensidad son sesenta líneas que no informan, así
+  que sin pieza señalada quedan como trama atenuada y en el mapa de calor no se
+  dibujan: ahí el color ya lo cuenta.
+- **Nada se calcula en el servidor ni se guarda**: es una capa de lectura sobre
+  la posición que ya está en pantalla, sin endpoint, sin esquema y sin motor,
+  como dice la entrada de esta sección. Recordar el sub-modo entre sesiones es
+  RF-7.8 y sigue pendiente.
+
 ### RF-10 · Alternativas por jugada en el análisis guardado
 
 Añadido al alcance de v1.0 el 2026-09-06 (ver la nota de alcance al inicio del
@@ -711,4 +803,4 @@ Notas técnicas, para cuando se retome:
 
 | ID | Requerimiento |
 | ---- | --------------- |
-| RNF-11 | La interfaz se comporta igual en todas las pantallas: paridad entre lo que se puede hacer con el teclado y lo que hay como control visible, mismo nombre y misma posición para la misma acción, estados explícitos de lo que está haciendo el sistema (en cola, trabajando con progreso, listo, vacío, error), estados de carga/error/vacío compartidos, un solo formato por dato, y ningún número del motor sin etiqueta o representación visual que lo explique. Los criterios verificables están en [docs/07-coherencia-ui.md](07-coherencia-ui.md), donde también se lleva el inventario de incumplimientos: vacío, con las 63 filas que llegó a tener cerradas. |
+| RNF-11 | La interfaz se comporta igual en todas las pantallas: paridad entre lo que se puede hacer con el teclado y lo que hay como control visible, mismo nombre y misma posición para la misma acción, estados explícitos de lo que está haciendo el sistema (en cola, trabajando con progreso, listo, vacío, error), estados de carga/error/vacío compartidos, un solo formato por dato, y ningún número del motor sin etiqueta o representación visual que lo explique. Los criterios verificables están en [docs/07-coherencia-ui.md](07-coherencia-ui.md), donde también se lleva el inventario de incumplimientos abiertos, que se cuenta allí y no aquí: es un criterio permanente y cada cambio de `apps/web` puede abrir filas nuevas. |

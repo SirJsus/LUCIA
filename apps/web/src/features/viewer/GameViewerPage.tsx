@@ -12,21 +12,25 @@ import { Button } from "../../components/Button";
 import { EngineSelect } from "../../components/EngineSelect";
 import { ClassificationBadge } from "../../components/ClassificationBadge";
 import { CustomPositionBadge } from "../../components/CustomPositionBadge";
+import { GameSourceBadge } from "../../components/GameSourceBadge";
 import { BoardWithEvalBar } from "../../components/board/BoardWithEvalBar";
 import { EngineLineList } from "../../components/board/EngineLineList";
 import { arrowsFromEngineLines, arrowsFromPreviewLine } from "../../components/board/boardConfig";
 import { MoveButton } from "../../components/board/MoveButton";
 import { MoveNavigator } from "../../components/board/MoveNavigator";
+import { OccupancyLayer } from "../../components/board/OccupancyLayer";
+import { OccupancyPanel } from "../../components/board/OccupancyPanel";
 import { useMoveNavigationKeys } from "../../components/board/useMoveNavigationKeys";
+import { useOccupancy } from "../../components/board/useOccupancy";
 import { EmptyState, ErrorBox, ProgressBox, Spinner } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
 import {
   BOARD_HINT_CLASSES,
   BOARD_SIDEBAR_GRID_CLASS,
-  buttonClasses,
   MOVE_LIST_HEIGHT_CLASS,
 } from "../../components/styles";
-import { analysisPgnUrl, api } from "../../lib/api";
+import { api } from "../../lib/api";
+import { saveTextAsFile } from "../../lib/download";
 import { classificationStyle, MISTAKE_CLASSIFICATIONS } from "../../lib/classification";
 import {
   formatAccuracy,
@@ -101,6 +105,18 @@ export function GameViewerPage() {
     },
   });
 
+  // --- Exportar el PGN anotado (RF-5.5) ---
+  // Se pide el archivo, se comprueba la respuesta y solo entonces se guarda.
+  // Es lo que permite que un análisis borrado desde otra pestaña acabe en un
+  // `ErrorBox` y no en un archivo con el error dentro (fila 70 del inventario
+  // de docs/07-coherencia-ui.md).
+  const exportPgnMutation = useMutation({
+    mutationFn: async (doneAnalysisId: number) => {
+      const { text, filename } = await api.getAnalysisPgn(doneAnalysisId);
+      saveTextAsFile(filename, text, "application/x-chess-pgn");
+    },
+  });
+
   // --- Abrir como tablero de análisis (RF-6.6) ---
   // La copia es **desacoplada**: se lee el PGN una vez y lo que se juegue
   // después en el tablero no vuelve a esta partida ni a su análisis. Se
@@ -111,7 +127,7 @@ export function GameViewerPage() {
     mutationFn: async () => {
       const pgn =
         analysis?.status === "done"
-          ? await api.getAnalysisPgn(analysis.id)
+          ? (await api.getAnalysisPgn(analysis.id)).text
           : (gameQuery.data?.pgn ?? "");
       const parsed = fromPgn(pgn); // lanza con el motivo si no hay árbol que sacar
       return api.createBoard({
@@ -144,6 +160,12 @@ export function GameViewerPage() {
     () => parsePgn(gameQuery.data?.pgn),
     [gameQuery.data?.pgn],
   );
+
+  const currentFen = currentPly < 0 ? startingFen : positions[currentPly].fen;
+
+  // La capa de ocupación (RF-7) se calcula sobre la posición que se está
+  // viendo, igual que en el tablero de análisis.
+  const occupancyController = useOccupancy(currentFen);
 
   // Una partida que empieza en la jugada 12 (odds chess, Chess960, partidas
   // desde posición) tiene que numerarse desde ahí en todas partes: lista,
@@ -215,7 +237,6 @@ export function GameViewerPage() {
   if (gameQuery.isError) return <ErrorBox error={gameQuery.error} onRetry={gameQuery.refetch} />;
 
   const game = gameQuery.data;
-  const currentFen = currentPly < 0 ? startingFen : positions[currentPly].fen;
   const lastMoveUci = currentPly < 0 ? null : positions[currentPly].lan;
 
   return (
@@ -236,8 +257,11 @@ export function GameViewerPage() {
               {formatDate(game.played_at)} · {formatTimeClass(game.time_class)} ·{" "}
               {game.rated ? "puntuada" : "amistosa"}
             </span>
-            {/* Sin esto, un tablero al que le faltan piezas se lee como un
-                fallo de la aplicación y no como la partida que es. */}
+            {/* De dónde vino la partida y si empieza en una posición dada: las
+                dos explican huecos o rarezas que sin una palabra se leen como
+                un fallo de la aplicación. Mismas insignias y mismo orden que en
+                el listado (criterio C-2). */}
+            <GameSourceBadge platform={game.platform} />
             {game.starts_from_custom_position && <CustomPositionBadge />}
           </p>
         </div>
@@ -252,23 +276,28 @@ export function GameViewerPage() {
             Girar tablero
           </Button>
           <EngineSelect value={engine} onChange={setEngine} />
-          {/* Un enlace y no un botón: descarga un archivo, así que el
-              navegador hace el trabajo y respeta el nombre que manda el
-              servidor. Solo sale con el análisis terminado, que es lo único
-              que la API exporta: uno a medias daría una partida comentada
-              hasta la mitad y muda después (criterio C-3). */}
-          {analysis?.status === "done" && (
-            <a
-              href={analysisPgnUrl(analysis.id)}
-              download
-              className={buttonClasses("secondary")}
-              // Qué lleva el archivo, con la misma forma que "Copiar PGN" del
-              // tablero de análisis, que es la otra acción que saca el PGN.
-              title="Descarga la partida con los comentarios del análisis y las variantes, para abrirla en lichess o ChessBase"
-            >
-              Exportar PGN anotado
-            </a>
-          )}
+          {/* Está **siempre**, también sin análisis: deshabilitado y diciendo
+              qué falta para que sirva. Antes no existía hasta que había un
+              análisis terminado, así que quien abría una partida sin analizar
+              no podía saber que la exportación existe ni que analizar es lo
+              que la trae. Es lo que ya hace la barra de filtros de Partidas
+              con sus tres campos (fila 68 del inventario, criterio C-3).
+
+              Y es un botón, no un `<a download>`: con el enlace la descarga la
+              hacía el navegador, y un 409 o un 404 se guardaban como si fueran
+              el archivo sin que la pantalla dijera nada (fila 70). Ahora el
+              error sale en su `ErrorBox`, como el del resto de acciones. */}
+          <Button
+            onClick={() => analysis && exportPgnMutation.mutate(analysis.id)}
+            disabled={analysis?.status !== "done" || exportPgnMutation.isPending}
+            title={
+              analysis?.status === "done"
+                ? "Descarga la partida con los comentarios del análisis y las variantes, para abrirla en lichess o ChessBase"
+                : "Analiza la partida para poder exportarla con los comentarios del motor"
+            }
+          >
+            {exportPgnMutation.isPending ? "Exportando…" : "Exportar PGN anotado"}
+          </Button>
           {/* Va junto a "Exportar PGN anotado" porque las dos sacan la partida
               de aquí: una a un archivo y otra a un tablero propio. A
               diferencia de aquella, esta no necesita análisis: una partida sin
@@ -302,6 +331,7 @@ export function GameViewerPage() {
       </div>
 
       {analyzeMutation.isError && <ErrorBox error={analyzeMutation.error} />}
+      {exportPgnMutation.isError && <ErrorBox error={exportPgnMutation.error} />}
       {openAsBoardMutation.isError && <ErrorBox error={openAsBoardMutation.error} />}
       {existingQuery.isError && (
         <ErrorBox error={existingQuery.error} onRetry={existingQuery.refetch} />
@@ -333,6 +363,9 @@ export function GameViewerPage() {
             lastMoveUci={lastMoveUci}
             engineArrows={engineArrows}
             whiteWinPercent={whiteWinPercent}
+            overlay={<OccupancyLayer controller={occupancyController} orientation={orientation} />}
+            onSelectSquare={occupancyController.selectSquare}
+            onHoverSquare={occupancyController.hoverSquare}
           />
 
           <MoveNavigator
@@ -348,8 +381,10 @@ export function GameViewerPage() {
           <p className={BOARD_HINT_CLASSES}>
             ← → recorren la partida, Inicio y Fin van a sus extremos. Pulsa una jugada de la lista
             o del gráfico para saltar a esa posición. Señala una jugada de las alternativas para
-            verla sobre el tablero.
+            verla sobre el tablero. Con O se enciende y se apaga la capa de ocupación.
           </p>
+
+          <OccupancyPanel controller={occupancyController} />
 
           {analysis?.status === "done" && analysis.moves.length > 0 && (
             <EvalChart

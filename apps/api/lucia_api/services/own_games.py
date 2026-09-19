@@ -44,12 +44,16 @@ import io
 from typing import Literal
 
 import chess.pgn
-from lucia_core.openings import opening_of_pgn
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db.models import Analysis, Board, Game, Player
+from lucia_api.services.games import (
+    UNKNOWN_TIME_CLASS,
+    UNKNOWN_TIME_CONTROL,
+    set_pgn_and_opening,
+)
 from lucia_api.services.pgn_import import SIDE_RESULTS_BY_PGN_RESULT, get_or_create_player
 
 #: Plataforma con la que se guardan las partidas publicadas desde un tablero.
@@ -57,13 +61,6 @@ from lucia_api.services.pgn_import import SIDE_RESULTS_BY_PGN_RESULT, get_or_cre
 #: `platform_id` es el id del tablero, así que volver a marcar el mismo
 #: tablero reescribe su fila en vez de duplicarla.
 BOARD_PLATFORM = "board"
-
-#: Ritmo de una partida publicada desde un tablero: el mismo hueco que deja la
-#: importación de PGN manual (RF-1.5). Un tablero no dice a qué ritmo se jugó,
-#: y elegir uno por él haría aparecer partidas inventadas en la tabla por
-#: control de tiempo.
-UNKNOWN_TIME_CONTROL = "-"
-UNKNOWN_TIME_CLASS = "unknown"
 
 PlayerColor = Literal["white", "black"]
 PlayerResult = Literal["win", "draw", "loss"]
@@ -143,7 +140,7 @@ async def publish_board_as_own_game(
         session.add(game)
 
     game.player_id = player.id
-    _set_moves_and_opening(game, _build_pgn_with_headers(pgn, details, username=username))
+    set_pgn_and_opening(game, _build_pgn_with_headers(pgn, details, username=username))
     game.white_username = username if details.player_color == "white" else details.opponent_name
     game.black_username = details.opponent_name if details.player_color == "white" else username
     game.white_rating = 0
@@ -187,7 +184,7 @@ async def refresh_own_game_moves(session: AsyncSession, board: Board, pgn: str) 
         return
     game, details = published
     username = details.username or game.white_username
-    _set_moves_and_opening(game, _build_pgn_with_headers(pgn, details, username=username))
+    set_pgn_and_opening(game, _build_pgn_with_headers(pgn, details, username=username))
     await link_analyses_to_own_game(session, board, analyzed_pgn=pgn)
 
 
@@ -229,19 +226,6 @@ async def link_analyses_to_own_game(
     for analysis in analyses:
         counts = analyzed_pgn is not None and analysis.analyzed_pgn == analyzed_pgn
         analysis.game_id = board.own_game_id if counts else None
-
-
-def _set_moves_and_opening(game: Game, pgn: str) -> None:
-    """Deja en la partida las jugadas y la apertura que se deduce de ellas.
-
-    Van juntas porque la apertura sale del PGN: guardar uno sin la otra
-    dejaría la partida contada bajo la apertura de una versión anterior del
-    tablero.
-    """
-    game.pgn = pgn
-    opening = opening_of_pgn(pgn)
-    game.opening_eco = opening.eco if opening else None
-    game.opening_name = opening.name if opening else None
 
 
 #: Resultado en notación PGN según de qué color jugó el usuario y cómo le fue.

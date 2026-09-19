@@ -12,26 +12,24 @@
  *
  * Escribiendo en un campo las teclas son del campo: `Ctrl+Z` dentro del
  * `textarea` de importar un PGN tiene que deshacer lo tecleado, no retirar
- * una jugada del tablero (criterio C-1 de docs/07-coherencia-ui.md).
+ * una jugada del tablero (criterio C-1 de docs/07-coherencia-ui.md). Por eso
+ * mira `isTextEntryTarget` y no `isTypingTarget`, que es la regla de los
+ * atajos de navegación: un desplegable se queda con las flechas, pero no tiene
+ * texto que deshacer, y quitarle `Ctrl+Z` al tablero con el foco en el
+ * selector de motor sería perder el atajo sin dárselo a nadie.
  */
 import { useEffect } from "react";
+import { isTextEntryTarget } from "../../lib/keyboard";
 
 export function useUndoRedoKeys({ onUndo, onRedo }: { onUndo: () => void; onRedo: () => void }) {
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
-      if (
-        !(event.ctrlKey || event.metaKey) ||
-        event.target instanceof HTMLInputElement ||
-        event.target instanceof HTMLTextAreaElement
-      ) {
-        return;
-      }
+      if (!(event.ctrlKey || event.metaKey) || isTextEntryTarget(event.target)) return;
       const key = event.key.toLowerCase();
-      const isRedo = key === "y" || (key === "z" && event.shiftKey);
       if (key !== "z" && key !== "y") return;
 
       event.preventDefault();
-      if (isRedo) onRedo();
+      if (key === "y" || event.shiftKey) onRedo();
       else onUndo();
     }
     window.addEventListener("keydown", onKeyDown);

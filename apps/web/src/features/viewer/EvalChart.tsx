@@ -64,7 +64,7 @@ export function EvalChart({ moves, currentPly, startingPly, onSelectPly }: EvalC
             <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
             <XAxis
               dataKey="ply"
-              tick={{ fontSize: 11, fill: theme.axisColor }}
+              tick={theme.axisTickStyle}
               stroke={theme.axisColor}
               // El eje enseña el número de jugada de la partida, el mismo que
               // la lista y la comparación de motores.
@@ -72,7 +72,7 @@ export function EvalChart({ moves, currentPly, startingPly, onSelectPly }: EvalC
             />
             <YAxis
               domain={[0, 100]}
-              tick={{ fontSize: 11, fill: theme.axisColor }}
+              tick={theme.axisTickStyle}
               stroke={theme.axisColor}
               width={32}
               unit="%"

@@ -5,6 +5,14 @@ con evaluación NNUE, y Lc0 explora con una red que "intuye" el valor
 posicional. Donde los dos coinciden, la jugada suele estar clara; donde
 discrepan es donde hay algo que entender, y eso es lo que este módulo
 localiza.
+
+**Cada discrepancia se acompaña de la W/D/L que da cada motor**, que es la otra
+mitad de RF-2.6. La distancia en probabilidad de victoria dice *cuánto* se
+separan, pero no *en qué*: sale de convertir el centipeón con una fórmula
+común, así que dos motores que discrepan en centipeones discrepan ahí por
+definición. La W/D/L la contesta cada motor por su cuenta, y es donde se ve el
+desacuerdo de verdad — el caso que motiva el requerimiento es la posición que
+Stockfish puntúa como ganada y la red de Lc0 ve como tablas técnicas.
 """
 
 from __future__ import annotations
@@ -15,6 +23,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db.models import Analysis, AnalyzedMove
+from lucia_api.services.analysis import LineWdl
 
 #: Diferencia de probabilidad de victoria (0-100) a partir de la cual se
 #: considera que los motores discrepan de verdad. Por debajo es ruido: dos
@@ -34,6 +43,12 @@ class MoveComparison:
     win_percent_after_b: float
     best_move_a: str | None
     best_move_b: str | None
+    wdl_after_a: LineWdl | None = None
+    wdl_after_b: LineWdl | None = None
+    """Lo que cada motor da como W/D/L de la posición que deja esta jugada
+    (RF-2.6). `None` en la última jugada de la partida —no hay posición
+    siguiente de la que se guardaran líneas— y en los análisis anteriores a
+    que se le pidiera la W/D/L al motor."""
 
     @property
     def win_percent_gap(self) -> float:
@@ -104,6 +119,8 @@ async def compare_analyses(
             win_percent_after_b=move_b.win_percent_after,
             best_move_a=move_a.best_move_uci,
             best_move_b=move_b.best_move_uci,
+            wdl_after_a=_wdl_after(moves_a, ply),
+            wdl_after_b=_wdl_after(moves_b, ply),
         )
         if move_comparison.same_best_move:
             agreed_best_moves += 1
@@ -122,6 +139,21 @@ async def compare_analyses(
         agreed_best_moves=agreed_best_moves,
         disagreements=disagreements,
     )
+
+
+def _wdl_after(moves_by_ply: dict[int, AnalyzedMove], ply: int) -> LineWdl | None:
+    """La W/D/L de la posición que deja la jugada de `ply`, según este análisis.
+
+    No hace falta guardarla aparte: las líneas de una jugada son las de la
+    posición **anterior** a ella (RF-10.1), así que la posición posterior a la
+    jugada `ply` es justo la anterior a `ply + 1`, y ahí ya está. La mejor
+    línea es la primera, que es la que sostiene la evaluación de la posición.
+    """
+    next_move = moves_by_ply.get(ply + 1)
+    if next_move is None or not next_move.alternatives_json:
+        return None
+    stored_wdl = next_move.alternatives_json[0].get("wdl")
+    return LineWdl(*stored_wdl) if stored_wdl else None
 
 
 async def _moves_by_ply(session: AsyncSession, analysis_id: int) -> dict[int, AnalyzedMove]:

@@ -180,10 +180,10 @@ function StatsContent({ stats, username }: { stats: PlayerStats; username: strin
               }))}
             >
               <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: theme.axisColor }} stroke={theme.axisColor} />
+              <XAxis dataKey="label" tick={theme.axisTickStyle} stroke={theme.axisColor} />
               <YAxis
                 allowDecimals={false}
-                tick={{ fontSize: 11, fill: theme.axisColor }}
+                tick={theme.axisTickStyle}
                 stroke={theme.axisColor}
                 width={32}
               />
@@ -317,7 +317,6 @@ function TrendsSection({ trends }: { trends: Trends }) {
   const ratingLabel = trends.rating_time_class
     ? `Rating (${formatTimeClass(trends.rating_time_class)})`
     : null;
-  const axisTickStyle = { fontSize: 11, fill: theme.axisColor };
   const legendStyle = { fontSize: 11, color: theme.axisColor };
 
   return (
@@ -335,14 +334,14 @@ function TrendsSection({ trends }: { trends: Trends }) {
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={monthlyChartData}>
               <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-              <XAxis dataKey="label" tick={axisTickStyle} stroke={theme.axisColor} />
+              <XAxis dataKey="label" tick={theme.axisTickStyle} stroke={theme.axisColor} />
               {/* Dos escalas distintas: la precisión es un porcentaje y el
                   rating son puntos Elo. Compartir eje aplastaría una de las
                   dos contra el borde. */}
               <YAxis
                 yAxisId="accuracy"
                 domain={[0, 100]}
-                tick={axisTickStyle}
+                tick={theme.axisTickStyle}
                 stroke={theme.axisColor}
                 width={36}
                 unit="%"
@@ -352,7 +351,7 @@ function TrendsSection({ trends }: { trends: Trends }) {
                   yAxisId="rating"
                   orientation="right"
                   domain={["dataMin - 50", "dataMax + 50"]}
-                  tick={axisTickStyle}
+                  tick={theme.axisTickStyle}
                   stroke={theme.axisColor}
                   width={44}
                 />
@@ -404,8 +403,8 @@ function TrendsSection({ trends }: { trends: Trends }) {
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={monthlyChartData}>
               <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-              <XAxis dataKey="label" tick={axisTickStyle} stroke={theme.axisColor} />
-              <YAxis tick={axisTickStyle} stroke={theme.axisColor} width={36} />
+              <XAxis dataKey="label" tick={theme.axisTickStyle} stroke={theme.axisColor} />
+              <YAxis tick={theme.axisTickStyle} stroke={theme.axisColor} width={36} />
               <Tooltip
                 contentStyle={theme.tooltipStyle}
                 formatter={(value: number, name: string) => [formatPerHundredMoves(value), name]}
@@ -498,9 +497,9 @@ function PhaseSection({ phases }: { phases: PhaseStats[] }) {
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={data}>
               <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: theme.axisColor }} stroke={theme.axisColor} />
+              <XAxis dataKey="label" tick={theme.axisTickStyle} stroke={theme.axisColor} />
               <YAxis
-                tick={{ fontSize: 11, fill: theme.axisColor }}
+                tick={theme.axisTickStyle}
                 stroke={theme.axisColor}
                 width={36}
                 unit="%"

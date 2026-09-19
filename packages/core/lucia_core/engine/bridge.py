@@ -29,6 +29,14 @@ class EngineBridge:
         aplican solo si el motor las declara — eso también hace que enchufar
         un motor UCI cualquiera funcione sin tocar código (RNF-9).
 
+        `UCI_ShowWDL` va por la misma vía y por la misma razón. Es lo que hace
+        que el motor informe de su probabilidad de victoria, tablas y derrota
+        (RF-2.6) en vez de solo del centipeón; lo declaran tanto Stockfish como
+        Lc0, pero no tiene por qué declararlo un motor cualquiera, y pedírselo
+        a quien no lo conoce abortaría la conexión. Sin él, `python-chess` no
+        recibe `wdl` en las líneas y `EngineLine.wdl` se queda en `None`, que
+        es justo lo que debe pasar con un motor que no sabe contestarlo.
+
         `extra_options` es la excepción: se aplican siempre, sin filtrar,
         porque las pidió explícitamente quien configuró el motor. Si no
         existen, es un error de configuración y conviene que se note.
@@ -40,6 +48,7 @@ class EngineBridge:
         generic_options: dict[str, str | int | bool] = {
             "Threads": self.config.threads,
             "Hash": self.config.hash_mb,
+            "UCI_ShowWDL": True,
         }
         options = {k: v for k, v in generic_options.items() if k in supported_options}
         options.update(self.config.extra_options)

@@ -14,6 +14,7 @@ encontraría ninguna de sus propias partidas.
 
 from __future__ import annotations
 
+from lucia_core.openings import opening_of_pgn
 from sqlalchemy import case, func
 
 from lucia_api.db.models import Game
@@ -32,6 +33,28 @@ DRAW_RESULTS = (
     "50move",
     "timevsinsufficient",
 )
+
+
+#: Los huecos con los que se guarda el ritmo de una partida que no dice a qué
+#: se jugó: las de un archivo PGN (RF-1.5) y las publicadas desde un tablero
+#: (RF-6.5). Se dejan en hueco en vez de inventar una categoría, y por eso
+#: `services/stats.py` los descarta de la línea de rating de las tendencias.
+UNKNOWN_TIME_CONTROL = "-"
+UNKNOWN_TIME_CLASS = "unknown"
+
+
+def set_pgn_and_opening(game: Game, pgn: str) -> None:
+    """Deja en la partida el PGN y la apertura que se deduce de él.
+
+    Van juntos porque la apertura sale del PGN: guardar uno sin la otra
+    dejaría la partida contada bajo la apertura de unas jugadas anteriores.
+    Lo usan las dos vías que guardan un PGN propio: la importación manual
+    (RF-1.5) y la publicación de un tablero como partida propia (RF-6.5).
+    """
+    game.pgn = pgn
+    opening = opening_of_pgn(pgn)
+    game.opening_eco = opening.eco if opening else None
+    game.opening_name = opening.name if opening else None
 
 
 def is_white(username: str):

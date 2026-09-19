@@ -170,15 +170,27 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  /** El PGN anotado como texto, para traerlo al tablero de análisis (RF-6.6).
+  /** El PGN anotado (RF-5.5), con el nombre de archivo que propone el servidor.
    *
-   * Convive con `analysisPgnUrl`, que sirve para descargarlo: aquí el archivo
-   * no se guarda, se lee, así que hace falta el cuerpo y no un enlace. No pasa
-   * por `request`, que espera JSON. */
-  getAnalysisPgn: async (analysisId: number): Promise<string> => {
+   * Lo usan sus dos consumidores: el tablero de análisis, que solo quiere el
+   * texto para traerse la partida (RF-6.6), y el botón de exportar del visor,
+   * que además guarda el archivo y necesita cómo llamarlo.
+   *
+   * **Se pide por aquí y no con un `<a download>`**, que era lo que había: un
+   * enlace deja la descarga en manos del navegador, y entonces un 409 —análisis
+   * sin terminar— o un 404 —partida borrada desde otra pestaña— se guardan como
+   * si fueran el archivo, sin que la pantalla diga nada (fila 70 del inventario
+   * de docs/07-coherencia-ui.md). Pasando por aquí, el error es un `ApiError`
+   * como los demás y la pantalla lo enseña en su `ErrorBox`.
+   *
+   * No pasa por `request`, que espera JSON. */
+  getAnalysisPgn: async (analysisId: number): Promise<{ text: string; filename: string }> => {
     const response = await fetch(analysisPgnUrl(analysisId));
     if (!response.ok) throw new ApiError(response.status, await extractErrorMessage(response));
-    return response.text();
+    return {
+      text: await response.text(),
+      filename: filenameFromResponse(response) ?? `analisis-${analysisId}.pgn`,
+    };
   },
 
   listBoards: () => request<BoardSummary[]>("/boards"),
@@ -284,6 +296,14 @@ export const api = {
  * Es un enlace y no una llamada `fetch`: el navegador descarga el archivo y le
  * pone el nombre que manda el servidor en `Content-Disposition`, que es
  * justamente lo que se perdería al pasarlo por JavaScript. */
+/** El nombre que el servidor propone para el archivo, de su cabecera
+ * `Content-Disposition`. Sin ella —o si viene con una forma que no se reconoce—
+ * devuelve `null` y quien llama pone uno. */
+function filenameFromResponse(response: Response): string | null {
+  const disposition = response.headers.get("Content-Disposition");
+  return disposition?.match(/filename="([^"]+)"/)?.[1] ?? null;
+}
+
 export function analysisPgnUrl(analysisId: number): string {
   return `${BASE_URL}/analysis/${analysisId}/pgn`;
 }

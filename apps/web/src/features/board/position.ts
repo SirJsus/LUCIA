@@ -36,8 +36,11 @@ export interface EditablePosition {
  * posición montada en el editor se compara sin más con la estándar. */
 export const STANDARD_STARTING_FEN = new Chess().fen();
 
-export const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
-export const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
+/** Las columnas, y las filas en el orden en que las escribe un FEN: de la
+ * octava a la primera. Solo se usan aquí, al componer y leer la cadena; las
+ * casillas que se pintan en pantalla se recorren con `components/board/squares`. */
+const FILES = ["a", "b", "c", "d", "e", "f", "g", "h"] as const;
+const RANKS = ["8", "7", "6", "5", "4", "3", "2", "1"] as const;
 
 /** Los enroques en el orden en que se escriben en un FEN. El orden importa:
  * "kqKQ" describe lo mismo que "KQkq" y no es un FEN válido. */

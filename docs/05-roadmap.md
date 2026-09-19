@@ -15,7 +15,7 @@
 - [x] `uv sync --all-packages --all-extras` + `pnpm install` limpios; ruff,
       pytest, tsc, eslint y `vite build` pasan en local igual que en CI.
 
-## Fase 1 · MVP "Game Review propio" (P0)
+## Fase 1 · MVP "Game Review propio" (P0) ✅
 
 - [x] `lucia-chesscom`: descargar perfil (RF-1.1) + archivos mensuales (RF-1.2),
       parsear PGN y relojes, guardar en SQLite vía Alembic (`players`, `games`,
@@ -55,9 +55,10 @@
       HTTP sería ejecución arbitraria de comandos). Tema claro/oscuro.
       Tipos TS generados desde el OpenAPI real (`make types`), con
       verificación en CI de que no se desincronizan. 10 tests de front.
-      Pendiente: reordenar/explorar variantes desde el visor (RF-5.2).
-      Exportar PGN anotado (RF-5.5) llegó el 2026-09-17 (ver su ítem en la
-      fase 2).
+      Lo que quedaba aquí de RF-5.2 —explorar variantes del motor desde el
+      visor— se cerró el 2026-09-18 con "Abrir como tablero" (RF-6.6), y
+      exportar PGN anotado (RF-5.5) llegó el 2026-09-17; los dos tienen su
+      ítem en la fase 2.
 - [x] Dashboard (RF-3.1 a 3.3): marcador y rating por control de tiempo,
       partidas por mes, rendimiento por apertura separando blancas de negras,
       y pérdida de ventaja por fase, resaltando la peor. Necesitó implementar
@@ -78,18 +79,35 @@
       pieza a pieza —la cuarta forma de arrancar que pide RF-6.1— con el ítem
       de los extras del tablero, los dos en la fase 2.
 
-## Fase 2 · Insight (P1)
+## Fase 2 · Insight (P1) ✅
+
+> Cerrada el **2026-09-19** con la capa de ocupación del tablero, su último
+> ítem pendiente. Es el corte de la versión `0.3.0` (ver
+> [CHANGELOG.md](../CHANGELOG.md)); su apéndice, auditado y cerrado ese mismo
+> día, es el de `0.4.0`. Quedan las fases 3 y 4 para llegar a 1.0.0.
 
 - [x] Lc0 integrado como segundo motor (RF-2.6); vista de discrepancias
       Stockfish vs Lc0. Nunca había llegado a funcionar: `EngineBridge` le
       mandaba la opción `Hash`, que Lc0 no soporta, y abortaba la conexión —
       ahora las opciones genéricas se filtran contra las que declara cada
-      motor (esto además cumple RNF-9: enchufar otro motor UCI no necesita
-      tocar código). El límite se mide en nodos para Lc0 y en profundidad
-      para Stockfish, porque en MCTS la profundidad es un promedio del árbol
-      y pedir una concreta cuesta un número imprevisible de evaluaciones.
+      motor (esto es lo que cumple RNF-9 en el núcleo: `EngineBridge` habla
+      con cualquier motor UCI sin saber cuál es. Añadir un tercer motor sigue
+      pidiendo dos cosas fuera del núcleo: su ruta en `.env` y su nombre en
+      `ENGINE_NAMES` de `services/engines.py`). El límite se mide en nodos
+      para Lc0 y en profundidad para Stockfish, porque en MCTS la profundidad
+      es un promedio del árbol y pedir una concreta cuesta un número
+      imprevisible de evaluaciones.
       Endpoint `GET /analysis/compare` y panel en el visor con las jugadas
-      donde los motores no coinciden.
+      donde los motores no coinciden. **Lo que no se entregó del texto del
+      RF**: la "probabilidad W/D/L" que Lc0 sabe dar. Los dos motores se
+      comparan en la misma unidad —la probabilidad de victoria derivada de la
+      puntuación con el modelo de Lichess, la misma de RF-2.3—, porque una
+      W/D/L solo del motor que la reporta no se podría poner al lado de la de
+      Stockfish. Anotado en la nota de RF-2.6 de
+      [02-requerimientos.md](02-requerimientos.md); que cada motor se
+      configure en sus propios términos —opciones filtradas, esfuerzo en su
+      unidad y la red dentro de su identidad en la caché— quedó registrado en
+      [ADR-0015](adr/0015-cada-motor-con-su-unidad-de-esfuerzo-y-sus-opciones.md).
       **Sobre el rendimiento de Lc0** (medido en un portátil con i7 y GTX
       1060). El backend y la red deciden si sirve o no:
 
@@ -98,6 +116,8 @@
     | grande (transformer, 313 MB) | CPU/BLAS | 2,5 nodos/s |
     | grande (transformer) | OpenCL | **no soportada** |
     | T74 convolucional (6 MB) | OpenCL | ~4.000 nodos/s |
+    | T74 convolucional (6 MB) | CPU/BLAS | ~200 nodos/s |
+    | T74 convolucional (6 MB) | sin especificar (Lc0 elige) | ~2.400 nodos/s |
     | Maia (1 MB) | OpenCL | ~12.500 nodos/s |
 
       El instalador descargaba solo la red grande, que es transformer: OpenCL
@@ -156,10 +176,11 @@
       - **De RF-5.2 quedaba la mitad del visor**, y no por decisión de
         interfaz: el análisis guardado solo tenía `best_move_uci` por jugada,
         así que solo se podía dibujar una flecha. Lo resolvió RF-10 el
-        2026-09-08, en esta misma fase. Sigue pendiente "explorar variantes del
-        motor desde cualquier posición" en el visor, que es el ítem de RF-6.6
-        (abrir una partida importada como copia desacoplada). Hasta que ese se
-        marque, RF-5.2 no está entregado del todo.
+        2026-09-08, en esta misma fase. Lo último que le faltaba —"explorar
+        variantes del motor desde cualquier posición" en el visor— lo cerró
+        RF-6.6 el 2026-09-18 con "Abrir como tablero", que saca la partida al
+        tablero de análisis como copia desacoplada: **con eso RF-5.2 queda
+        entregado entero**.
 - [x] Alternativas por jugada en el análisis guardado (RF-10.1 y RF-10.2).
       Persistir las N mejores líneas de cada posición analizada, no solo
       `best_move_uci`, y usarlas en el visor. Movido al alcance de v1.0 el
@@ -190,10 +211,14 @@
       Queda fuera RF-10.3 (usar las alternativas en los puzzles de RF-4.1),
       que es P2 y vive en la fase 3 con el resto de entrenamiento.
 - [x] Coherencia de la interfaz entre pantallas (RF-5.1 y RNF-6; criterios en
-      [docs/07-coherencia-ui.md](07-coherencia-ui.md), cuyo inventario de
-      incumplimientos está **vacío**: las 63 filas que llegó a tener, cerradas
-      —las dos últimas, las que abrieron los extractores de patrones el
-      2026-09-09—). El tablero de análisis se
+      [docs/07-coherencia-ui.md](07-coherencia-ui.md)). Esta casilla es el
+      trabajo de coherencia que arrancó el inventario y cerró sus 51 primeras
+      filas; el inventario **no se cierra con la fase**, porque RNF-11 es un
+      criterio permanente y cada cambio de `apps/web` puede abrir filas
+      nuevas: al cerrar la fase 2 llevaba 90 filas, 86 cerradas y **cuatro
+      abiertas** (65 y 67, de la importación de PGN; 68 y 70, de la
+      exportación a PGN anotado). Quien las cuenta y las cierra es el agente
+      `coherencia-ui`, no este roadmap. El tablero de análisis se
       navegaba solo con el teclado y su pantalla era siempre la misma, mientras
       que el visor tenía controles visibles y cambiaba según lo que hace el
       motor: quien no sabe ya de análisis leía el tablero como una herramienta
@@ -428,11 +453,13 @@
         ([ADR-0013](adr/0013-analisis-de-partida-o-de-tablero.md)), el PGN de
         la línea principal lo manda el front (`toPgn`) y se guarda en
         `analyses.analyzed_pgn`, así que la pantalla avisa cuando el tablero
-        cambió desde el análisis (`matchAnalyzedLine`). No cuenta en las
-        estadísticas (RF-6.5), y **que un tablero marcado como propio sí
-        cuente sigue pendiente**: las agregaciones de RF-3 se apoyan en
-        columnas de `games` que un tablero no tiene (ver la nota de RF-6.8 /
-        RF-6.9 en [02-requerimientos.md](02-requerimientos.md)).
+        cambió desde el análisis (`matchAnalyzedLine`). Un tablero a secas no
+        cuenta en las estadísticas (RF-6.5); que uno marcado como propio sí
+        cuente quedó pendiente aquí unas horas y lo cerró el ítem siguiente
+        el mismo 2026-09-18, publicándolo como partida —las agregaciones de
+        RF-3 se apoyan en columnas de `games` que un tablero no tiene (ver la
+        nota de RF-6.8 / RF-6.9 en
+        [02-requerimientos.md](02-requerimientos.md))—.
 
       **Y el mismo 2026-09-18** lo último que quedaba de RF-6.1: el editor de
       posición pieza a pieza, `features/board/PositionEditor.tsx` con la
@@ -485,7 +512,45 @@
         `analyzed_moves.analysis_id` no tenía cascada (migración
         `c8f3a2b91e47`). Las migraciones siguen corriendo con el pragma
         apagado, porque alembic recrea tablas enteras para cambiarlas.
-- [ ] Capa de ocupación del tablero (RF-7.1 a 7.7): sub-modo mapa de calor, sub-modo cobertura directa del turno, inspección por casilla, piezas colgadas, rayos X aparte y clavadas marcadas, reglas de conteo (rey, peones en diagonal, al paso). Cálculo en cliente con chess.js, activable en visor, tablero de análisis y entrenamiento.
+- [x] Capa de ocupación del tablero (RF-7.1 a 7.7): sub-modo mapa de calor,
+      sub-modo cobertura directa del turno, inspección por casilla, piezas
+      colgadas, rayos X aparte y clavadas marcadas, reglas de conteo (rey,
+      peones en diagonal, al paso). Hecho el 2026-09-19: se enciende con la
+      tecla O o desde su panel, en el visor (RF-5) y en el tablero de análisis
+      (RF-6); en el entrenamiento (RF-4) se enchufará cuando esa pantalla
+      exista, en la fase 3.
+
+      - **Cálculo propio de los alcances, no `attackers()` de chess.js.** El
+        atajo de la librería devuelve solo las casillas de origen, y aquí hacen
+        falta tres cosas más: qué pieza ataca desde cada una (para ordenar la
+        inspección por valor, RF-7.3), el rayo X separado del ataque directo
+        (RF-7.5) y si la pieza que ataca está clavada, **de los dos bandos**
+        —chess.js solo calcula las jugadas legales del que tiene el turno, así
+        que la clavada se resuelve por geometría (RF-7.6)—. Recorrer las líneas
+        una vez las saca las tres, y de paso las reglas de conteo de RF-7.7
+        salen solas: el rey alcanza sus ocho casillas como cualquier otra
+        pieza, el peón sus dos diagonales y no la de delante, y la casilla de
+        captura al paso la alcanza el peón que podría capturar ahí sin tratarla
+        como caso especial. A chess.js se le pide solo leer el FEN.
+      - **La casilla bajo el puntero se calcula por geometría**, midiendo sobre
+        el rectángulo del tablero, y no se le pregunta a chessground: sus
+        eventos de selección solo existen cuando el tablero es manipulable —el
+        visor lo tiene en modo lectura— y no tiene evento alguno de "el ratón
+        pasa por encima", que es justo lo que RF-7.2 necesita para filtrar la
+        cobertura al señalar una pieza. Con la medida, las dos pantallas
+        responden igual y chessground sigue recibiendo el ratón intacto.
+      - **Los conectores son de la pieza señalada o fijada**, y solo una trama
+        muy atenuada para el bando entero en cobertura: dibujar las sesenta
+        líneas de un bando a plena intensidad no informa de nada, y en mapa de
+        calor no se dibuja ninguna porque ahí el color ya lo cuenta.
+      - **Nada de esto toca la API ni el motor**: es una capa de lectura sobre
+        la posición que ya está en pantalla, como pedía el propio RF-7. Sin
+        endpoint nuevo, sin esquema nuevo y sin persistencia, así que no hay
+        decisión de arquitectura que registrar en un ADR.
+      - **Quedan fuera RF-7.8 y RF-7.9**, los dos P2 y en la fase 4: recordar
+        el sub-modo y los filtros entre sesiones —que espera al almacén único
+        de preferencias de RF-8— y las casillas críticas según motor, el único
+        punto de RF-7 que necesitaría llamar a Stockfish.
 - [x] Exportar PGN anotado (RF-5.5). Hecho el 2026-09-17:
       `GET /analysis/{id}/pgn` y el enlace "Exportar PGN anotado" en la
       cabecera del visor. El archivo se abre en lichess, ChessBase o SCID como
@@ -512,6 +577,184 @@
         dejó de estar duplicado entre el detalle y la exportación
         (`_load_analysis_with_moves`).
 
+## Apéndice de la fase 2 · lo que destapó la auditoría (2026-09-19) ✅
+
+> Sus siete puntos están cerrados. Es el corte de la versión `0.4.0` (ver
+> [CHANGELOG.md](../CHANGELOG.md)).
+
+Cerrada la fase, se auditaron por separado el mapa del proyecto, la
+documentación y el código de los catorce ítems. Lo que salió de ahí y no cabía
+dentro de ninguno de ellos queda recogido aquí, en vez de reabrir casillas ya
+cerradas o de quedarse en un informe que nadie vuelve a leer. **No es alcance
+nuevo**: ninguno de estos puntos añade un RF, son cabos sueltos de lo ya
+entregado. Lo que sí es alcance —RF-3.8— se dice expresamente.
+
+- [x] **RF-2.6 entregó la mitad de su texto**, y ya está completo. Hecho el
+      2026-09-19. El requerimiento pide "probabilidad W/D/L, contraste con
+      Stockfish en posiciones donde discrepan": el contraste estaba, la W/D/L
+      no. Lo que se guardaba era la probabilidad de victoria derivada del
+      centipeón con el modelo de Lichess
+      (`Score.wdl(model="lichess").expectation()` en `lucia_core.accuracy`),
+      que es una fórmula común a los dos motores y no lo que el motor opina.
+
+      - **La W/D/L se le pide al motor con `UCI_ShowWDL`**, por la misma vía
+        filtrada que `Threads` y `Hash` (`EngineBridge._options_to_apply`): la
+        declaran Stockfish y Lc0, pero no tiene por qué declararla un motor
+        UCI cualquiera, y pedírsela a quien no la conoce abortaría la
+        conexión. Un motor que no la informe deja `EngineLine.wdl` en `None` y
+        la interfaz se dibuja sin la columna, que es lo que debe pasar
+        (RNF-9 sigue en pie).
+      - **No hizo falta ninguna migración.** La W/D/L viaja en el mismo JSON
+        que la puntuación (`position_cache.lines_json` y
+        `analyzed_moves.alternatives_json`), en una clave que puede faltar:
+        toda la caché y todos los análisis escritos antes de esto se leen sin
+        ella y siguen valiendo. Y como las líneas de una jugada son las de la
+        posición **anterior** a ella (RF-10.1), la W/D/L de la posición que
+        deja la jugada `ply` ya está guardada en la fila `ply + 1`: la
+        comparación la lee de ahí (`comparison._wdl_after`) en vez de
+        duplicarla en una columna nueva. La última jugada de la partida no
+        tiene posición siguiente y se queda sin reparto, dicho y no inventado.
+      - **Se enseña en los dos sitios donde se lee una opinión del motor**, con
+        el mismo componente (`components/WdlBar.tsx`, criterio C-5): la lista
+        de líneas —tablero de análisis y alternativas del visor— y la
+        comparación entre motores, donde cada uno trae el suyo. La barra usa
+        los blancos y negros de la barra de evaluación para que los bandos se
+        reconozcan entre las dos, con el gris de las tablas en medio.
+      - **Por qué era la mitad que faltaba, medido**: desde la posición
+        inicial, Stockfish da 159/837/4 y Lc0 330/429/241. La probabilidad de
+        victoria de los dos ronda el 50 % y no distingue nada; el reparto dice
+        que uno ve tablas casi seguras y el otro una partida abierta. Ese es el
+        desacuerdo que el requerimiento quería ver.
+- [x] **RF-3.8 no estaba en ninguna fase**, y ahora está en la **fase 4**.
+      Resuelto el 2026-09-19. "Análisis de rivales: patrones contra rivales
+      recurrentes" (P2) entró en el alcance congelado de v1.0 el 2026-09-05 y
+      nunca llegó a tener ítem: el mapa lo daba por "pendiente (fase 2)" y la
+      fase 2 se cerró sin él. Se queda dentro del alcance de 1.0 —no se manda a
+      Post 1.0— y baja a la fase 4 con los demás P2 congelados, que es donde
+      encaja: lo que necesita para montarse (las agregaciones de
+      `services/stats.py` y los extractores de `lucia_core.insights`) ya está
+      entregado, así que no bloquea la fase 3.
+- [x] **Cuatro incoherencias de interfaz seguían abiertas**, y ya no queda
+      ninguna. Hecho el 2026-09-19. Eran las filas 65, 67, 68 y 70 de
+      [07-coherencia-ui.md](07-coherencia-ui.md), dos de la pantalla de
+      Partidas y dos del control de exportar del visor, heredadas de RF-1.5 y
+      RF-5.5 (2026-09-17). **Es la primera vez que el inventario queda vacío.**
+
+      - **65 (C-2)**: la cabecera de Partidas repartía con `justify-between` el
+        título y **dos** formularios; al envolverse, el título se quedaba solo
+        arriba y las dos formas de traer partidas a distinta altura. Ahora el
+        título va en su línea y los dos formularios en la de abajo.
+      - **67 (C-6)**: el listado no decía de dónde venía una partida, así que
+        una importada de un PGN enseñaba cuatro columnas vacías sin explicar por
+        qué. `GameSummary` expone ya `platform` y `GameSourceBadge` marca lo que
+        se sale de la norma —"PGN importado", "tablero propio"—, en el listado y
+        en la cabecera del visor. Las de chess.com no llevan insignia: son la
+        mayoría y marcarlas todas sería ruido.
+      - **68 y 70 (C-3) se arreglaron juntas porque son el mismo control.**
+        "Exportar PGN anotado" está ahora **siempre**, deshabilitado y diciendo
+        qué falta cuando no hay análisis; y dejó de ser un `<a download>`, con
+        lo que un 409 o un 404 ya no se guardan como si fueran el archivo.
+        Pasa por `api.getAnalysisPgn`, que comprueba la respuesta y solo
+        entonces guarda (`lib/download.ts`), respetando el nombre que propone el
+        servidor. Convertir el enlace en botón es lo que permitió las dos cosas:
+        un enlace no se puede deshabilitar con un motivo ni sabe que falló.
+- [x] **Dos dependencias declaradas y nunca importadas**, y ya no están.
+      Hecho el 2026-09-19. Eran `polars>=1.5` en
+      `packages/core/pyproject.toml` —las agregaciones de RF-3 acabaron siendo
+      SQL puro— y `zustand` en `apps/web/package.json`, que
+      [03-arquitectura.md](03-arquitectura.md) ya decía expresamente que no
+      hizo falta. Se retiran de los manifiestos y de los dos lockfiles; si
+      alguna vez hacen falta, volver a añadirlas es una línea.
+
+      - **Quitar polars invirtió una decisión escrita**, así que llevó ADR
+        propio: [ADR-0016](adr/0016-agregaciones-en-sql-sin-polars.md). La
+        consecuencia de ADR-0005 decía "agregaciones pesadas se hacen en polars
+        sobre extractos, no con SQL complejo" y nunca se cumplió; ADR-0005 no se
+        edita, se supera. ADR-0003 sigue válido en lo que decide y solo pierde
+        uno de los ejemplos de su razonamiento.
+      - **Zustand no necesitaba ADR**: no era una decisión de arquitectura
+        registrada, solo una fila en el stack. El estado de servidor lo lleva
+        TanStack Query y el local de cada pantalla es `useState`.
+      - **Quedan dos menciones del mismo tipo en
+        [04-stack-tecnologico.md](04-stack-tecnologico.md)**, que no se han
+        tocado porque no son dependencias declaradas en ningún manifiesto —solo
+        texto—: **shadcn/ui**, que la interfaz no usa (los componentes de
+        `apps/web/src/components/` son propios), y **Playwright**, que no tiene
+        ni configuración ni una sola prueba E2E.
+- [x] **Los valores por defecto de Lc0 eran la peor combinación posible**, y
+      ya no. Hecho el 2026-09-19. `Settings` traía `default.pb.gz` + `blas`
+      mientras que `.env.example` recomendaba otra cosa: quien clonara el repo
+      y no copiara el `.env` arrancaba Lc0 con la red transformer, que OpenCL
+      rechaza y en CPU da 2,5 nodos/s.
+
+      - **La red por defecto pasa a ser la T74 convolucional**
+        (`744706-conv.pb.gz`), que es la que el propio repo llamaba "la
+        recomendada" en tres documentos mientras el código cargaba otra.
+      - **El backend por defecto pasa a ser vacío**, no `opencl`. Vacío no deja
+        a Lc0 sin backend: hace que elija entre los que `setup-engines.sh` le
+        compiló en esa máquina, y elige bien. Copiar el `opencl` del
+        `.env.example` al código habría sido peor que el problema original,
+        porque un backend que no se compiló aborta el arranque —se comprobó
+        pidiendo `cuda` en esta máquina, que se compiló con OpenCL: `invalid
+        value for combo option 'Backend'`—.
+      - **La advertencia que traía el código era falsa.** Decía que "sin
+        especificarlo, Lc0 elige por su cuenta y puede ser ~20x más lento",
+        medido en 74 s contra 4 s. Medido ahora con la red T74, 3.000 nodos
+        desde la posición inicial en la misma GTX 1060: **vacío 1,23 s,
+        `opencl` 1,12 s, `blas` 14,88 s**. Dejar elegir a Lc0 está al nivel del
+        mejor backend, y el defecto anterior era doce veces más lento; aquellos
+        74 segundos los costaba la **red** transformer, no la elección
+        automática de backend. La tabla de medidas de más arriba, en el ítem de
+        Lc0, sigue siendo correcta: cruza red con backend y no incluía la fila
+        de "sin especificar".
+- [x] **`analyzed_moves` arrastraba una clave foránea duplicada**, y ya no.
+      Hecho el 2026-09-19 con la migración `3208b0d0f467`. La `c8f3a2b91e47`
+      había añadido la de `ON DELETE CASCADE` dentro de un `batch_alter_table`
+      sin quitar la original sin nombre, así que la tabla tenía dos sobre
+      `analysis_id`, una `NO ACTION` y otra `CASCADE`.
+
+      - **No era un fallo vivo**, y conviene que conste: se comprobó sobre una
+        copia de la base que el borrado en cascada funcionaba —sqlite aplica la
+        cascada y la `NO ACTION` ya no encuentra huérfanas que objetar—. Lo que
+        dejaba era un esquema que decía dos cosas contradictorias sobre la
+        misma columna, un `SAWarning` en cada `alembic check` y una trampa para
+        la siguiente migración que tocara la tabla.
+      - **Por qué la anterior no la quitó, que es lo que hay que recordar**:
+        dentro de un `batch_alter_table`, alembic reconstruye la tabla a partir
+        de lo que **refleja** de la base, así que reflejó la original, la
+        recreó y le puso la nueva al lado. La de ahora lleva `copy_from` con la
+        definición escrita entera en el propio archivo, y `recreate="always"`
+        para forzar la reconstrucción sin pedirle ningún cambio de columna. La
+        definición no se importa de `db/models.py` a propósito: una migración
+        describe la tabla tal como era en ese punto de la historia.
+      - **Comprobado sobre una copia de la base real** antes de tocar nada: 728
+        jugadas antes y después, con la misma huella SHA-256 fila a fila; una
+        sola clave foránea, la del cascade; el borrado en cascada sigue
+        funcionando y `PRAGMA foreign_key_check` no encuentra violaciones;
+        `alembic check` ya no avisa; bajar y volver a subir deja el esquema
+        donde estaba; y una base creada desde cero nace con una sola.
+- [x] **ADR-0008 citaba dos veces un `GET /stats/{username}` que nunca
+      existió** (el endpoint es `GET /stats?username=…`). Corregido el
+      2026-09-19, en el propio archivo y con una nota fechada al final que dice
+      qué se cambió y por qué.
+
+      - **Sí es excepción a la norma, y conviene dejar sentado por qué.** No
+        editar un ADR publicado protege el registro de las **decisiones**: lo
+        que ADR-0008 decide —que los patrones se deducen al leer, sin tabla
+        propia ni segunda pasada del motor— es idéntico antes y después. Un
+        dato de hecho equivocado en la prosa de apoyo no es una decisión, y
+        conservarlo solo sirve para desinformar a quien lo lea. Lo que la norma
+        sí busca evitar —que la historia se reescriba en silencio— lo cubre la
+        nota de corrección, no el dejarlo mal.
+      - **El barrido fue a los dieciséis ADR, no solo a este**: se cruzaron los
+        endpoints que citan contra `openapi.json`, sus rutas de archivo contra
+        el disco y sus identificadores entre comillas invertidas contra el
+        código. Las dos menciones de ADR-0008 eran **el único** error de hecho;
+        los identificadores que no aparecen en el código son nombres de
+        alternativas descartadas que los propios ADR discuten
+        (`analyzed_move_lines`, `mistake_types`, `board_analyses`), que es como
+        deben estar.
+
 ## Fase 3 · Entrenamiento (P1/P2)
 
 - [ ] Puzzles desde mis errores con repetición espaciada, aceptando como buena
@@ -524,6 +767,16 @@
 ## Fase 4 · Pulido y distribución
 
 - [ ] Ocupación del tablero, extras (RF-7.8 y 7.9): recordar sub-modo y filtros entre sesiones; "casillas críticas según motor" superponiendo las casillas más frecuentes en las mejores líneas de Stockfish.
+- [ ] Análisis de rivales recurrentes (**RF-3.8**): contra quién se juega más y
+      qué pasa en esas partidas —marcador, precisión, aperturas que salen y
+      dónde se pierde la ventaja—, frente a la media propia. Colocado aquí el
+      **2026-09-19**: es alcance congelado de v1.0 desde el corte del
+      2026-09-05, pero se quedó sin ítem en ninguna fase y el mapa lo daba por
+      "pendiente (fase 2)" mientras la fase 2 se cerraba sin él (ver el
+      apéndice de la fase 2). Cae en esta fase y no antes porque es el único
+      P2 de RF-3 y las agregaciones sobre las que se monta —`services/stats.py`
+      y los extractores de `lucia_core.insights`— ya están entregadas: no
+      bloquea nada de la fase 3.
 - [ ] Explicaciones en lenguaje natural de errores.
 - [ ] Empaquetado (Docker, posiblemente Tauri).
 - [ ] macOS / Windows.

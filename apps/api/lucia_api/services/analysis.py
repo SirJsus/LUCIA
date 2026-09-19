@@ -69,7 +69,10 @@ class CachedEngineBridge:
         self._session.add(
             PositionCache(
                 **cache_key,
-                lines_json=[_serialize_line(line["score"], line.get("pv") or []) for line in lines],
+                lines_json=[
+                    _serialize_line(line["score"], line.get("pv") or [], line.get("wdl"))
+                    for line in lines
+                ],
             )
         )
         await self._session.flush()
@@ -87,7 +90,11 @@ def _cache_engine_name(engine_name: str, extra_options: Mapping[str, object]) ->
     return f"{engine_name}/{Path(str(weights_file)).name}" if weights_file else engine_name
 
 
-def _serialize_line(score: chess.engine.PovScore, pv: Sequence[chess.Move]) -> dict:
+def _serialize_line(
+    score: chess.engine.PovScore,
+    pv: Sequence[chess.Move],
+    wdl: chess.engine.PovWdl | None = None,
+) -> dict:
     """Una línea del motor tal como se guarda en la base.
 
     Mismo formato en `position_cache.lines_json` y en
@@ -95,14 +102,23 @@ def _serialize_line(score: chess.engine.PovScore, pv: Sequence[chess.Move]) -> d
     tal cual como alternativas de una jugada, sin traducción de por medio
     (ADR-0007) — romper esa simetría rompe `alternatives_from_cache`. La
     puntuación va siempre desde el punto de vista de las blancas, como todo lo
-    que se persiste.
+    que se persiste, y la W/D/L también.
+
+    `wdl` va en una clave que puede faltar (RF-2.6): las líneas guardadas antes
+    de pedírsela al motor no la traen, y un motor que no declare `UCI_ShowWDL`
+    tampoco. Se escribe solo cuando la hay, para no llenar la base de nulos que
+    no dicen nada.
     """
     white_score = score.white()
-    return {
+    serialized_line: dict[str, object] = {
         "score_cp": None if white_score.is_mate() else white_score.score(),
         "score_mate": white_score.mate() if white_score.is_mate() else None,
         "pv": [move.uci() for move in pv],
     }
+    if wdl is not None:
+        white_wdl = wdl.white()
+        serialized_line["wdl"] = [white_wdl.wins, white_wdl.draws, white_wdl.losses]
+    return serialized_line
 
 
 def _deserialize_line(serialized_line: dict) -> chess.engine.InfoDict:
@@ -111,10 +127,16 @@ def _deserialize_line(serialized_line: dict) -> chess.engine.InfoDict:
         if serialized_line["score_mate"] is not None
         else chess.engine.Cp(serialized_line["score_cp"])
     )
-    return {
+    info: chess.engine.InfoDict = {
         "score": chess.engine.PovScore(score, chess.WHITE),
         "pv": [chess.Move.from_uci(move_uci) for move_uci in serialized_line["pv"]],
     }
+    # `.get`, no `[...]`: toda la caché escrita antes de RF-2.6 carece de esta
+    # clave y sigue sirviendo perfectamente sin ella.
+    stored_wdl = serialized_line.get("wdl")
+    if stored_wdl is not None:
+        info["wdl"] = chess.engine.PovWdl(chess.engine.Wdl(*stored_wdl), chess.WHITE)
+    return info
 
 
 async def alternatives_from_cache(
@@ -165,6 +187,22 @@ def alternatives_of(move: AnalyzedMove, cached_alternatives: dict[int, list[dict
 
 
 @dataclass(frozen=True)
+class LineWdl:
+    """Probabilidad de victoria, tablas y derrota **de las blancas** según el
+    motor, en partes por mil (RF-2.6).
+
+    Va desde el punto de vista de las blancas como todo lo que sale de aquí
+    (criterio C-5), aunque el motor la informe desde el de quien mueve. Suma
+    1000, así que el front puede dibujarla como una barra de tres tramos sin
+    normalizar nada.
+    """
+
+    win: int
+    draw: int
+    loss: int
+
+
+@dataclass(frozen=True)
 class EngineLine:
     """Una línea del motor para una posición suelta (RF-5.2 / RF-6.2)."""
 
@@ -174,6 +212,10 @@ class EngineLine:
     """Positivo = mate a favor de las blancas (todo se guarda desde su punto de vista)."""
     pv_uci: list[str]
     pv_san: list[str]
+    wdl: LineWdl | None = None
+    """Lo que el motor da como probabilidad de ganar, empatar y perder las
+    blancas (RF-2.6). `None` con un motor que no la informe y en las líneas
+    guardadas antes de que se le pidiera."""
 
 
 async def analyze_position(
@@ -238,6 +280,7 @@ def _engine_lines(raw_lines: Sequence[chess.engine.InfoDict], fen: str) -> list[
     for rank, raw_line in enumerate(raw_lines, start=1):
         score = raw_line["score"].white()
         pv = list(raw_line.get("pv") or [])
+        raw_wdl = raw_line.get("wdl")
         lines.append(
             EngineLine(
                 rank=rank,
@@ -245,9 +288,19 @@ def _engine_lines(raw_lines: Sequence[chess.engine.InfoDict], fen: str) -> list[
                 score_mate=score.mate() if score.is_mate() else None,
                 pv_uci=[move.uci() for move in pv],
                 pv_san=_pv_to_san(board, pv),
+                wdl=_line_wdl(raw_wdl),
             )
         )
     return lines
+
+
+def _line_wdl(raw_wdl: chess.engine.PovWdl | None) -> LineWdl | None:
+    """Pasa la W/D/L del motor al punto de vista de las blancas, que es el
+    único que usa la API (criterio C-5)."""
+    if raw_wdl is None:
+        return None
+    white_wdl = raw_wdl.white()
+    return LineWdl(win=white_wdl.wins, draw=white_wdl.draws, loss=white_wdl.losses)
 
 
 def _pv_to_san(board: chess.Board, pv: list[chess.Move]) -> list[str]:
@@ -341,7 +394,8 @@ async def run_analysis(
                     # RF-10.1: las N mejores líneas de la posición previa, no
                     # solo la mejor. Con MultiPV 1 la lista tiene un elemento.
                     alternatives_json=[
-                        _serialize_line(line.score, line.pv) for line in analyzed_move.alternatives
+                        _serialize_line(line.score, line.pv, line.wdl)
+                        for line in analyzed_move.alternatives
                     ],
                 )
             )

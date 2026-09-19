@@ -28,8 +28,8 @@ que está analizando y la barra se queda sin cifra: callarlo hacía que la barra
 afirmara lo contrario que el tablero mientras se avanzaba por una línea.
 
 Lo visual del tablero no vive aquí: `Chessboard`, `EvalBar`,
-`BoardWithEvalBar`, `MoveNavigator`, `MoveButton`, `EngineLineList` y
-`boardConfig` están en `components/board/` y se comparten con el visor de
+`BoardWithEvalBar`, `MoveNavigator`, `MoveButton`, `EngineLineList`,
+`boardConfig` y la capa de ocupación (RF-7) están en `components/board/` y se comparten con el visor de
 partidas para que las dos pantallas se vean y se lean igual (RNF-11). La lista
 de líneas se subió ahí con RF-10.2, cuando el visor pasó a enseñar las mismas
 alternativas que este tablero.
@@ -87,7 +87,15 @@ se le suma una comprobación que él no hace, que el bando que no mueve no esté
 dando jaque. La rejilla de 64 botones que `PositionEditor` superpone al
 tablero existe porque chessground no hace enfocable ninguna casilla: va con
 `pointer-events-none`, así que solo aporta paradas de foco y el ratón sigue
-llegando al tablero de siempre.
+llegando al tablero de siempre. Esa rejilla ya no es de aquí: cuando la capa de
+ocupación necesitó lo mismo pasó a ser `components/board/SquareKeyboardGrid`,
+y los nombres y valores de las piezas, a `components/board/pieces.ts`.
+
+**La capa de ocupación se enciende sobre este tablero** (RF-7.1 a RF-7.7), con
+la tecla `O` o desde su panel, igual que en el visor: `BoardPage` solo le pasa
+el FEN del nodo actual a `useOccupancy` y enchufa `OccupancyLayer` en el hueco
+`overlay` de `Chessboard`. Todo lo demás —el cálculo, los sub-modos y la
+leyenda— es de `components/board/`, para que las dos pantallas la lean igual.
 
 Un tablero no tiene por qué arrancar en la posición estándar (se crea desde
 un FEN o desde un PGN con `[SetUp "1"]`), así que la numeración de las
