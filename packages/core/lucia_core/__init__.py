@@ -1,3 +1,4 @@
-"""lucia-core: puente con motores UCI, análisis de partidas e insight."""
+"""lucia-core: puente con motores UCI, análisis de partidas, insight y las
+reglas puras del entrenamiento (puzzles y sparring)."""
 
-__version__ = "0.4.0"
+__version__ = "0.4.2"

@@ -8,6 +8,9 @@ RF-6 (tablero de análisis): `Board` y `BoardVersion`, el historial lineal de
 deshacer y rehacer de RF-6.8.
 RF-3.6 (comparación de repertorio): `ExplorerPositionCache`, la caché de lo
 que se le preguntó al Opening Explorer de Lichess.
+RF-4.1 (entrenamiento desde los errores propios): `Puzzle`, con su estado de
+repetición espaciada.
+RF-4.3 (sparring contra el motor con fuerza calibrada): `SparringGame`.
 
 Las columnas que no se explican solas llevan su porqué al lado; el mapa
 completo, con las relaciones y las reglas entre tablas, está en
@@ -414,3 +417,126 @@ class PositionCache(Base):
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
     )
+
+
+class Puzzle(Base):
+    """Un puzzle sacado de un error propio, con su estado de repaso (RF-4.1).
+
+    La posición es la de **antes** del error y quien resuelve es quien lo
+    cometió: el turno del FEN ya lo dice, así que no hace falta guardar el
+    color aparte.
+
+    **Se guarda entero y no como un enlace a la jugada analizada.** Volver a
+    analizar la partida —con otro motor o a otra profundidad— escribe un
+    `Analysis` nuevo con sus propias `analyzed_moves`, y la fila de la que
+    salió el puzzle deja de ser la vigente; borrar ese análisis se la lleva en
+    cascada. Con un `analyzed_move_id` por delante, el puzzle se quedaría
+    colgando de una fila obsoleta o desaparecida, y con ella se iría el
+    historial de repasos, que es justo lo que no se puede perder: un puzzle
+    acertado tres veces vale por esas tres veces, no por la fila que lo
+    originó. Lo que sí lo identifica es de dónde salió, y por eso la clave
+    única es la partida y la jugada: reanalizar no crea un puzzle repetido.
+    Razonado en ADR-0017.
+    """
+
+    __tablename__ = "puzzles"
+    __table_args__ = (UniqueConstraint("game_id", "ply", name="uq_puzzle_game_ply"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    game_id: Mapped[int] = mapped_column(ForeignKey("games.id", ondelete="CASCADE"))
+    """La partida donde se cometió el error. En cascada: borrada la partida, el
+    puzzle no se puede volver a situar ni revisar, así que se va con ella."""
+    ply: Mapped[int]
+
+    fen: Mapped[str]
+    """La posición a resolver: la de antes del error."""
+    played_uci: Mapped[str]
+    """Lo que se jugó de verdad. **No se manda a la pantalla hasta que el
+    puzzle se cierra**: verlo antes es media solución."""
+    solutions_json: Mapped[list] = mapped_column(JSON)
+    """Las jugadas que se aceptan como respuesta, en UCI y de mejor a peor
+    (RF-10.3, `lucia_core.training.equivalent_solutions`). La primera es la
+    del motor; las demás son las que pierden lo mismo que ella.
+
+    Se congela al generar el puzzle y no se recalcula al servirlo: el puzzle
+    es el que era cuando se generó, y cambiar sus respuestas bajo un historial
+    de repasos ya hecho falsearía ese historial."""
+    classification: Mapped[str]
+    """Qué fue el error, de `lucia_core.classification`: "blunder", "mistake" o
+    "missed_win". Es lo que la pantalla enseña al cerrar el puzzle, con la
+    misma insignia que el visor (criterio C-5)."""
+    win_percent_before: Mapped[float]
+    win_percent_after: Mapped[float]
+    """Probabilidad de victoria **de quien resuelve**, antes y después del
+    error: lo que costó, dicho en la unidad de siempre (RF-2.3)."""
+
+    repetitions: Mapped[int] = mapped_column(default=0)
+    interval_days: Mapped[int] = mapped_column(default=0)
+    ease_factor: Mapped[float] = mapped_column(default=2.5)
+    """El estado de SM-2 (`lucia_core.training.SpacedRepetitionState`), una
+    columna por campo para poder ordenar y filtrar por él en SQL."""
+    due_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC), index=True
+    )
+    """Cuándo vuelve a tocar. Un puzzle recién generado toca ya. Indexada
+    porque la cola de repaso se pide siempre por ella."""
+    last_reviewed_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
+    )
+
+    game: Mapped[Game] = relationship()
+
+
+class SparringGame(Base):
+    """Una partida jugada contra el motor con fuerza calibrada (RF-4.3).
+
+    **Guarda lo mínimo del que todo lo demás se deriva**: la posición de
+    partida y las jugadas en UCI, en orden. La posición actual, el PGN y si la
+    partida acabó se recalculan al vuelo con `lucia_core.sparring`, así que no
+    pueden contradecirse entre sí — es la misma razón por la que un tablero no
+    guarda su posición actual aparte del árbol.
+
+    **No es una `Game` del historial** y no cuenta en estadísticas ni en
+    detección de patrones (RF-3), igual que un tablero de análisis sin
+    publicar (RF-6.5): una partida contra un motor al que se le ha bajado la
+    fuerza no dice nada del rendimiento real. Para analizarla se abre como
+    tablero de análisis (RF-6.6), que es el camino que ya existe y que deja el
+    análisis fuera de las estadísticas por construcción.
+    """
+
+    __tablename__ = "sparring_games"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    player_color: Mapped[str]
+    """"white" | "black": de qué color juega la persona. El motor lleva el otro."""
+    engine: Mapped[str]
+    """"stockfish" | "lc0", el rival."""
+    engine_elo: Mapped[int | None] = mapped_column(default=None)
+    """Fuerza pedida con `UCI_Elo`. **Solo Stockfish**: Lc0 juega con una red
+    Maia, cuya fuerza es la de la red que se cargó y no un número que se le
+    pueda pedir, así que ahí queda a `None` (ver `services/sparring.py`)."""
+    starting_fen: Mapped[str]
+    """Hoy siempre la inicial. Está en columna y no dado por supuesto porque
+    RF-4.4 ("re-juega desde el error") y RF-11.1 arrancan de otra posición, y
+    entonces no habría que migrar nada."""
+    moves_uci_json: Mapped[list] = mapped_column(JSON, default=list)
+    """Las jugadas de la partida, en UCI y en orden, las de ambos bandos."""
+
+    result: Mapped[str | None] = mapped_column(default=None)
+    """"1-0" | "0-1" | "1/2-1/2", o `None` mientras se juega.
+
+    Es la **única** marca de que la partida terminó: un booleano aparte podría
+    contradecirla. `termination` dice por qué (`lucia_core.sparring`)."""
+    termination: Mapped[str | None] = mapped_column(default=None)
+
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
+    )
+    updated_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
+    )
+    """Cuándo se jugó la última jugada. Ordena el listado: lo que se está
+    jugando ahora va primero."""

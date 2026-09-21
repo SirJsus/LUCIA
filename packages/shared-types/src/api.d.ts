@@ -465,6 +465,141 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/training/puzzles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Player Puzzle Queue
+         * @description Los puzzles que toca repasar ahora, del más atrasado al más reciente.
+         */
+        get: operations["player_puzzle_queue_training_puzzles_get"];
+        put?: never;
+        /**
+         * Generate Player Puzzles
+         * @description Crea puzzles a partir de los errores de las partidas ya analizadas.
+         *
+         *     Se pide a mano y no al analizar: quien entrena decide cuándo renovar su
+         *     baraja, y así analizar una tanda de partidas no cambia la cola de repaso
+         *     por sorpresa. Volver a pulsar solo añade lo nuevo.
+         */
+        post: operations["generate_player_puzzles_training_puzzles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/training/puzzles/{puzzle_id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer Player Puzzle
+         * @description Comprueba una respuesta y, si cierra el puzzle, anota el repaso.
+         */
+        post: operations["answer_player_puzzle_training_puzzles__puzzle_id__answer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sparring/games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sparring Games
+         * @description Las partidas jugadas, la de la última jugada primero. La pantalla
+         *     distingue las vivas de las terminadas por `result`.
+         */
+        get: operations["list_sparring_games_sparring_games_get"];
+        put?: never;
+        /**
+         * Start Sparring Game
+         * @description Abre una partida contra el motor. Si el motor lleva blancas, ya ha
+         *     movido cuando la respuesta llega.
+         */
+        post: operations["start_sparring_game_sparring_games_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sparring/games/{game_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Sparring Game
+         * @description Retomar una partida: es lo que permite cerrar la pestaña a mitad y
+         *     seguir después, porque el estado vive en la base y no en la pantalla.
+         */
+        get: operations["get_sparring_game_sparring_games__game_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sparring/games/{game_id}/moves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Play Sparring Move
+         * @description Juega una jugada y devuelve la partida con la respuesta del motor.
+         */
+        post: operations["play_sparring_move_sparring_games__game_id__moves_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sparring/games/{game_id}/resign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resign Sparring Game
+         * @description Abandona la partida: gana el motor y la partida queda cerrada.
+         */
+        post: operations["resign_sparring_game_sparring_games__game_id__resign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1115,6 +1250,85 @@ export interface components {
             /** Multipv */
             multipv?: number | null;
         };
+        /** PuzzleAnswerIn */
+        PuzzleAnswerIn: {
+            /** Uci */
+            uci?: string | null;
+            /**
+             * Attempt
+             * @default 1
+             */
+            attempt: number;
+        };
+        /** PuzzleAnswerOut */
+        PuzzleAnswerOut: {
+            /** Correct */
+            correct: boolean;
+            /** Reviewed */
+            reviewed: boolean;
+            /** Solutions San */
+            solutions_san: string[];
+            /** Played San */
+            played_san: string | null;
+            /** Classification */
+            classification: string | null;
+            /** Win Percent Before */
+            win_percent_before: number | null;
+            /** Win Percent After */
+            win_percent_after: number | null;
+            /** Due At */
+            due_at: string | null;
+            /** Interval Days */
+            interval_days: number | null;
+        };
+        /** PuzzleGenerationOut */
+        PuzzleGenerationOut: {
+            /** Created */
+            created: number;
+            /** Total */
+            total: number;
+        };
+        /**
+         * PuzzleOut
+         * @description Un puzzle por resolver, sin nada que lo resuelva.
+         */
+        PuzzleOut: {
+            /** Id */
+            id: number;
+            /** Fen */
+            fen: string;
+            /** Color */
+            color: string;
+            /** Game Id */
+            game_id: number;
+            /** Ply */
+            ply: number;
+            /** Opponent */
+            opponent: string;
+            /**
+             * Played At
+             * Format: date-time
+             */
+            played_at: string;
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /** Repetitions */
+            repetitions: number;
+        };
+        /** PuzzleQueueOut */
+        PuzzleQueueOut: {
+            /** Puzzles */
+            puzzles: components["schemas"]["PuzzleOut"][];
+            /** Due */
+            due: number;
+            /** Total */
+            total: number;
+            /** Next Due At */
+            next_due_at: string | null;
+        };
         /** RecordOut */
         RecordOut: {
             /** Wins */
@@ -1151,6 +1365,63 @@ export interface components {
             positions_per_refresh: number;
             /** Seconds Between Positions */
             seconds_between_positions: number;
+        };
+        /** SparringGameCreate */
+        SparringGameCreate: {
+            /** Player Color */
+            player_color: string;
+            /**
+             * Engine
+             * @default stockfish
+             */
+            engine: string;
+            /** Engine Elo */
+            engine_elo?: number | null;
+        };
+        /**
+         * SparringGameOut
+         * @description Una partida de sparring entera: lo que hay en el tablero y cómo se llegó.
+         */
+        SparringGameOut: {
+            /** Id */
+            id: number;
+            /** Player Color */
+            player_color: string;
+            /** Engine */
+            engine: string;
+            /** Engine Elo */
+            engine_elo: number | null;
+            /** Opponent Name */
+            opponent_name: string;
+            /** Fen */
+            fen: string;
+            /** Moves San */
+            moves_san: string[];
+            /** Last Move Uci */
+            last_move_uci: string | null;
+            /** Is Player Turn */
+            is_player_turn: boolean;
+            /** Result */
+            result: string | null;
+            /** Termination */
+            termination: string | null;
+            /** Pgn */
+            pgn: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** SparringMoveIn */
+        SparringMoveIn: {
+            /** Uci */
+            uci: string;
         };
         /** SyncRequest */
         SyncRequest: {
@@ -2079,6 +2350,273 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RefreshResultOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    player_puzzle_queue_training_puzzles_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PuzzleQueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_player_puzzles_training_puzzles_post: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PuzzleGenerationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    answer_player_puzzle_training_puzzles__puzzle_id__answer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                puzzle_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PuzzleAnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PuzzleAnswerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sparring_games_sparring_games_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SparringGameOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_sparring_game_sparring_games_post: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SparringGameCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SparringGameOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sparring_game_sparring_games__game_id__get: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SparringGameOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    play_sparring_move_sparring_games__game_id__moves_post: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SparringMoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SparringGameOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resign_sparring_game_sparring_games__game_id__resign_post: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SparringGameOut"];
                 };
             };
             /** @description Validation Error */

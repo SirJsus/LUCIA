@@ -21,8 +21,13 @@ import type {
   OwnGamePublishRequest,
   PgnImportSummary,
   PlayerStats,
+  PuzzleAnswer,
+  PuzzleGeneration,
+  PuzzleQueue,
   RepertoireComparison,
   RepertoireRefresh,
+  SparringGame,
+  SparringGameCreate,
   SyncSummary,
 } from "@lucia/shared-types";
 
@@ -263,6 +268,54 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(body),
     }),
+
+  /** Crea puzzles a partir de los errores de las partidas ya analizadas
+   * (RF-4.1). Se pide a mano: analizar una tanda de partidas no debe cambiar
+   * la cola de repaso por sorpresa. Volver a pulsar solo añade lo nuevo. */
+  generatePuzzles: (username?: string) =>
+    request<PuzzleGeneration>(`/training/puzzles${toQueryString({ username })}`, {
+      method: "POST",
+    }),
+
+  /** Los puzzles que toca repasar ahora, del más atrasado al más reciente.
+   * No traen ni la solución ni la jugada que se hizo en la partida: las dos
+   * resolverían el puzzle, así que se quedan en el servidor hasta cerrarlo. */
+  getPuzzleQueue: () => request<PuzzleQueue>("/training/puzzles"),
+
+  /** Contesta un puzzle. `uci` a `null` es rendirse y ver la solución;
+   * `attempt` es el número de intento, y con él el servidor distingue acertar
+   * a la primera de acertar tropezando (RF-4.1, repetición espaciada). */
+  answerPuzzle: (puzzleId: number, body: { uci: string | null; attempt: number }) =>
+    request<PuzzleAnswer>(`/training/puzzles/${puzzleId}/answer`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  /** Abre una partida de sparring contra el motor (RF-4.3). Si el motor lleva
+   * blancas, la partida vuelve con su primera jugada ya hecha. */
+  startSparringGame: (body: SparringGameCreate) =>
+    request<SparringGame>("/sparring/games", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  /** Las partidas de sparring, la de la última jugada primero. Las que siguen
+   * vivas son las que tienen `result` a `null`. */
+  getSparringGames: () => request<SparringGame[]>("/sparring/games"),
+
+  getSparringGame: (gameId: number) => request<SparringGame>(`/sparring/games/${gameId}`),
+
+  /** Juega una jugada. La respuesta trae ya la del motor: para quien juega es
+   * un solo turno, así que es una sola petición. */
+  playSparringMove: (gameId: number, uci: string) =>
+    request<SparringGame>(`/sparring/games/${gameId}/moves`, {
+      method: "POST",
+      body: JSON.stringify({ uci }),
+    }),
+
+  /** Abandona la partida: gana el motor y queda cerrada. */
+  resignSparringGame: (gameId: number) =>
+    request<SparringGame>(`/sparring/games/${gameId}/resign`, { method: "POST" }),
 
   sync: (username?: string) =>
     request<SyncSummary>("/sync", {

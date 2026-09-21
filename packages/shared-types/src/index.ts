@@ -47,6 +47,12 @@ export type EngineLine = Schemas["EngineLineOut"];
 export type Wdl = Schemas["WdlOut"];
 export type AnalysisComparison = Schemas["AnalysisComparisonOut"];
 export type MoveComparison = Schemas["MoveComparisonOut"];
+export type Puzzle = Schemas["PuzzleOut"];
+export type PuzzleQueue = Schemas["PuzzleQueueOut"];
+export type PuzzleGeneration = Schemas["PuzzleGenerationOut"];
+export type PuzzleAnswer = Schemas["PuzzleAnswerOut"];
+export type SparringGame = Schemas["SparringGameOut"];
+export type SparringGameCreate = Schemas["SparringGameCreate"];
 
 /** Categorías de `classify_move` (lucia_core.classification). El OpenAPI las
  * expone como `string` porque en la BD se guardan así, de modo que este tipo
@@ -72,6 +78,17 @@ export type MistakeType = "time" | "tactical" | "endgame" | "positional";
  * valía una jugada, la partida cambió de manos, o había una ganada y se
  * escapó. */
 export type CriticalMomentKind = "only_move" | "swing" | "missed_chance";
+
+/** Por qué terminó una partida de sparring (`lucia_core.sparring`, RF-4.3).
+ * Como las clasificaciones, el OpenAPI lo expone como `string` y este tipo es
+ * la fuente de verdad para la UI. */
+export type SparringTermination =
+  | "checkmate"
+  | "stalemate"
+  | "insufficient_material"
+  | "fifty_moves"
+  | "repetition"
+  | "resignation";
 
 /** Eventos que emite `WS /ws/analysis/{id}`. No están en el OpenAPI: el
  * esquema no describe WebSockets. */

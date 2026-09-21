@@ -3,7 +3,7 @@
   "info": {
     "title": "L.U.C.I.A. API",
     "description": "Logic & Ultimate Chess Insight Algorithm",
-    "version": "0.4.0"
+    "version": "0.4.2"
   },
   "paths": {
     "/health": {
@@ -1373,6 +1373,464 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/RefreshResultOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/puzzles": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Generate Player Puzzles",
+        "description": "Crea puzzles a partir de los errores de las partidas ya analizadas.\n\nSe pide a mano y no al analizar: quien entrena decide cuándo renovar su\nbaraja, y así analizar una tanda de partidas no cambia la cola de repaso\npor sorpresa. Volver a pulsar solo añade lo nuevo.",
+        "operationId": "generate_player_puzzles_training_puzzles_post",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuzzleGenerationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Player Puzzle Queue",
+        "description": "Los puzzles que toca repasar ahora, del más atrasado al más reciente.",
+        "operationId": "player_puzzle_queue_training_puzzles_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuzzleQueueOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/puzzles/{puzzle_id}/answer": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Answer Player Puzzle",
+        "description": "Comprueba una respuesta y, si cierra el puzzle, anota el repaso.",
+        "operationId": "answer_player_puzzle_training_puzzles__puzzle_id__answer_post",
+        "parameters": [
+          {
+            "name": "puzzle_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Puzzle Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PuzzleAnswerIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuzzleAnswerOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sparring/games": {
+      "post": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "Start Sparring Game",
+        "description": "Abre una partida contra el motor. Si el motor lleva blancas, ya ha\nmovido cuando la respuesta llega.",
+        "operationId": "start_sparring_game_sparring_games_post",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SparringGameCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringGameOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "List Sparring Games",
+        "description": "Las partidas jugadas, la de la última jugada primero. La pantalla\ndistingue las vivas de las terminadas por `result`.",
+        "operationId": "list_sparring_games_sparring_games_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SparringGameOut"
+                  },
+                  "title": "Response List Sparring Games Sparring Games Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sparring/games/{game_id}": {
+      "get": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "Get Sparring Game",
+        "description": "Retomar una partida: es lo que permite cerrar la pestaña a mitad y\nseguir después, porque el estado vive en la base y no en la pantalla.",
+        "operationId": "get_sparring_game_sparring_games__game_id__get",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringGameOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sparring/games/{game_id}/moves": {
+      "post": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "Play Sparring Move",
+        "description": "Juega una jugada y devuelve la partida con la respuesta del motor.",
+        "operationId": "play_sparring_move_sparring_games__game_id__moves_post",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SparringMoveIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringGameOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sparring/games/{game_id}/resign": {
+      "post": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "Resign Sparring Game",
+        "description": "Abandona la partida: gana el motor y la partida queda cerrada.",
+        "operationId": "resign_sparring_game_sparring_games__game_id__resign_post",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringGameOut"
                 }
               }
             }
@@ -3219,6 +3677,241 @@
         ],
         "title": "PositionAnalysisRequest"
       },
+      "PuzzleAnswerIn": {
+        "properties": {
+          "uci": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uci"
+          },
+          "attempt": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Attempt",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "title": "PuzzleAnswerIn"
+      },
+      "PuzzleAnswerOut": {
+        "properties": {
+          "correct": {
+            "type": "boolean",
+            "title": "Correct"
+          },
+          "reviewed": {
+            "type": "boolean",
+            "title": "Reviewed"
+          },
+          "solutions_san": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Solutions San"
+          },
+          "played_san": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Played San"
+          },
+          "classification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Classification"
+          },
+          "win_percent_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Percent Before"
+          },
+          "win_percent_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Percent After"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "interval_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "correct",
+          "reviewed",
+          "solutions_san",
+          "played_san",
+          "classification",
+          "win_percent_before",
+          "win_percent_after",
+          "due_at",
+          "interval_days"
+        ],
+        "title": "PuzzleAnswerOut"
+      },
+      "PuzzleGenerationOut": {
+        "properties": {
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "total"
+        ],
+        "title": "PuzzleGenerationOut"
+      },
+      "PuzzleOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "opponent": {
+            "type": "string",
+            "title": "Opponent"
+          },
+          "played_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Played At"
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Due At"
+          },
+          "repetitions": {
+            "type": "integer",
+            "title": "Repetitions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "fen",
+          "color",
+          "game_id",
+          "ply",
+          "opponent",
+          "played_at",
+          "due_at",
+          "repetitions"
+        ],
+        "title": "PuzzleOut",
+        "description": "Un puzzle por resolver, sin nada que lo resuelva."
+      },
+      "PuzzleQueueOut": {
+        "properties": {
+          "puzzles": {
+            "items": {
+              "$ref": "#/components/schemas/PuzzleOut"
+            },
+            "type": "array",
+            "title": "Puzzles"
+          },
+          "due": {
+            "type": "integer",
+            "title": "Due"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "next_due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Due At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "puzzles",
+          "due",
+          "total",
+          "next_due_at"
+        ],
+        "title": "PuzzleQueueOut"
+      },
       "RecordOut": {
         "properties": {
           "wins": {
@@ -3315,6 +4008,161 @@
           "seconds_between_positions"
         ],
         "title": "RepertoireOut"
+      },
+      "SparringGameCreate": {
+        "properties": {
+          "player_color": {
+            "type": "string",
+            "pattern": "^(white|black)$",
+            "title": "Player Color"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine",
+            "default": "stockfish"
+          },
+          "engine_elo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Elo"
+          }
+        },
+        "type": "object",
+        "required": [
+          "player_color"
+        ],
+        "title": "SparringGameCreate"
+      },
+      "SparringGameOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "player_color": {
+            "type": "string",
+            "title": "Player Color"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "engine_elo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Elo"
+          },
+          "opponent_name": {
+            "type": "string",
+            "title": "Opponent Name"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "moves_san": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Moves San"
+          },
+          "last_move_uci": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Move Uci"
+          },
+          "is_player_turn": {
+            "type": "boolean",
+            "title": "Is Player Turn"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "termination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Termination"
+          },
+          "pgn": {
+            "type": "string",
+            "title": "Pgn"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "player_color",
+          "engine",
+          "engine_elo",
+          "opponent_name",
+          "fen",
+          "moves_san",
+          "last_move_uci",
+          "is_player_turn",
+          "result",
+          "termination",
+          "pgn",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SparringGameOut",
+        "description": "Una partida de sparring entera: lo que hay en el tablero y cómo se llegó."
+      },
+      "SparringMoveIn": {
+        "properties": {
+          "uci": {
+            "type": "string",
+            "title": "Uci"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uci"
+        ],
+        "title": "SparringMoveIn"
       },
       "SyncRequest": {
         "properties": {

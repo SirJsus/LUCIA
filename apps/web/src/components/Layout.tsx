@@ -1,6 +1,6 @@
 /** Marco común de la aplicación: navegación y conmutador de tema. */
 import { Link, Outlet, useMatchRoute } from "@tanstack/react-router";
-import { buttonClasses } from "./styles";
+import { buttonClasses, NAV_LINK_CLASSES } from "./styles";
 import { ThemeToggle } from "./ThemeToggle";
 
 /** `detailRoute` es la pantalla de detalle que pertenece a esa sección. Sin
@@ -11,6 +11,7 @@ import { ThemeToggle } from "./ThemeToggle";
 const NAV_LINKS = [
   { to: "/", label: "Partidas", detailRoute: "/games/$gameId" },
   { to: "/boards", label: "Tableros", detailRoute: undefined },
+  { to: "/training", label: "Entrenamiento", detailRoute: undefined },
   { to: "/stats", label: "Estadísticas", detailRoute: undefined },
   { to: "/engines", label: "Motores", detailRoute: undefined },
 ] as const;
@@ -41,9 +42,7 @@ export function Layout() {
                   // El enlace activo se ve como el botón primario, y sale de la
                   // misma receta: era la última copia a mano que quedaba.
                   className={
-                    isDetailOfThisSection
-                      ? buttonClasses("primary")
-                      : "rounded px-3 py-1.5 text-sm hover:bg-slate-100 dark:hover:bg-slate-800"
+                    isDetailOfThisSection ? buttonClasses("primary") : NAV_LINK_CLASSES
                   }
                   activeProps={{ className: buttonClasses("primary") }}
                 >

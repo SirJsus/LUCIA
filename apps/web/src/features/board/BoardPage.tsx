@@ -26,6 +26,7 @@ import { BoardWithEvalBar } from "../../components/board/BoardWithEvalBar";
 import { MoveNavigator } from "../../components/board/MoveNavigator";
 import { useMoveNavigationKeys } from "../../components/board/useMoveNavigationKeys";
 import { arrowsFromEngineLines, arrowsFromPreviewLine } from "../../components/board/boardConfig";
+import { legalMovesByOrigin } from "../../components/board/legalMoves";
 import { OccupancyLayer } from "../../components/board/OccupancyLayer";
 import { OccupancyPanel } from "../../components/board/OccupancyPanel";
 import { useOccupancy } from "../../components/board/useOccupancy";
@@ -302,7 +303,7 @@ export function BoardPage() {
   // igual que en el visor de partidas.
   const occupancyController = useOccupancy(currentFen);
 
-  const legalMoves = useMemo(() => movesByOrigin(currentFen), [currentFen]);
+  const legalMoves = useMemo(() => legalMovesByOrigin(currentFen), [currentFen]);
   const turnColor = currentFen.split(" ")[1] === "b" ? "black" : "white";
 
   /** Juega una secuencia de jugadas desde la posición actual, dejando el
@@ -756,22 +757,6 @@ export function BoardPage() {
       </div>
     </div>
   );
-}
-
-/** Jugadas legales agrupadas por casilla de origen, en el formato que espera
- * chessground para permitir el arrastre. */
-function movesByOrigin(fen: string): Map<string, string[]> {
-  const destsByOrigin = new Map<string, string[]>();
-  if (!fen) return destsByOrigin;
-  try {
-    const chess = new Chess(fen);
-    for (const move of chess.moves({ verbose: true })) {
-      destsByOrigin.set(move.from, [...(destsByOrigin.get(move.from) ?? []), move.to]);
-    }
-  } catch {
-    // FEN inválido: sin jugadas, el tablero queda en modo lectura
-  }
-  return destsByOrigin;
 }
 
 /** El árbol guardado del tablero. Un `tree_json` con forma inesperada

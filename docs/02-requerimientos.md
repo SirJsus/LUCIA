@@ -22,6 +22,9 @@
 > antes el editor de posición pieza a pieza (RF-6.1, fase 2) y el sparring
 > contra motor con fuerza calibrada (RF-4.3, fase 3), que sí son alcance de
 > 1.0, y no cambia el esquema de la base ni obliga a re-analizar nada.
+> Sus dos dependencias están ya entregadas —RF-6.1 el **2026-09-18** y RF-4.3
+> el **2026-09-21**—, y **RF-11 sigue fuera del alcance de v1.0**: que ya se
+> pueda montar no lo mete dentro del corte.
 >
 > Ese mismo día se **reescribieron los textos de RF-5.2 y RF-6.2**, que estaban
 > resumidos en una línea ("análisis en vivo, flechas de mejores jugadas"), para
@@ -320,6 +323,115 @@ requerimiento.
 | RF-4.3 | Sparring contra motor con fuerza calibrada (Stockfish `UCI_LimitStrength` / `UCI_Elo`, o Lc0 con redes "Maia"-like para estilo humano). | P1 |
 | RF-4.4 | "Re-juega desde el error": retomar una partida propia desde la posición del blunder contra el motor. | P2 |
 | RF-4.5 | Plan de entrenamiento semanal generado a partir de las debilidades detectadas. | P2 |
+
+**Con qué reglas se cumplió RF-4.1** (**2026-09-19**), junto con RF-10.3. El
+texto dice "posición antes del blunder, encontrar la mejor jugada, con
+repetición espaciada", y no dice qué errores dan puzzle, qué respuestas se
+aceptan ni con qué algoritmo vuelven. Esta es la lectura que se le dio; los
+umbrales son constantes con nombre en `lucia_core.training` y en
+`lucia_api.services.training`, ajustables sin tocar el requerimiento ni
+[ADR-0017](adr/0017-puzzle-persistido-con-su-solucion-congelada.md).
+
+- **Dan puzzle los errores propios graves**: `mistake`, `blunder` y
+  `missed_win` (`PUZZLE_CLASSIFICATIONS`). Las imprecisiones quedan fuera: una
+  jugada que pierde menos de diez puntos de probabilidad de victoria no tiene
+  una respuesta que encontrar, tiene un matiz que discutir, y como puzzle solo
+  enseñaría a adivinar la preferencia del motor. Del rival no sale ninguno:
+  su error dice cómo juega el otro. Y se miran solo las jugadas del **análisis
+  terminado más reciente** de cada partida, el mismo criterio con el que se
+  cuentan las estadísticas (`latest_analysis_ids`).
+- **"La mejor jugada" se lee como "cualquiera igual de buena"** (RF-10.3). Se
+  acepta la línea favorita del motor y toda la que no pierda más de **2 puntos
+  de probabilidad de victoria** respecto a ella
+  (`EQUIVALENT_MOVE_MAX_WIN_PERCENT_LOSS`), que es el mismo margen con el que
+  RF-2.2 llama "excelente" a una jugada: lo que el análisis no considera un
+  error tampoco puede serlo en un puzzle sacado de ese mismo análisis. Las
+  candidatas salen de las alternativas de RF-10.1, o de lo que se rescate de
+  `position_cache`; si no hay ninguna, queda la única `best_move_uci`, que es
+  peor puzzle pero no uno falso, y un error del que no se pueda afirmar
+  ninguna respuesta no genera puzzle.
+- **La repetición espaciada es SM-2**, el algoritmo de SuperMemo que usa Anki,
+  con tres resultados: fallar (o rendirse), acertar tras más de un intento y
+  acertar a la primera. Fallar reinicia la cuenta de aciertos pero **no** la
+  facilidad, que se arrastra: un puzzle que se falla una y otra vez acaba
+  volviendo casi a diario. El próximo vencimiento se cuenta desde el repaso y
+  no desde el anterior, para que repasar con retraso no encadene retrasos.
+- **Los puzzles se generan a mano**, con un botón, y no al terminar un
+  análisis: quien entrena decide cuándo renovar su baraja, y analizar una
+  tanda de partidas no debe cambiar la cola de repaso por sorpresa. Generar es
+  idempotente —la clave es `(partida, jugada)`—, así que volver a pulsar solo
+  añade lo nuevo y no toca el estado de repaso de lo que ya había.
+- **La comprobación es del servidor y el puzzle abierto viaja sin nada que lo
+  resuelva**: ni la solución, ni la jugada que se hizo en la partida, ni la
+  clasificación, ni las probabilidades. Saber que aquello fue un blunder de
+  treinta puntos ya es media respuesta. Todo eso se manda al cerrarlo, que es
+  cuando la pantalla lo enseña; por lo mismo, esta es la única pantalla con
+  tablero sin barra de evaluación.
+- **El puzzle se guarda entero y con su solución congelada**, desacoplado de
+  la jugada analizada de la que salió, porque lleva encima el historial de
+  repasos y ese dato no está en ninguna otra parte. Razonado en
+  [ADR-0017](adr/0017-puzzle-persistido-con-su-solucion-congelada.md), que es
+  la decisión contraria a la de los patrones
+  ([ADR-0008](adr/0008-patrones-deducidos-al-leer.md)) y explica por qué.
+
+**Con qué reglas se cumplió RF-4.3** (**2026-09-21**). El texto nombra las dos
+maneras de calibrar al rival —`UCI_LimitStrength`/`UCI_Elo` en Stockfish, redes
+tipo Maia en Lc0— y no dice qué pasa con la partida después. Esta es la lectura
+que se le dio; los topes y los tiempos son constantes con nombre en
+`lucia_api.services.sparring`, ajustables sin tocar el requerimiento ni
+[ADR-0018](adr/0018-sparring-en-su-propia-tabla-y-el-servidor-como-arbitro.md).
+
+- **Las dos perillas de fuerza no son la misma, y la pantalla lo dice.**
+  Stockfish busca igual de bien y se contiene: acepta un Elo entre **1320 y
+  3190** (`STOCKFISH_ELO_RANGE`, los topes de Stockfish 17 — fuera de ahí el
+  motor no acepta el valor o ya no limita nada) y piensa un segundo por jugada,
+  porque lo que lo frena es `UCI_LimitStrength` y no el reloj. Lc0 con una red
+  Maia **no se contiene**: la red está entrenada para predecir la jugada de una
+  persona de ~1500, así que sus errores son los que comete la gente y no los de
+  un motor mutilado; su fuerza es la de la red cargada y no un número que se le
+  pueda pedir, por eso `engine_elo` solo existe con Stockfish y el formulario
+  esconde el deslizador en vez de enseñar uno muerto. Maia se juega a **un solo
+  nodo**: con más, la búsqueda empieza a corregir a la red y se pierde justo lo
+  que la hace humana. Medido en el portátil de desarrollo (i7 + GTX 1060),
+  Stockfish calibrado tarda ~1,15 s por jugada y Maia ~0,08 s, y abre con el
+  Giuoco Piano, que es el comportamiento que se buscaba.
+- **La red del sparring es otra que la del análisis** (`MAIA_WEIGHTS`,
+  `maia-1500.pb.gz`, la que descarga `make engines`). Cambiarla por otra de la
+  familia (1100 a 1900) es cambiar la fuerza del rival de Lc0. No puede ser la
+  misma que la del análisis: Maia es buena imitando y mala como fuente de
+  verdad, que es exactamente lo contrario de lo que se le pide a un analizador.
+- **Una partida de sparring no es una partida del historial.** Vive en su
+  propia tabla (`sparring_games`) y **no cuenta** en estadísticas ni en
+  detección de patrones (RF-3), igual que un tablero de análisis sin publicar
+  (RF-6.5): una partida contra un motor al que se le ha bajado la fuerza no
+  dice nada del rendimiento real. Para estudiarla se abre como tablero de
+  análisis desde su PGN (RF-6.6) y se analiza desde ahí (RF-6.9), que es el
+  camino que ya existía y que la deja fuera de las estadísticas por
+  construcción; si quien juega decide que cuente, el paso es marcarla como
+  partida propia (RF-6.5), que es un acto explícito y no un efecto colateral de
+  haber entrenado. Razonado en
+  [ADR-0018](adr/0018-sparring-en-su-propia-tabla-y-el-servidor-como-arbitro.md),
+  que adelanta buena parte de lo que RF-11.3 pedirá.
+- **Aquí el servidor sí valida las jugadas**, al revés que en el tablero de
+  análisis, donde quien sabe de reglas es chess.js y la API solo custodia el
+  árbol. La razón es que en sparring el servidor **es el rival**: para contestar
+  tiene que saber qué posición hay, y una jugada inventada por el navegador
+  dejaría la partida donde el motor no la reconocería. Jugada de la persona y
+  respuesta del motor viajan en la misma petición, porque son un solo turno.
+- **La partida se guarda como posición de partida más jugadas en UCI**, y la
+  posición actual, el PGN y el final se derivan al servir: así no hay dos
+  versiones de la misma partida que puedan discrepar. `result` es la **única**
+  marca de que terminó (`null` mientras se juega) y `termination` dice por qué
+  —mate, ahogado, material insuficiente, cincuenta jugadas, repetición o
+  abandono—, porque "0-1" no distingue un mate de un abandono y en un
+  entrenamiento eso es justo lo que se quiere saber.
+- **Sin reloj y sin barra de evaluación.** El requerimiento no pide reloj, y
+  una partida de entrenamiento se interrumpe: se retoma por su URL tal como
+  estaba, porque el estado vive en la base. La barra queda fuera por lo mismo
+  que en los puzzles de RF-4.1: decir a cada jugada quién va ganando convierte
+  la partida en un análisis asistido.
+
+RF-4.2, RF-4.4 y RF-4.5 siguen pendientes.
 
 ### RF-5 · Interfaz
 
@@ -628,7 +740,8 @@ en el tablero de análisis; el entrenamiento (RF-4) lo enchufará cuando exista.
 ### RF-10 · Alternativas por jugada en el análisis guardado
 
 Añadido al alcance de v1.0 el 2026-09-06 (ver la nota de alcance al inicio del
-documento) y **entregado el 2026-09-08** en sus dos puntos P1. Nació de esto:
+documento) y **entregado el 2026-09-08** en sus dos puntos P1 —el P2, RF-10.3,
+el **2026-09-19** con los puzzles de RF-4.1—. Nació de esto:
 las flechas múltiples de RF-5.2 solo existían en el tablero de análisis, porque
 ahí el motor responde en vivo sobre la posición actual, mientras que en el
 visor de una partida analizada había una sola flecha —y no por decisión de
@@ -655,7 +768,13 @@ razonada en [ADR-0007](adr/0007-alternativas-por-jugada-json-y-cache.md):
   posición, motor, red, límite y MultiPV—. Si no coincide, no se sirve nada:
   una línea calculada con otra configuración no es la que produjo esa
   clasificación.
-- **RF-10.3 sigue pendiente**, con RF-4.1: los puzzles no existen todavía.
+- **RF-10.3 quedó entregado el 2026-09-19**, con RF-4.1: los puzzles aceptan
+  como respuesta cualquier jugada que no pierda más de 2 puntos de
+  probabilidad de victoria respecto a la mejor, y esas jugadas salen de estas
+  alternativas —o de lo que se rescate de `position_cache`—. Las candidatas se
+  congelan en el puzzle al generarlo
+  ([ADR-0017](adr/0017-puzzle-persistido-con-su-solucion-congelada.md)); las
+  reglas concretas están en la nota de RF-4.
 - **RF-2.8 se apoyó en esto**, un día después: distinguir una jugada única de
   una con tres alternativas igual de buenas necesita exactamente este material.
   El extractor de momentos críticos lee `alternatives_json` —o lo que se
@@ -795,9 +914,22 @@ Notas técnicas, para cuando se retome:
   siempre, así que las partidas con `[SetUp "1"]` daban posiciones imposibles;
   ahora arranca de `pgn_game.board()`, que además marca Chess960 cuando toca.
   Una partida con ventaja se analiza hoy sin tocar nada más.
-- **Lo que falta de verdad es jugar.** No hay ningún flujo en el que el motor
-  responda a una jugada del usuario: `EngineBridge` solo analiza. RF-4.3 y
-  RF-4.4 comparten esa carencia, y conviene resolverla una vez para los tres.
+- **Jugar contra el motor ya está resuelto** (**2026-09-21**, con RF-4.3).
+  Hasta entonces no había ningún flujo en el que el motor respondiera a una
+  jugada del usuario: `EngineBridge` solo analizaba. Ahora tiene `play(board)`,
+  que le pide al motor que **mueva** —y entonces respeta lo que se le haya
+  pedido de fuerza, que es lo que lo convierte en rival y no en oráculo—, y el
+  sparring de RF-4.3 lo usa entero: `sparring_games`, validación de jugadas en
+  el servidor y PGN derivado. RF-11.1 hereda eso resuelto y lo que le queda es
+  su parte propia: arrancar de una posición con ventaja (`starting_fen` ya es
+  columna, precisamente para esto) y la segunda perilla de dificultad.
+- **RF-11.3 está medio adelantado.** La frontera que pide —una partida contra
+  el motor que se guarda y se analiza pero **no cuenta** en RF-3— ya se trazó
+  para el sparring en
+  [ADR-0018](adr/0018-sparring-en-su-propia-tabla-y-el-servidor-como-arbitro.md):
+  tabla propia y análisis por el camino de RF-6.6 + RF-6.9. Lo que falta por
+  decidir es si una partida con ventaja se guarda en esa misma tabla o en
+  `games` con `[SetUp "1"]`, como dice hoy el texto del requerimiento.
 
 ### Requerimientos no funcionales (Post 1.0)
 

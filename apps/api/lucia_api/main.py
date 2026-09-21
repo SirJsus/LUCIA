@@ -22,8 +22,10 @@ from .routers import (
     health,
     pgn_import,
     repertoire,
+    sparring,
     stats,
     sync,
+    training,
 )
 from .worker import AnalysisWorker
 
@@ -56,3 +58,5 @@ app.include_router(engines.router)
 app.include_router(stats.router)
 app.include_router(boards.router)
 app.include_router(repertoire.router)
+app.include_router(training.router)
+app.include_router(sparring.router)

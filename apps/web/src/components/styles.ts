@@ -60,6 +60,14 @@ export const BOARD_SIDEBAR_GRID_CLASS = "grid gap-4 lg:grid-cols-[minmax(0,1fr)_
  * el teclado se anuncia, no se descubre probando). */
 export const BOARD_HINT_CLASSES = "text-center text-xs opacity-60";
 
+/** El enlace de navegación que no está marcado. El activo se ve como el botón
+ * primario (`buttonClasses("primary")`), así que este lleva su mismo relleno y
+ * su mismo tamaño de texto para que marcar uno no mueva a los demás. Lo usan
+ * la barra de navegación principal y la sub-navegación de Entrenamiento, que
+ * lo tenían copiado carácter a carácter (criterio C-2). */
+export const NAV_LINK_CLASSES =
+  "rounded px-3 py-1.5 text-sm hover:bg-slate-100 dark:hover:bg-slate-800";
+
 /** Fila y celda de una tabla de datos (`components/DataTable.tsx`), que las
  * escribe quien pinta cada fila y por eso no puede recibirlas del componente. */
 export const TABLE_ROW_CLASSES =

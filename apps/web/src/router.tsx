@@ -10,6 +10,9 @@ import { BoardsPage } from "./features/board/BoardsPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { EnginesPage } from "./features/engines/EnginesPage";
 import { GamesPage } from "./features/games/GamesPage";
+import { SparringGamePage } from "./features/training/SparringGamePage";
+import { SparringPage } from "./features/training/SparringPage";
+import { TrainingPage } from "./features/training/TrainingPage";
 import { GameViewerPage } from "./features/viewer/GameViewerPage";
 
 const rootRoute = createRootRoute({ component: Layout });
@@ -38,6 +41,24 @@ const statsRoute = createRoute({
   component: DashboardPage,
 });
 
+const trainingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/training",
+  component: TrainingPage,
+});
+
+const sparringRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/training/sparring",
+  component: SparringPage,
+});
+
+const sparringGameRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/training/sparring/$sparringGameId",
+  component: SparringGamePage,
+});
+
 const boardsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/boards",
@@ -55,6 +76,9 @@ const routeTree = rootRoute.addChildren([
   gameViewerRoute,
   boardsRoute,
   boardRoute,
+  trainingRoute,
+  sparringRoute,
+  sparringGameRoute,
   statsRoute,
   enginesRoute,
 ]);

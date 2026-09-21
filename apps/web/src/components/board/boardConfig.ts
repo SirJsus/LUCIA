@@ -35,7 +35,10 @@ import { formatScore } from "../../lib/score";
  * la segunda opción". */
 export interface EngineArrow {
   uci: string;
-  brush: "green" | "paleGreen" | "paleGrey" | "blue" | "paleBlue";
+  /** `red` no lo usa ninguna línea del motor: es para señalar la jugada que
+   * se hizo de verdad frente a la que había que hacer, que es lo que enseña
+   * un puzzle resuelto (RF-4.1). */
+  brush: "green" | "paleGreen" | "paleGrey" | "blue" | "paleBlue" | "red";
   /** Texto sobre la flecha; la evaluación de esa línea, normalmente. */
   label?: string;
 }

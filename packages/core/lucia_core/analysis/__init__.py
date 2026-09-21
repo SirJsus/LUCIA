@@ -159,9 +159,7 @@ async def evaluate_positions(
         lines: tuple[EngineLine, ...] = ()
         if not current_board.is_game_over():
             lines = tuple(
-                EngineLine(
-                    score=line["score"], pv=tuple(line.get("pv") or []), wdl=line.get("wdl")
-                )
+                EngineLine(score=line["score"], pv=tuple(line.get("pv") or []), wdl=line.get("wdl"))
                 for line in await engine.analyze(current_board)
             )
         position_evals.append(

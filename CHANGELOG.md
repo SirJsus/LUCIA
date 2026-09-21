@@ -11,31 +11,212 @@ SemVer para la serie `0.x`).
 
 ## [Sin publicar]
 
-Nada todavía: `0.4.0` acaba de cerrar el apéndice de la fase 2 y lo siguiente
-arranca la fase 3.
+Nada todavía: `0.4.2` acaba de cerrar el segundo ítem de la fase 3 y lo
+siguiente es el resto de esa fase.
 
 Camino a v1.0.0 — ver progreso en [docs/05-roadmap.md](docs/05-roadmap.md) y
 alcance congelado en [docs/02-requerimientos.md](docs/02-requerimientos.md).
-Con `0.3.0` quedaron cerradas las **fases 0, 1 y 2**, y con `0.4.0` su
-**apéndice**: entre las tres fases y el apéndice están entregados RF-1, RF-2
-—RF-2.6 incluido, ya entero—, RF-5, RF-6, RF-10, los siete puntos P1 de RF-7 y
-todo RF-3 salvo su RF-3.8. Para el corte de `1.0.0` faltan dos fases enteras:
-la **fase 3** (entrenamiento: RF-4 —puzzles desde los propios errores,
-sparring, drill de aperturas y plan semanal—, donde además se enchufará la capa
-de ocupación en esa tercera pantalla) y la **fase 4** (RF-3.8 · rivales
+Con `0.3.0` quedaron cerradas las **fases 0, 1 y 2**, con `0.4.0` su
+**apéndice** y con `0.4.1` y `0.4.2` los dos primeros ítems de la **fase 3**:
+están entregados RF-1, RF-2, RF-5, RF-6, RF-10 —ya entero, porque RF-10.3
+llegó con los puzzles—, los siete puntos P1 de RF-7, todo RF-3 salvo su RF-3.8
+y, de RF-4, sus puntos 4.1 y 4.3. Para el corte de `1.0.0` falta el resto de la
+**fase 3**, que sigue abierta (RF-4.2 y RF-4.4 · drill de aperturas y "re-juega
+desde el error", RF-4.5 · plan semanal, más enchufar la capa de ocupación en la
+pantalla de entrenamiento) y la **fase 4** entera (RF-3.8 · rivales
 recurrentes, RF-7.8 y RF-7.9, explicaciones en lenguaje natural, empaquetado y
 soporte de macOS/Windows).
 
 Fuera de ese camino, en Post 1.0: **RF-8 · Personalización de interfaz**
 (Fase 5), **RF-11 · Partidas con ventaja (odds) contra el motor** (Fase 6,
-planteado el 2026-09-07: necesitaba antes el editor de posición de RF-6.1 —ya
-entregado— y el sparring calibrado de RF-4.3, que sigue pendiente en la fase
-3), **RF-9 · Comparación de evaluaciones entre motores** (ampliación de
-RF-2.6, sin fase propia) y **RNF-11 · Coherencia de interfaz**, criterio
-permanente cuyos incumplimientos concretos se arreglan dentro de 1.0: las **90
-filas** que su inventario en
+planteado el 2026-09-07: necesitaba antes el editor de posición de RF-6.1 y el
+sparring calibrado de RF-4.3, **los dos entregados ya** —2026-09-18 y
+2026-09-21—, así que lo que le falta es solo suyo; sigue fuera del alcance de
+1.0 porque se planteó después del corte), **RF-9 · Comparación de evaluaciones
+entre motores** (ampliación de RF-2.6, sin fase propia) y **RNF-11 ·
+Coherencia de interfaz**, criterio permanente cuyos incumplimientos concretos
+se arreglan dentro de 1.0: las **90 filas** que su inventario en
 [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) ha llegado a tener están
 **todas cerradas** desde el 2026-09-19, la primera vez que queda vacío.
+
+## [0.4.2] - 2026-09-21
+
+El motor deja de ser solo un oráculo y se sienta enfrente: **sparring contra
+motor con fuerza calibrada** (**RF-4.3**), Stockfish conteniéndose con
+`UCI_LimitStrength`/`UCI_Elo` o Lc0 jugando con una red Maia. Cierra el
+**segundo ítem de la fase 3** del roadmap, que **sigue abierta** con los otros
+dos —drill de aperturas y "re-juega desde el error" (RF-4.2, RF-4.4) y plan
+semanal (RF-4.5)— más la capa de ocupación en la pantalla de entrenamiento, así
+que sube el **patch y no el minor**, mismo criterio que en `0.2.1` a `0.2.5` y
+en `0.4.1`. **No hay alcance nuevo**: RF-4.3 es alcance congelado de v1.0 desde
+el corte del **2026-09-05**, no se ha añadido ningún RF ni RNF y nada baja a
+Post 1.0 ni sube a 1.0.
+
+### Añadido
+
+- **Sparring contra el motor con la fuerza calibrada** (RF-4.3): la pantalla
+  `/training/sparring` para elegir rival y empezar y
+  `/training/sparring/$sparringGameId` para jugar y retomar, con
+  sub-navegación nueva dentro de Entrenamiento. En la API, cinco endpoints
+  bajo `/sparring` —crear partida, listarlas, ver una, jugar y abandonar— con
+  `apps/api/lucia_api/services/sparring.py`, y las reglas puras de una partida
+  —rehacerla desde sus jugadas, saber si acabó y por qué, y escribirla en
+  PGN— en `lucia_core.sparring`, sin base de datos y sin motor, para poder
+  probarse solas (RNF-8).
+  - **`EngineBridge.play(board)`**: le pide al motor la jugada que **haría**,
+    no la que recomienda. Es la otra forma de hablar UCI y la que faltaba para
+    jugar contra él: `analyze` siempre contesta lo mejor que hay, mientras que
+    `play` respeta lo que se le haya pedido de fuerza, que es lo que convierte
+    al motor en rival y no en oráculo. La nota técnica de **RF-11** señalaba
+    esta carencia como compartida por RF-4.3, RF-4.4 y RF-11: **queda resuelta
+    una vez para los tres**. Como en `evaluate_positions`, no se le pregunta
+    por una posición ya terminada —no hay jugada que devolver y Lc0 se queda
+    esperando para siempre—.
+  - **Dos rivales que no se calibran igual, y la pantalla lo dice.** Stockfish
+    busca igual de bien y se contiene: acepta un Elo entre **1320 y 3190**
+    (`STOCKFISH_ELO_RANGE`, los topes de Stockfish 17) y piensa un segundo por
+    jugada, porque lo que lo frena es el límite de fuerza y no el reloj. Lc0
+    con una red Maia **no se contiene**: está entrenada para predecir la jugada
+    de una persona de ~1500, así que sus errores son los que comete la gente y
+    no los de un motor mutilado; su fuerza es la de la red cargada y no un
+    número que se le pueda pedir, por eso `engine_elo` solo existe con
+    Stockfish y el formulario esconde el deslizador en vez de enseñar uno
+    muerto. Maia se juega a **un solo nodo**: con más, la búsqueda empieza a
+    corregir a la red y se pierde justo lo que la hace humana. Medido en el
+    portátil de desarrollo (i7 + GTX 1060): ~1,15 s por jugada Stockfish
+    calibrado y ~0,08 s Maia, que además abre con el Giuoco Piano.
+  - **Ajuste nuevo `MAIA_WEIGHTS`** (`maia-1500.pb.gz`, la que descarga
+    `make engines`), separado de la red del análisis: cambiarlo por otra de la
+    familia (1100 a 1900) es cambiar la fuerza del rival de Lc0. No puede ser
+    la misma red que analiza, porque Maia es buena imitando y mala como fuente
+    de verdad, que es lo contrario de lo que se le pide a un analizador.
+  - **Tabla `sparring_games`** (migración `f3d9a1c47b58`), que nace vacía y
+    guarda la partida como **posición de partida más jugadas en UCI**: la
+    posición actual, el PGN y el final se derivan al servir, así que no hay dos
+    versiones de la misma partida que puedan discrepar. `result` es la única
+    marca de que terminó (`null` mientras se juega) y `termination` dice por
+    qué —mate, ahogado, material insuficiente, cincuenta jugadas, repetición o
+    abandono—, porque "0-1" no distingue un mate de un abandono y en un
+    entrenamiento eso es justo lo que se quiere saber.
+  - **Aquí el servidor es el rival y el árbitro**, al revés que en el tablero
+    de análisis, donde quien sabe de reglas es chess.js y la API solo custodia
+    el árbol ([ADR-0013](docs/adr/0013-analisis-de-partida-o-de-tablero.md)):
+    para contestar hay que saber qué posición hay, así que la jugada de la
+    persona se valida en el servidor y la respuesta del motor vuelve en la
+    misma petición, porque son un solo turno. Y la partida **no cuenta** en
+    estadísticas ni en detección de patrones (RF-3), la misma frontera que un
+    tablero sin publicar (RF-6.5): para estudiarla se abre como tablero desde
+    su PGN (RF-6.6) y se analiza desde ahí (RF-6.9). Razonado en
+    [ADR-0018](docs/adr/0018-sparring-en-su-propia-tabla-y-el-servidor-como-arbitro.md),
+    que adelanta buena parte de lo que RF-11.3 pedirá.
+  - **Sin reloj y sin barra de evaluación**: una partida de entrenamiento se
+    interrumpe y se retoma por su URL tal como estaba, porque el estado vive en
+    la base; la barra queda fuera por lo mismo que en los puzzles de RF-4.1,
+    que decir a cada jugada quién va ganando convierte la partida en un
+    análisis asistido.
+
+### Cambiado
+
+- El **segundo ítem de la fase 3** del roadmap queda marcado y la fase se
+  documenta como abierta, con lo que falta enumerado; ver
+  [docs/05-roadmap.md](docs/05-roadmap.md).
+- **Ese ítem citaba `RF-4.2` y no le tocaba.** El sparring es RF-4.3 y solo
+  RF-4.3; RF-4.2 es el drill de aperturas, que es el ítem siguiente del propio
+  roadmap y ahora lo cita junto a RF-4.4. Corregido de paso, sin mover nada de
+  sitio: los dos son alcance congelado de v1.0 y siguen en la fase 3.
+- **La nota de RF-11 en Post 1.0 ya no da por pendiente que el motor sepa
+  jugar.** Sus dos dependencias de alcance 1.0 están entregadas —RF-6.1 el
+  2026-09-18 y RF-4.3 hoy—, así que lo que le queda es solo suyo: arrancar de
+  una posición con ventaja y la segunda perilla de dificultad. **Sigue fuera
+  del alcance de v1.0**: que ya se pueda montar no lo mete dentro del corte del
+  2026-09-05.
+- Contrato de la API: esquemas y rutas **nuevos** (`/sparring/...`), sin tocar
+  ninguno de los existentes, así que nada de lo que ya la consumía se rompe.
+  `openapi.json` y los tipos de `packages/shared-types` regenerados con
+  `make types`.
+
+## [0.4.1] - 2026-09-19
+
+LUCIA deja de solo contar lo que se hizo mal y pasa a preguntarlo: la pantalla
+de **Entrenamiento** convierte los errores propios del análisis en puzzles y
+los devuelve con repetición espaciada, aceptando cualquier jugada tan buena
+como la del motor (**RF-4.1** con **RF-10.3**). Cierra el **primer ítem de la
+fase 3** del roadmap, que **sigue abierta** con los otros tres —sparring
+(RF-4.2, RF-4.3), drill de aperturas y "re-juega desde el error" (RF-4.4) y
+plan semanal (RF-4.5)— más la capa de ocupación en esta tercera pantalla, así
+que sube el **patch y no el minor**, mismo criterio que en `0.2.1` a `0.2.5`.
+**No hay alcance nuevo**: RF-4.1 y RF-10.3 son alcance congelado de v1.0 desde
+el corte del **2026-09-05**, no se ha añadido ningún RF ni RNF y nada baja a
+Post 1.0 ni sube a 1.0.
+
+### Añadido
+
+- **Puzzles desde los errores propios, con repetición espaciada** (RF-4.1), en
+  la pantalla de Entrenamiento (`apps/web/src/features/training/`): un botón
+  que genera la baraja desde lo ya analizado, la cola de lo que toca hoy y el
+  tablero donde se responde. En la API, `POST /training/puzzles` (generar),
+  `GET /training/puzzles` (la cola) y `POST /training/puzzles/{id}/answer`
+  (responder), con `apps/api/lucia_api/services/training.py`; las dos reglas
+  puras —SM-2 y la equivalencia de jugadas— en `lucia_core.training`, sin base
+  de datos y sin reloj, para poder probarse solas (RNF-8).
+  - **Dan puzzle los errores propios graves** —`mistake`, `blunder` y
+    `missed_win` (`PUZZLE_CLASSIFICATIONS`)— del análisis terminado más
+    reciente de cada partida, el mismo criterio con el que se cuentan las
+    estadísticas. Las imprecisiones no: una jugada que pierde menos de diez
+    puntos de probabilidad de victoria no tiene respuesta que encontrar, y como
+    puzzle solo enseñaría a adivinar la preferencia del motor. Los del rival
+    tampoco: su error dice cómo juega el otro.
+  - **SM-2, el algoritmo de SuperMemo que usa Anki**, con tres resultados:
+    fallar (o rendirse), acertar tras más de un intento y acertar a la primera.
+    Fallar reinicia los aciertos seguidos pero **no** la facilidad, que se
+    arrastra, de modo que un puzzle que se falla una y otra vez acaba volviendo
+    casi a diario; el próximo vencimiento se cuenta desde el repaso y no desde
+    el anterior, para que repasar con retraso no encadene retrasos.
+  - **Generar es un acto explícito y es idempotente**, con clave
+    `(partida, jugada)`: quien entrena decide cuándo renovar su baraja, volver
+    a pulsar solo añade lo nuevo y analizar una tanda de partidas no le cambia
+    la cola de repaso por sorpresa.
+  - **La comprobación es del servidor y un puzzle abierto no viaja con nada
+    que lo resuelva**: ni la solución, ni la jugada que se hizo en la partida,
+    ni la clasificación, ni las probabilidades. Saber que aquello fue un
+    blunder de treinta puntos ya es media respuesta; todo eso llega al
+    cerrarlo, que es cuando la pantalla lo enseña. Por lo mismo, es la única
+    pantalla con tablero **sin barra de evaluación**.
+  - **Tabla `puzzles`** (migración `e1a7c93d40b2`), que nace vacía y no enlaza
+    a `analyzed_moves`: cada fila se basta a sí misma —posición, jugada que se
+    hizo, soluciones aceptadas, coste del error y estado de SM-2— porque lleva
+    encima el historial de repasos, el único dato de LUCIA que no se puede
+    regenerar volviendo a pasar el motor. Reanalizar una partida no la toca:
+    crea un análisis nuevo, con sus propias `analyzed_moves`, y el anterior
+    deja de ser el vigente, así que un puzzle colgado de aquella fila hablaría
+    de un análisis que ya no se enseña. Razonado en
+    [ADR-0017](docs/adr/0017-puzzle-persistido-con-su-solucion-congelada.md),
+    que es la decisión contraria a la de los patrones
+    ([ADR-0008](docs/adr/0008-patrones-deducidos-al-leer.md)) y explica dónde
+    está la línea.
+
+- **Se acepta como buena cualquier jugada equivalente** (RF-10.3), y no solo
+  la favorita del motor: toda la que no pierda más de **2 puntos de
+  probabilidad de victoria** respecto a ella
+  (`EQUIVALENT_MOVE_MAX_WIN_PERCENT_LOSS`), que es el mismo margen con el que
+  RF-2.2 llama "excelente" a una jugada — lo que el análisis no considera un
+  error tampoco puede serlo en un puzzle sacado de ese mismo análisis. Las
+  candidatas salen de las alternativas persistidas por RF-10.1 o de lo que se
+  rescate de `position_cache`; si no hay ninguna queda la `best_move_uci`
+  sola, que es peor puzzle pero no uno falso, y un error del que no se pueda
+  afirmar ninguna respuesta no genera puzzle. **Con esto RF-10 queda entregado
+  entero.**
+
+### Cambiado
+
+- El primer ítem de la **fase 3** del roadmap queda marcado y la fase se
+  documenta como abierta, con lo que falta enumerado; ver
+  [docs/05-roadmap.md](docs/05-roadmap.md). El bloque "Estado" del `README.md`
+  pasa de "fases 0 a 2 cerradas" a decir también qué hay ya de la fase 3.
+- Contrato de la API: esquemas y rutas **nuevos** (`/training/...`), sin tocar
+  ninguno de los existentes, así que nada de lo que ya la consumía se rompe.
+  `openapi.json` y los tipos de `packages/shared-types` regenerados con
+  `make types`.
 
 ## [0.4.0] - 2026-09-19
 

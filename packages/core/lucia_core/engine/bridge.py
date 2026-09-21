@@ -1,5 +1,15 @@
 """Puente asíncrono con un motor UCI (Stockfish, Lc0 o cualquier otro),
-usando `python-chess` para hablar el protocolo."""
+usando `python-chess` para hablar el protocolo.
+
+Dos formas de usarlo, y no son la misma pregunta: `analyze()` pide la opinión
+del motor sobre una posición —de ahí vive todo RF-2, a través de
+`lucia_core.analysis` y del `CachedEngineBridge` de la API— y `play()` le pide
+que **mueva**, que es lo que hace posible jugar contra él (RF-4.3, desde
+`lucia_api.services.sparring`).
+
+Aquí solo se habla UCI: qué motor hay al otro lado, con qué red y con cuánta
+fuerza lo decide quien arma el `EngineConfig`, fuera del núcleo (RNF-9).
+"""
 
 from __future__ import annotations
 
@@ -69,12 +79,42 @@ class EngineBridge:
     async def analyze(self, board: chess.Board) -> list[chess.engine.InfoDict]:
         """Analiza `board` y devuelve una línea por cada `multipv` configurado,
         ordenadas de mejor a peor (índice 0 = mejor jugada del motor)."""
+        engine = self._require_open_engine()
+        return await engine.analyse(board, self._limit(), multipv=self.config.multipv)
+
+    async def play(self, board: chess.Board) -> chess.Move:
+        """La jugada que el motor **haría** en `board`, no la que recomienda.
+
+        Es la otra forma de hablar con un motor UCI, y la que hacía falta para
+        jugar contra él (RF-4.3): `analyze` pregunta "qué es lo mejor aquí" y
+        siempre contesta lo mismo, mientras que `play` le pide que mueva, y
+        entonces respeta lo que se le haya pedido de fuerza —`UCI_LimitStrength`
+        y `UCI_Elo` en Stockfish, la red Maia y un solo nodo en Lc0— que es
+        justo lo que hace de rival calibrado y no de oráculo.
+
+        Quién decide esa fuerza está fuera del núcleo, en `EngineConfig`
+        (`extra_options` y el límite de búsqueda): aquí solo se habla UCI, sin
+        saber qué motor hay al otro lado (RNF-9).
+
+        No se le pregunta por una posición ya terminada: en jaque mate o
+        ahogado no hay jugada que devolver y Lc0 se queda esperando para
+        siempre, que es el mismo cuidado que tiene `evaluate_positions`.
+        """
+        if board.is_game_over(claim_draw=True):
+            raise ValueError("la partida ya terminó: no hay jugada que pedirle al motor")
+        engine = self._require_open_engine()
+        played = await engine.play(board, self._limit())
+        if played.move is None:
+            raise RuntimeError(f"{self.config.name} no devolvió jugada en {board.fen()}")
+        return played.move
+
+    def _require_open_engine(self) -> chess.engine.UciProtocol:
         if self._engine is None:
             raise RuntimeError(
                 "El motor no está abierto: usa 'async with EngineBridge(...)' "
                 "o llama a open() antes."
             )
-        return await self._engine.analyse(board, self._limit(), multipv=self.config.multipv)
+        return self._engine
 
     def _limit(self) -> chess.engine.Limit:
         kind, value = self.config.limit_kind, self.config.limit_value
