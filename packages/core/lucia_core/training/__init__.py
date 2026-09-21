@@ -11,7 +11,12 @@ lo que hace útil al entrenamiento y tienen que poder probarse solas (RNF-8):
 
 Quién lo usa: `lucia_api.services.training`, que carga los errores desde
 `analyzed_moves`, los convierte en puzzles y guarda el estado que estas
-funciones devuelven.
+funciones devuelven. Desde RF-4.2 también `lucia_api.services.drills`, que
+reparte con el mismo `next_review` las líneas de apertura de
+`lucia_core.drills`: un drill se repasa como se repasa un puzzle, así que no
+hay dos algoritmos de repaso que mantener. `equivalent_solutions`, en cambio,
+es solo de los puzzles — en una línea de apertura la respuesta es una y la
+dicen los maestros.
 """
 
 from __future__ import annotations

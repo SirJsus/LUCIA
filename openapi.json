@@ -3,7 +3,7 @@
   "info": {
     "title": "L.U.C.I.A. API",
     "description": "Logic & Ultimate Chess Insight Algorithm",
-    "version": "0.4.2"
+    "version": "0.4.3"
   },
   "paths": {
     "/health": {
@@ -1537,6 +1537,153 @@
         }
       }
     },
+    "/training/drills": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Generate Opening Drills",
+        "description": "Crea los drills que falten a partir del repertorio y de las aperturas.\n\nSe pide a mano, como los puzzles: quien entrena decide cuándo renovar su\nbaraja. Volver a pulsar solo añade lo nuevo y no toca el estado de repaso\nde lo que ya había.",
+        "operationId": "generate_opening_drills_training_drills_post",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrillGenerationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Player Drill Queue",
+        "description": "Los drills que toca repetir ahora, del más atrasado al más reciente.",
+        "operationId": "player_drill_queue_training_drills_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrillQueueOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/drills/{drill_id}/moves": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Play Drill Move",
+        "description": "Comprueba una jugada de la línea y contesta por el rival.\n\nFallar **no** cierra el drill ni enseña la jugada buena: se puede volver a\nintentar, igual que en un puzzle. Rendirse (`uci` a `null`) sí lo cierra,\ncomo fallado, y entonces se ve la línea entera.",
+        "operationId": "play_drill_move_training_drills__drill_id__moves_post",
+        "parameters": [
+          {
+            "name": "drill_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Drill Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DrillMoveIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrillMoveOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sparring/games": {
       "post": {
         "tags": [
@@ -2667,6 +2814,283 @@
         ],
         "title": "DepartureOut",
         "description": "Un punto donde el repertorio propio se separa del de los maestros."
+      },
+      "DrillGenerationOut": {
+        "properties": {
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "positions_missing": {
+            "type": "integer",
+            "title": "Positions Missing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "total",
+          "positions_missing"
+        ],
+        "title": "DrillGenerationOut"
+      },
+      "DrillMoveIn": {
+        "properties": {
+          "ply": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ply"
+          },
+          "uci": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uci"
+          },
+          "wrong_moves": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Wrong Moves",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "ply"
+        ],
+        "title": "DrillMoveIn"
+      },
+      "DrillMoveOut": {
+        "properties": {
+          "correct": {
+            "type": "boolean",
+            "title": "Correct"
+          },
+          "reply_uci": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Uci"
+          },
+          "reply_san": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply San"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "next_ply": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Ply"
+          },
+          "finished": {
+            "type": "boolean",
+            "title": "Finished"
+          },
+          "line_san": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Line San"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "interval_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "correct",
+          "reply_uci",
+          "reply_san",
+          "fen",
+          "next_ply",
+          "finished",
+          "line_san",
+          "due_at",
+          "interval_days"
+        ],
+        "title": "DrillMoveOut"
+      },
+      "DrillOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "reason": {
+            "type": "string",
+            "title": "Reason"
+          },
+          "player_color": {
+            "type": "string",
+            "title": "Player Color"
+          },
+          "opening_eco": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opening Eco"
+          },
+          "opening_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opening Name"
+          },
+          "games": {
+            "type": "integer",
+            "title": "Games"
+          },
+          "score_percent": {
+            "type": "number",
+            "title": "Score Percent"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "first_player_ply": {
+            "type": "integer",
+            "title": "First Player Ply"
+          },
+          "preceding_moves_san": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Preceding Moves San"
+          },
+          "length_plies": {
+            "type": "integer",
+            "title": "Length Plies"
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Due At"
+          },
+          "repetitions": {
+            "type": "integer",
+            "title": "Repetitions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "reason",
+          "player_color",
+          "opening_eco",
+          "opening_name",
+          "games",
+          "score_percent",
+          "fen",
+          "first_player_ply",
+          "preceding_moves_san",
+          "length_plies",
+          "due_at",
+          "repetitions"
+        ],
+        "title": "DrillOut",
+        "description": "Un drill por hacer, sin la línea que lo resuelve."
+      },
+      "DrillQueueOut": {
+        "properties": {
+          "drills": {
+            "items": {
+              "$ref": "#/components/schemas/DrillOut"
+            },
+            "type": "array",
+            "title": "Drills"
+          },
+          "due": {
+            "type": "integer",
+            "title": "Due"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "next_due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Due At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "drills",
+          "due",
+          "total",
+          "next_due_at"
+        ],
+        "title": "DrillQueueOut"
       },
       "EngineConfigOut": {
         "properties": {

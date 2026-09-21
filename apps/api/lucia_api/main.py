@@ -17,6 +17,7 @@ from . import __version__
 from .routers import (
     analysis,
     boards,
+    drills,
     engines,
     games,
     health,
@@ -59,4 +60,5 @@ app.include_router(stats.router)
 app.include_router(boards.router)
 app.include_router(repertoire.router)
 app.include_router(training.router)
+app.include_router(drills.router)
 app.include_router(sparring.router)

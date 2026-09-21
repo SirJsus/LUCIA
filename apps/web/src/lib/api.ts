@@ -13,6 +13,9 @@ import type {
   AnalysisSummary,
   BoardDetail,
   BoardSummary,
+  DrillGeneration,
+  DrillMove,
+  DrillQueue,
   EngineLine,
   EngineConfigUpdate,
   EnginesConfigOut,
@@ -316,6 +319,31 @@ export const api = {
   /** Abandona la partida: gana el motor y queda cerrada. */
   resignSparringGame: (gameId: number) =>
     request<SparringGame>(`/sparring/games/${gameId}/resign`, { method: "POST" }),
+
+  /** Crea los drills de apertura que falten, a partir del repertorio ya
+   * comparado (RF-3.6) y de las estadísticas por apertura (RF-3.2). Se pide a
+   * mano, como los puzzles, y volver a pulsar solo añade lo nuevo. */
+  generateDrills: (username?: string) =>
+    request<DrillGeneration>(`/training/drills${toQueryString({ username })}`, {
+      method: "POST",
+    }),
+
+  /** Los drills que toca repetir ahora. **No traen la línea**: es la
+   * respuesta, y la comprueba el servidor jugada a jugada. */
+  getDrillQueue: () => request<DrillQueue>("/training/drills"),
+
+  /** Juega una jugada de la línea. El servidor comprueba, contesta por el
+   * rival y, cuando la línea se acaba, anota el repaso y la enseña entera.
+   * `uci` a `null` es rendirse. `wrong_moves` son los fallos de esta pasada, que
+   * es lo que distingue recorrerla limpia de recorrerla tropezando. */
+  playDrillMove: (
+    drillId: number,
+    body: { ply: number; uci: string | null; wrong_moves: number },
+  ) =>
+    request<DrillMove>(`/training/drills/${drillId}/moves`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
 
   sync: (username?: string) =>
     request<SyncSummary>("/sync", {

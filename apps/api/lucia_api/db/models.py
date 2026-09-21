@@ -10,6 +10,8 @@ RF-3.6 (comparación de repertorio): `ExplorerPositionCache`, la caché de lo
 que se le preguntó al Opening Explorer de Lichess.
 RF-4.1 (entrenamiento desde los errores propios): `Puzzle`, con su estado de
 repetición espaciada.
+RF-4.2 (drill de aperturas): `OpeningDrill`, la línea que se repite y su
+estado de repaso.
 RF-4.3 (sparring contra el motor con fuerza calibrada): `SparringGame`.
 
 Las columnas que no se explican solas llevan su porqué al lado; el mapa
@@ -540,3 +542,70 @@ class SparringGame(Base):
     )
     """Cuándo se jugó la última jugada. Ordena el listado: lo que se está
     jugando ahora va primero."""
+
+
+class OpeningDrill(Base):
+    """Una línea de apertura que se repite jugando, con su estado de repaso
+    (RF-4.2).
+
+    **Guarda la línea, no la partida de la que salió.** Es la misma decisión
+    que `Puzzle` (ADR-0017) y por la misma razón: el drill lleva encima un
+    historial de repasos que no está en ninguna otra parte, y volver a
+    sincronizar o a refrescar el repertorio no puede llevárselo por delante.
+    La partida de la que se sacó la línea ya cumplió su papel al generarla.
+
+    Las dos barajas —salidas de la teoría (RF-3.6) y peores aperturas
+    (RF-3.2)— comparten tabla porque son la misma cosa para quien entrena: una
+    línea que hay que reproducir. De dónde salió lo dice `reason`, que es lo
+    único que las distingue en pantalla.
+    """
+
+    __tablename__ = "opening_drills"
+    __table_args__ = (UniqueConstraint("player_color", "line_uci", name="uq_drill_color_line"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reason: Mapped[str]
+    """De qué baraja salió: "departure" (te sales de la teoría aquí, RF-3.6) o
+    "opening" (esta apertura te va mal, RF-3.2). Cambia lo que la pantalla
+    cuenta al presentarla, no cómo se juega."""
+    player_color: Mapped[str]
+    """"white" | "black": de qué bando se entrena la línea. Va en columna
+    porque la misma secuencia de jugadas es un drill distinto según de qué
+    lado se mire, y por eso es parte de la clave única."""
+    line_uci: Mapped[str]
+    """La línea entera, jugadas de ambos bandos separadas por espacios y en
+    UCI ("e2e4 c7c5 g1f3"). Texto y no JSON para poder ser clave única: es lo
+    que hace idempotente la generación, que se pide a mano y se repite.
+
+    **No viaja a la pantalla mientras el drill está abierto**: es la
+    respuesta. El servidor comprueba jugada a jugada, como en los puzzles."""
+
+    opening_eco: Mapped[str | None] = mapped_column(default=None)
+    opening_name: Mapped[str | None] = mapped_column(default=None)
+    """Cómo se llama la apertura de esta línea (`lucia_core.openings`), para
+    poder decir qué se está entrenando. `None` si la línea se sale del libro
+    antes de tener nombre, que es justo lo que pasa en las salidas tempranas."""
+
+    games: Mapped[int]
+    score_percent: Mapped[float]
+    """Cuántas partidas propias justifican este drill y qué se sacó en ellas.
+    Es el "rendimiento peor" de RF-4.2, y se congela al generar: el drill es el
+    que era cuando se creó, y cambiarle el motivo bajo un historial de repasos
+    ya hecho falsearía ese historial (misma regla que las soluciones de
+    `Puzzle`)."""
+
+    repetitions: Mapped[int] = mapped_column(default=0)
+    interval_days: Mapped[int] = mapped_column(default=0)
+    ease_factor: Mapped[float] = mapped_column(default=2.5)
+    """El estado de SM-2 (`lucia_core.training.SpacedRepetitionState`), el
+    mismo algoritmo con el que vuelven los puzzles: un drill se repasa como se
+    repasa un puzzle."""
+    due_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC), index=True
+    )
+    last_reviewed_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
+    created_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
+    )

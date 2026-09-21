@@ -1,6 +1,6 @@
 [project]
 name = "lucia-workspace"
-version = "0.4.2"
+version = "0.4.3"
 description = "L.U.C.I.A. - Logic & Ultimate Chess Insight Algorithm (workspace raiz)"
 requires-python = ">=3.12"
 dependencies = []

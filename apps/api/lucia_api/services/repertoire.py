@@ -19,6 +19,11 @@ casualidad, no significa que la estuvieras siguiendo. Es la misma regla que
 - `compare_repertoire` no sale a internet nunca: lee lo que haya en la caché.
   Sin conexión sigue respondiendo con lo que ya se preguntó, y dice cuánto le
   falta por saber.
+
+Quién lo usa: el router `repertoire` (la pantalla de estadísticas) y, desde
+RF-4.2, `services/drills.py`, que convierte cada salida en una línea para
+repetir jugando. Por eso una `Departure` lleva además el camino que se recorrió
+hasta ella y la jugada de maestros en UCI, que la comparación no mira.
 """
 
 from __future__ import annotations
@@ -64,6 +69,10 @@ class PlayerMove:
     color: str
     outcome: str
     """Cómo acabó esa partida para el jugador: "win", "draw" o "loss"."""
+    preceding_moves_uci: tuple[str, ...] = ()
+    """Las jugadas de los dos bandos anteriores a esta. Solo la usa el drill
+    (RF-4.2), para poder repetir la línea entera; la comparación de repertorio
+    no la mira."""
 
 
 @dataclass
@@ -77,6 +86,20 @@ class Departure:
     color: str
     master_moves: list[str] = field(default_factory=list)
     """Lo que juegan los maestros en esa posición, de más a menos frecuente."""
+    master_moves_uci: list[str] = field(default_factory=list)
+    """Las mismas, en UCI. Las dos notaciones porque cada consumidor quiere la
+    suya: la pantalla de repertorio enseña el SAN, y el drill de RF-4.2
+    necesita el UCI para componer la línea que se repite."""
+    preceding_moves_uci: list[str] = field(default_factory=list)
+    """Las jugadas —de los dos bandos— que llevaron hasta aquí, de la primera
+    partida del grupo que se salió por este punto. Es el camino hasta la
+    decisión, y con él el drill de RF-4.2 puede reproducir la línea entera en
+    vez de plantar al usuario en una posición suelta.
+
+    De una partida cualquiera del grupo y no de todas: las jugadas propias son
+    las mismas por definición —se agrupa por color, momento y jugada—, y las
+    del rival hasta ahí son de libro. Si no fueran las mismas, la posición
+    sería otra y el grupo también."""
     opening: str | None = None
     games: int = 0
     wins: int = 0
@@ -139,6 +162,7 @@ def _opening_moves(
         return
     outcome = _outcome_from_headers(game.headers.get("Result", "*"), player_is_white)
 
+    moves_so_far: list[str] = []
     for ply, move in enumerate(game.mainline_moves()):
         if ply >= MAX_REPERTOIRE_PLIES:
             return
@@ -152,7 +176,9 @@ def _opening_moves(
                 uci=move.uci(),
                 color="white" if player_is_white else "black",
                 outcome=outcome,
+                preceding_moves_uci=tuple(moves_so_far),
             )
+        moves_so_far.append(move.uci())
         board.push(move)
 
 
@@ -250,17 +276,21 @@ async def compare_repertoire(session: AsyncSession, username: str) -> Repertoire
             missing.add(move.epd)
             continue
 
+        # Las que se enseñan de esa posición, elegidas una vez y escritas
+        # luego en las dos notaciones (ver `Departure`): si se eligieran dos
+        # veces, la pantalla y el drill podrían no coincidir.
+        master_moves = [
+            master_move for master_move in position.moves if master_move.games >= MIN_MASTER_GAMES
+        ][:3]
         departure = departures.setdefault(
             (move.color, move.ply, move.san),
             Departure(
                 ply=move.ply,
                 san=move.san,
                 color=move.color,
-                master_moves=[
-                    master_move.san
-                    for master_move in position.moves
-                    if master_move.games >= MIN_MASTER_GAMES
-                ][:3],
+                master_moves=[master_move.san for master_move in master_moves],
+                master_moves_uci=[master_move.uci for master_move in master_moves],
+                preceding_moves_uci=list(move.preceding_moves_uci),
             ),
         )
         departure.games += 1

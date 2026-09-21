@@ -11,21 +11,21 @@ SemVer para la serie `0.x`).
 
 ## [Sin publicar]
 
-Nada todavía: `0.4.2` acaba de cerrar el segundo ítem de la fase 3 y lo
+Nada todavía: `0.4.3` acaba de cerrar el tercer ítem de la fase 3 y lo
 siguiente es el resto de esa fase.
 
 Camino a v1.0.0 — ver progreso en [docs/05-roadmap.md](docs/05-roadmap.md) y
 alcance congelado en [docs/02-requerimientos.md](docs/02-requerimientos.md).
 Con `0.3.0` quedaron cerradas las **fases 0, 1 y 2**, con `0.4.0` su
-**apéndice** y con `0.4.1` y `0.4.2` los dos primeros ítems de la **fase 3**:
-están entregados RF-1, RF-2, RF-5, RF-6, RF-10 —ya entero, porque RF-10.3
-llegó con los puzzles—, los siete puntos P1 de RF-7, todo RF-3 salvo su RF-3.8
-y, de RF-4, sus puntos 4.1 y 4.3. Para el corte de `1.0.0` falta el resto de la
-**fase 3**, que sigue abierta (RF-4.2 y RF-4.4 · drill de aperturas y "re-juega
-desde el error", RF-4.5 · plan semanal, más enchufar la capa de ocupación en la
-pantalla de entrenamiento) y la **fase 4** entera (RF-3.8 · rivales
-recurrentes, RF-7.8 y RF-7.9, explicaciones en lenguaje natural, empaquetado y
-soporte de macOS/Windows).
+**apéndice** y con `0.4.1`, `0.4.2` y `0.4.3` los tres primeros ítems de la
+**fase 3**: están entregados RF-1, RF-2, RF-5, RF-6, RF-10 —ya entero, porque
+RF-10.3 llegó con los puzzles—, los siete puntos P1 de RF-7, todo RF-3 salvo su
+RF-3.8 y, de RF-4, sus puntos 4.1, 4.2 y 4.3. Para el corte de `1.0.0` falta el
+resto de la **fase 3**, que sigue abierta (RF-4.4 · "re-juega desde el error",
+RF-4.5 · plan semanal, más enchufar la capa de ocupación en la pantalla de
+entrenamiento) y la **fase 4** entera (RF-3.8 · rivales recurrentes, RF-7.8 y
+RF-7.9, explicaciones en lenguaje natural, empaquetado y soporte de
+macOS/Windows).
 
 Fuera de ese camino, en Post 1.0: **RF-8 · Personalización de interfaz**
 (Fase 5), **RF-11 · Partidas con ventaja (odds) contra el motor** (Fase 6,
@@ -38,6 +38,116 @@ Coherencia de interfaz**, criterio permanente cuyos incumplimientos concretos
 se arreglan dentro de 1.0: las **90 filas** que su inventario en
 [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) ha llegado a tener están
 **todas cerradas** desde el 2026-09-19, la primera vez que queda vacío.
+
+## [0.4.3] - 2026-09-21
+
+El repertorio deja de ser un informe y se puede jugar: **drill de aperturas**
+(**RF-4.2**), que convierte los puntos donde se abandona la teoría y las
+aperturas que peor van en líneas para repetir desde la jugada 1, con el
+servidor contestando por el rival. Cierra el **tercer ítem de la fase 3** del
+roadmap, que **sigue abierta** con "re-juega desde el error" (RF-4.4), el plan
+semanal (RF-4.5) y la capa de ocupación en la pantalla de entrenamiento, así
+que sube el **patch y no el minor**, mismo criterio que en `0.2.1` a `0.2.5`,
+`0.4.1` y `0.4.2`. **No hay alcance nuevo**: RF-4.2 es alcance congelado de
+v1.0 desde el corte del **2026-09-05**, no se ha añadido ningún RF ni RNF y
+nada baja a Post 1.0 ni sube a 1.0.
+
+### Añadido
+
+- **Drill de aperturas: repetir jugando las líneas donde peor se rinde**
+  (RF-4.2), en la pestaña "Aperturas" de Entrenamiento (`/training/drills`):
+  un botón que genera la baraja desde lo que el repertorio ya sabe, la cola de
+  lo que toca hoy y el tablero donde se repite la línea. En la API, tres
+  endpoints bajo `/training/drills` —generar, la cola y jugar una jugada— con
+  `apps/api/lucia_api/services/drills.py`; las reglas puras de una línea en
+  `lucia_core.drills`, sin base de datos, sin motor y sin red, para poder
+  probarse solas (RNF-8). De dónde sale el material y qué se entiende por
+  "peor" está razonado en
+  [ADR-0019](docs/adr/0019-el-drill-de-aperturas-se-construye-sobre-las-salidas-de-la-teoria.md),
+  y las reglas que el texto del requerimiento no fijaba, en la nota "Con qué
+  reglas se cumplió RF-4.2" de
+  [docs/02-requerimientos.md](docs/02-requerimientos.md).
+  - **Un drill es una línea y no una posición.** Se recorre desde la jugada 1
+    jugando el bando propio y termina siempre en una jugada propia. Es la
+    diferencia con los puzzles de RF-4.1: una apertura no se olvida en una
+    posición, se olvida como camino —se llega a la jugada 6 por inercia y se
+    hace la de siempre—, así que empezar justo antes de la salida regalaría la
+    parte que no se recuerda.
+  - **Dos barajas del mismo material**, y lo único que las separa es por qué
+    entra cada línea: las **salidas de la teoría** (RF-3.6) y las **peores
+    aperturas** (RF-3.2). Las dos se construyen igual —el camino propio de la
+    partida hasta el punto donde se abandonó el libro, más la jugada que ahí
+    juegan los maestros—, así que una apertura que va mal pero en la que nunca
+    se abandona la teoría **no da drill**: no hay ninguna jugada que se pueda
+    enseñar como la que había que hacer, y ese problema es el de los puzzles
+    de RF-4.1.
+  - **"Peor" se mide en puntos perdidos, no con un corte por porcentaje**:
+    `partidas * (50 - %) / 100`, y la baraja se ordena por ese daño. Quince
+    partidas al 40 % cuestan punto y medio y tres al 20 % cuestan nueve
+    décimas: un corte absoluto deja fuera precisamente el agujero grande, que
+    sangra despacio y muchas veces. Medido sobre las **326 partidas reales**
+    del autor, el corte por porcentaje daba 3 líneas y ordenar por daño da 10.
+    El único umbral que queda es de hábito, **3 partidas**
+    (`MIN_GAMES_TO_DRILL`), la misma pregunta que ya se hace RF-3.6.
+  - **Generar no sale a la red**, y por eso la baraja crece con el
+    repertorio: usa solo lo que la caché del Opening Explorer ya sepa
+    ([ADR-0010](docs/adr/0010-repertorio-con-red-y-cacheado.md)), así que
+    mientras queden posiciones por consultar hay drills que todavía no
+    existen. **La pantalla lo avisa** y manda a refrescar el repertorio (RF-3.6)
+    en vez de dejar creer que no hay material. Por lo mismo, la línea termina
+    en la jugada de maestros que había que hacer y no continúa por la teoría
+    que sigue: limitación conocida y escrita.
+  - **La línea no viaja al navegador mientras el drill está abierto**: es la
+    respuesta y además diría qué va a contestar el rival. El servidor
+    comprueba jugada a jugada, contesta por el otro bando y solo al cerrarlo
+    manda la línea entera, la misma regla que en los puzzles de RF-4.1; y
+    tampoco hay barra de evaluación, por la misma razón. Fallar no cierra el
+    drill ni enseña la jugada buena; rendirse sí, como fallado.
+  - **El servidor no guarda progreso**: por dónde va la línea lo lleva la
+    pantalla (`ply`), como el número de intento de un puzzle. Un drill se
+    repite entero o no se repite.
+  - **Tabla `opening_drills`** (migración `c7b2e9f05a31`), que nace vacía y
+    guarda la línea y su motivo **congelados**, sin clave foránea a la partida
+    de la que salió, por lo mismo que el puzzle
+    ([ADR-0017](docs/adr/0017-puzzle-persistido-con-su-solucion-congelada.md)):
+    lleva encima un historial de repasos que no se puede regenerar. Su clave
+    única es `(bando, línea)` y no la partida de origen —al revés que en los
+    puzzles—, porque la gracia de un drill es que la misma línea se repite en
+    muchas partidas; eso es además lo que hace idempotente el generar.
+  - **No hay un segundo algoritmo de repaso**: un drill se reparte y vuelve
+    con el mismo SM-2 de `lucia_core.training` que los puzzles y con las
+    mismas tres notas —rendirse es fallar, recorrer la línea limpia es acertar
+    y tropezar por el camino queda en medio—.
+
+### Cambiado
+
+- **El ítem del roadmap que juntaba RF-4.2 y RF-4.4 se parte en dos**, y solo
+  el primero queda marcado: "re-juega desde el error" (**RF-4.4**) pasa a ser
+  ítem propio de la fase 3, todavía abierto. Marcar la casilla compartida
+  habría dado por cerrado algo que no lo está; es el mismo criterio con el que
+  en `0.2.4` lo que faltaba de RF-6.5 se separó de los extras del tablero.
+  RF-4.4 sigue siendo alcance congelado de v1.0 y sigue en esta fase: lo único
+  que cambia es que ya no comparte casilla. Ver
+  [docs/05-roadmap.md](docs/05-roadmap.md).
+- **`lucia_core.training` deja de ser "las reglas de los puzzles" para ser
+  "las reglas del repaso"**, con dos servicios que lo usan. `next_review` lo
+  comparten puzzles y drills; `equivalent_solutions` sigue siendo solo de los
+  puzzles, porque en una línea de apertura la respuesta es una y la dicen los
+  maestros.
+- **`Departure` (RF-3.6) lleva dos campos nuevos** —`master_moves_uci` y
+  `preceding_moves_uci`— que la comparación de repertorio no mira: son el
+  material del drill, y el camino y la jugada en UCI solo se pueden componer
+  mientras se recorre la partida. Recorrerla otra vez desde el drill sería
+  hacer dos veces el mismo trabajo, con el riesgo de que las dos pantallas no
+  coincidieran.
+- Cuatro filas nuevas del inventario de **RNF-11** (la 97 a la 100), abiertas
+  por esta pantalla y **abiertas todavía**, todas de lo que la separa de la de
+  puzzles, que es su gemela; ver
+  [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md).
+- Contrato de la API: esquemas y rutas **nuevos** (`/training/drills...`), sin
+  tocar ninguno de los existentes, así que nada de lo que ya la consumía se
+  rompe. `openapi.json` y los tipos de `packages/shared-types` regenerados con
+  `make types`.
 
 ## [0.4.2] - 2026-09-21
 

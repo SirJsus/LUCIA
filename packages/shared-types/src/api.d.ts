@@ -513,6 +513,58 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/training/drills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Player Drill Queue
+         * @description Los drills que toca repetir ahora, del más atrasado al más reciente.
+         */
+        get: operations["player_drill_queue_training_drills_get"];
+        put?: never;
+        /**
+         * Generate Opening Drills
+         * @description Crea los drills que falten a partir del repertorio y de las aperturas.
+         *
+         *     Se pide a mano, como los puzzles: quien entrena decide cuándo renovar su
+         *     baraja. Volver a pulsar solo añade lo nuevo y no toca el estado de repaso
+         *     de lo que ya había.
+         */
+        post: operations["generate_opening_drills_training_drills_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/training/drills/{drill_id}/moves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Play Drill Move
+         * @description Comprueba una jugada de la línea y contesta por el rival.
+         *
+         *     Fallar **no** cierra el drill ni enseña la jugada buena: se puede volver a
+         *     intentar, igual que en un puzzle. Rendirse (`uci` a `null`) sí lo cierra,
+         *     como fallado, y entonces se ve la línea entera.
+         */
+        post: operations["play_drill_move_training_drills__drill_id__moves_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sparring/games": {
         parameters: {
             query?: never;
@@ -889,6 +941,94 @@ export interface components {
             losses: number;
             /** Score Percent */
             score_percent: number;
+        };
+        /** DrillGenerationOut */
+        DrillGenerationOut: {
+            /** Created */
+            created: number;
+            /** Total */
+            total: number;
+            /** Positions Missing */
+            positions_missing: number;
+        };
+        /** DrillMoveIn */
+        DrillMoveIn: {
+            /** Ply */
+            ply: number;
+            /** Uci */
+            uci?: string | null;
+            /**
+             * Wrong Moves
+             * @default 0
+             */
+            wrong_moves: number;
+        };
+        /** DrillMoveOut */
+        DrillMoveOut: {
+            /** Correct */
+            correct: boolean;
+            /** Reply Uci */
+            reply_uci: string | null;
+            /** Reply San */
+            reply_san: string | null;
+            /** Fen */
+            fen: string;
+            /** Next Ply */
+            next_ply: number | null;
+            /** Finished */
+            finished: boolean;
+            /** Line San */
+            line_san: string[];
+            /** Due At */
+            due_at: string | null;
+            /** Interval Days */
+            interval_days: number | null;
+        };
+        /**
+         * DrillOut
+         * @description Un drill por hacer, sin la línea que lo resuelve.
+         */
+        DrillOut: {
+            /** Id */
+            id: number;
+            /** Reason */
+            reason: string;
+            /** Player Color */
+            player_color: string;
+            /** Opening Eco */
+            opening_eco: string | null;
+            /** Opening Name */
+            opening_name: string | null;
+            /** Games */
+            games: number;
+            /** Score Percent */
+            score_percent: number;
+            /** Fen */
+            fen: string;
+            /** First Player Ply */
+            first_player_ply: number;
+            /** Preceding Moves San */
+            preceding_moves_san: string[];
+            /** Length Plies */
+            length_plies: number;
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /** Repetitions */
+            repetitions: number;
+        };
+        /** DrillQueueOut */
+        DrillQueueOut: {
+            /** Drills */
+            drills: components["schemas"]["DrillOut"][];
+            /** Due */
+            due: number;
+            /** Total */
+            total: number;
+            /** Next Due At */
+            next_due_at: string | null;
         };
         /** EngineConfigOut */
         EngineConfigOut: {
@@ -2447,6 +2587,103 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PuzzleAnswerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    player_drill_queue_training_drills_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrillQueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_opening_drills_training_drills_post: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrillGenerationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    play_drill_move_training_drills__drill_id__moves_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                drill_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DrillMoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrillMoveOut"];
                 };
             };
             /** @description Validation Error */

@@ -10,6 +10,7 @@ import { BoardsPage } from "./features/board/BoardsPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { EnginesPage } from "./features/engines/EnginesPage";
 import { GamesPage } from "./features/games/GamesPage";
+import { DrillsPage } from "./features/training/DrillsPage";
 import { SparringGamePage } from "./features/training/SparringGamePage";
 import { SparringPage } from "./features/training/SparringPage";
 import { TrainingPage } from "./features/training/TrainingPage";
@@ -47,6 +48,12 @@ const trainingRoute = createRoute({
   component: TrainingPage,
 });
 
+const drillsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/training/drills",
+  component: DrillsPage,
+});
+
 const sparringRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/training/sparring",
@@ -77,6 +84,7 @@ const routeTree = rootRoute.addChildren([
   boardsRoute,
   boardRoute,
   trainingRoute,
+  drillsRoute,
   sparringRoute,
   sparringGameRoute,
   statsRoute,

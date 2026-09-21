@@ -5,9 +5,9 @@ Plataforma personal de entrenamiento de ajedrez. Usa **Stockfish** y **Lc0 (Leel
 > Estado: fases 0 a 2 del roadmap cerradas (importación, análisis con motor,
 > estadísticas, tablero de análisis y ocupación del tablero) y la **fase 3 en
 > marcha**: ya están los puzzles desde los errores propios con repetición
-> espaciada (RF-4.1) y el sparring contra el motor con fuerza calibrada
-> (RF-4.3), y quedan el drill de aperturas, el plan semanal y el empaquetado
-> (fase 4) para la v1.0.0. Ver
+> espaciada (RF-4.1), el drill de aperturas (RF-4.2) y el sparring contra el
+> motor con fuerza calibrada (RF-4.3), y quedan el plan semanal y el
+> empaquetado (fase 4) para la v1.0.0. Ver
 > [docs/05-roadmap.md](docs/05-roadmap.md) y [CHANGELOG.md](CHANGELOG.md).
 
 ## Estructura del monorepo
@@ -72,10 +72,14 @@ OTB, una de club— se marca como "partida propia" y pasa a contar en Partidas y
 en Estadísticas como cualquier otra), **Estadísticas** (marcador,
 ratings, aperturas con su código ECO, en qué fase se pierde más ventaja, de qué
 tipo son los errores, qué pasa cuando baja el reloj, si mejoras mes a mes y
-dónde te sales de la teoría de maestros), **Entrenamiento** (dos cosas:
+dónde te sales de la teoría de maestros), **Entrenamiento** (tres cosas:
 puzzles sacados de tus propios errores —la posición justo antes del blunder—,
 con repetición espaciada, donde los que aciertas vuelven cada vez más tarde y
-vale cualquier jugada tan buena como la del motor, no solo la suya; y
+vale cualquier jugada tan buena como la del motor, no solo la suya; el **drill
+de aperturas**, que toma las líneas donde más puntos pierdes —los puntos donde
+abandonas la teoría y las aperturas que peor se te dan— y te las hace repetir
+jugando desde la primera jugada, con la aplicación respondiendo por el rival,
+hasta la jugada que los maestros hacen ahí en lugar de la tuya; y
 **sparring**, partidas contra Stockfish con el Elo que le pongas o contra Lc0
 con una red Maia, que en vez de contenerse juega como una persona de ~1500. Una
 partida de sparring no cuenta en tus estadísticas —sería medirte contra un

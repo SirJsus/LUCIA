@@ -281,6 +281,14 @@ Cuánta teoría se sabe en cada momento es parte de la respuesta
 (`positions_missing`), y la pantalla lo dice siempre: ver la nota de RNF-1 más
 abajo.
 
+**Estas salidas son además el material del drill de aperturas** (RF-4.2, desde
+el **2026-09-21**): cada una lleva el camino que se recorrió hasta ella
+(`preceding_moves_uci`) y la jugada de maestros en UCI además de en SAN
+(`master_moves_uci`), que es lo que permite componer la línea que se repite
+jugando. De ahí sale la consecuencia de que un drill no continúe más allá de
+la salida: RF-3.6 no consulta esas posiciones. La comparación en sí no mira
+ninguno de los dos campos.
+
 **Con qué reglas se cumplió RF-3.7** (**2026-09-18**). El texto del
 requerimiento —"evolución de precisión y tipo de errores en el tiempo"— no
 dice en qué tramo ni en qué unidad; esta es la lectura que se le dio. Las
@@ -431,7 +439,82 @@ que se le dio; los topes y los tiempos son constantes con nombre en
   que en los puzzles de RF-4.1: decir a cada jugada quién va ganando convierte
   la partida en un análisis asistido.
 
-RF-4.2, RF-4.4 y RF-4.5 siguen pendientes.
+**Con qué reglas se cumplió RF-4.2** (**2026-09-21**). El texto dice "repetir
+las líneas donde mi rendimiento es peor" y no dice qué es una línea, qué es
+"peor" ni de dónde salen. Esta es la lectura que se le dio; los umbrales son
+constantes con nombre en `lucia_core.drills` y en `lucia_api.services.drills`,
+ajustables sin tocar el requerimiento ni
+[ADR-0019](adr/0019-el-drill-de-aperturas-se-construye-sobre-las-salidas-de-la-teoria.md).
+
+- **Un drill es una línea, no una posición.** Se repite desde la jugada 1
+  jugando el bando propio, y la aplicación responde por el rival hasta la
+  última jugada, que es siempre propia — una línea que acabara con la del
+  rival pediría recordar algo que no se llega a jugar. Es la diferencia con
+  los puzzles de RF-4.1, que son una posición suelta: una apertura no se
+  olvida en una posición, se olvida como camino, y así es como se recuerda.
+- **Las dos barajas comparten material y se diferencian en el criterio.**
+  "Salidas de la teoría" (RF-3.6) y "peores aperturas" (RF-3.2) se construyen
+  igual —el camino propio de una partida, corregido en el punto donde se
+  abandona el libro con la jugada más jugada por los maestros— y se eligen por
+  motivos distintos, que es lo único que las separa en pantalla (columna
+  `reason`). Consecuencia buscada: **una apertura que va mal pero en la que
+  nunca se abandona el libro no da drill**, y es honesto que no lo dé — ahí el
+  problema no es la apertura sino lo que viene después, y eso son los puzzles
+  de RF-4.1.
+- **"Peor" se mide en puntos perdidos, no en porcentaje**: `games * (50 -
+  score_percent) / 100` (`points_lost`), y la baraja se ordena por ese daño.
+  Un corte absoluto ("por debajo del 45 %") deja fuera precisamente los
+  agujeros de repertorio grandes, que sangran despacio y muchas veces: quince
+  partidas al 40 % cuestan punto y medio y tres al 20 % cuestan nueve décimas,
+  así que la primera hay que arreglarla antes aunque su porcentaje asuste
+  menos. Medido sobre las 326 partidas del autor, el corte absoluto daba 3
+  líneas y ordenar por daño da 10, encabezadas por las que de verdad cuestan
+  puntos. El único umbral que queda es de hábito: **3 partidas**
+  (`MIN_GAMES_TO_DRILL`), porque con una o dos un mal marcador es mala suerte
+  — la misma pregunta que ya se hace RF-3.6.
+- **Una salida de la que no se pueda afirmar ninguna respuesta no genera
+  drill.** Sin jugada de maestros en esa posición no hay nada que enseñar, y
+  un drill sin solución solo enseñaría a adivinar: es la misma regla con la
+  que RF-10.3 decide que un error sin respuesta afirmable no genera puzzle.
+- **La línea no viaja al navegador mientras el drill está abierto**: es la
+  respuesta. El servidor comprueba jugada a jugada, contesta por el rival y
+  solo al cerrarlo manda la línea entera. Es la misma regla de RF-4.1, y aquí
+  además es lo que permite que el rival responda sin que el navegador sepa qué
+  viene. Fallar no cierra el drill ni enseña la jugada buena; rendirse sí lo
+  cierra, como fallado. Por lo mismo que en los puzzles, esta pantalla tampoco
+  tiene barra de evaluación.
+- **El servidor no guarda progreso.** Por dónde va la línea lo lleva la
+  pantalla (`ply`), como el número de intento de un puzzle. Un drill a medias
+  no es un estado que valga la pena conservar: se repite entero o no se
+  repite.
+- **El repaso es el mismo SM-2 de los puzzles** (`lucia_core.training`):
+  rendirse es fallar, recorrer la línea limpia es acertar, y tropezar por el
+  camino queda en medio. No hay dos algoritmos de repaso que mantener ni dos
+  comportamientos que explicar.
+- **Los drills se generan a mano**, con un botón, como los puzzles, y generar
+  es idempotente —la clave es `(bando, línea)`—, así que volver a pulsar solo
+  añade lo nuevo y no toca el estado de repaso de lo que ya había. Generar
+  **no sale a la red**: usa lo que la caché del explorador ya sepa, y si falta
+  teoría faltan drills, así que la pantalla dice cuántas posiciones quedan por
+  consultar y manda a refrescar el repertorio en vez de dejar creer que no hay
+  material. Sobre las 326 partidas del autor, con la caché refrescada a 150
+  posiciones, salían 49 salidas de teoría —la mayoría en los plies 2-3—, 10
+  drills y 42 posiciones todavía por consultar: la baraja crece según se
+  refresca el repertorio.
+- **La línea no continúa más allá de la salida**, y es una limitación
+  conocida: termina en la jugada de maestros que había que hacer, no sigue por
+  la línea principal. Seguir pediría posiciones que RF-3.6 nunca consulta, y
+  la caché del explorador se llena despacio y a propósito
+  ([ADR-0010](adr/0010-repertorio-con-red-y-cacheado.md)).
+
+El drill se guarda entero, con su línea y su motivo congelados y sin enlace a
+la partida de la que salió, por la misma razón que los puzzles
+([ADR-0017](adr/0017-puzzle-persistido-con-su-solucion-congelada.md)): lleva
+encima un historial de repasos que no está en ninguna otra parte. De dónde
+sale el material y cómo se mide "peor" está razonado en
+[ADR-0019](adr/0019-el-drill-de-aperturas-se-construye-sobre-las-salidas-de-la-teoria.md).
+
+RF-4.4 y RF-4.5 siguen pendientes.
 
 ### RF-5 · Interfaz
 

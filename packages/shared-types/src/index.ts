@@ -51,6 +51,10 @@ export type Puzzle = Schemas["PuzzleOut"];
 export type PuzzleQueue = Schemas["PuzzleQueueOut"];
 export type PuzzleGeneration = Schemas["PuzzleGenerationOut"];
 export type PuzzleAnswer = Schemas["PuzzleAnswerOut"];
+export type Drill = Schemas["DrillOut"];
+export type DrillQueue = Schemas["DrillQueueOut"];
+export type DrillGeneration = Schemas["DrillGenerationOut"];
+export type DrillMove = Schemas["DrillMoveOut"];
 export type SparringGame = Schemas["SparringGameOut"];
 export type SparringGameCreate = Schemas["SparringGameCreate"];
 
@@ -78,6 +82,12 @@ export type MistakeType = "time" | "tactical" | "endgame" | "positional";
  * valía una jugada, la partida cambió de manos, o había una ganada y se
  * escapó. */
 export type CriticalMomentKind = "only_move" | "swing" | "missed_chance";
+
+/** De qué baraja salió un drill de aperturas (RF-4.2): de un punto donde te
+ * sales de la teoría (RF-3.6) o de una apertura que rinde mal (RF-3.2). El
+ * OpenAPI lo expone como `string` y este tipo es la fuente de verdad para la
+ * UI, como las clasificaciones. */
+export type DrillReason = "departure" | "opening";
 
 /** Por qué terminó una partida de sparring (`lucia_core.sparring`, RF-4.3).
  * Como las clasificaciones, el OpenAPI lo expone como `string` y este tipo es

@@ -2,18 +2,18 @@
  * sección, lo que hace la pantalla concreta y la navegación entre las formas
  * de entrenar.
  *
- * Está en un solo sitio porque las tres pantallas —los puzzles (RF-4.1), la
- * antesala del sparring y una partida de sparring (RF-4.3)— son la misma
- * sección y tienen que encabezarse igual (criterio C-2 de
+ * Está en un solo sitio porque todas las pantallas de la sección —los puzzles
+ * (RF-4.1), el drill de aperturas (RF-4.2), la antesala del sparring y una
+ * partida de sparring (RF-4.3)— tienen que encabezarse igual (criterio C-2 de
  * docs/07-coherencia-ui.md); lo único que cambia es la frase, que llega como
  * `children`.
  *
- * "Entrenamiento" tiene varias pantallas —y le faltan el drill de aperturas
- * (RF-4.2) y el plan semanal (RF-4.5)—, así que la elección vive dentro de la
- * sección y no en la navegación principal, que si no crecería una entrada por
- * cada forma de entrenar. Los enlaces se ven como el enlace activo de la
- * navegación principal y salen de la misma receta (`buttonClasses`), para que
- * "dónde estoy" se lea igual en los dos sitios.
+ * "Entrenamiento" tiene varias pantallas —y le falta todavía el plan semanal
+ * (RF-4.5)—, así que la elección vive dentro de la sección y no en la
+ * navegación principal, que si no crecería una entrada por cada forma de
+ * entrenar. Los enlaces se ven como el enlace activo de la navegación
+ * principal y salen de la misma receta (`buttonClasses`), para que "dónde
+ * estoy" se lea igual en los dos sitios.
  */
 import { Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
@@ -24,6 +24,7 @@ import { buttonClasses, NAV_LINK_CLASSES } from "../../components/styles";
  * no lo lleva porque tiene una pantalla debajo, la de una partida concreta. */
 const TRAINING_TABS = [
   { to: "/training", label: "Puzzles", exact: true },
+  { to: "/training/drills", label: "Aperturas", exact: false },
   { to: "/training/sparring", label: "Sparring", exact: false },
 ] as const;
 
