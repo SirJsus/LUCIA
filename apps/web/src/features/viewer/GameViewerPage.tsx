@@ -44,6 +44,7 @@ import {
   type EngineId,
 } from "../../lib/format";
 import { moveNumberLabel, plyFromFen } from "../../lib/moves";
+import { SparringSetupForm, type SparringSetup } from "../training/SparringSetupForm";
 import { fromPgn } from "../board/tree";
 import { whiteWinPercentAfterMove } from "../../lib/score";
 import { CriticalMoments } from "./CriticalMoments";
@@ -140,6 +141,30 @@ export function GameViewerPage() {
       });
     },
     onSuccess: (board) => navigate({ to: "/boards/$boardId", params: { boardId: String(board.id) } }),
+  });
+
+  // --- Jugar desde aquí contra el motor (RF-4.4) ---
+  // La otra puerta de "re-juega desde el error", además de la lista curada de
+  // `features/training/ReplaysPage`: desde aquí se retoma **cualquier**
+  // posición de la partida, no solo los errores graves.
+  // Se retoma la que hay **en pantalla**, y por eso se manda `currentPly + 1`:
+  // el ply de la API cuenta jugadas ya hechas y el del visor es el índice de
+  // la última jugada hecha. Se manda la partida y la jugada, no el FEN: la
+  // posición la deriva el servidor de lo que ya tiene guardado, que es lo que
+  // mantiene esto del lado de RF-4.4 y no de RF-11.1 (ver
+  // `routers/sparring.py::GamePositionIn` y ADR-0020).
+  const [isReplayFormOpen, setReplayFormOpen] = useState(false);
+  const startReplayMutation = useMutation({
+    mutationFn: (setup: SparringSetup) =>
+      api.startSparringGame({
+        ...setup,
+        origin: { game_id: id, ply: currentPly + 1 },
+      }),
+    onSuccess: (sparringGame) =>
+      navigate({
+        to: "/training/sparring/$sparringGameId",
+        params: { sparringGameId: String(sparringGame.id) },
+      }),
   });
 
   // Con análisis terminados de dos motores distintos se puede comparar (RF-2.6).
@@ -316,6 +341,17 @@ export function GameViewerPage() {
           >
             {openAsBoardMutation.isPending ? "Abriendo…" : "Abrir como tablero"}
           </Button>
+          {/* Junto a "Abrir como tablero" porque las dos se llevan la partida
+              de aquí a otra pantalla; esta se lleva solo la posición, para
+              seguir jugándola contra el motor. Tampoco necesita análisis: se
+              puede retomar cualquier posición (criterio C-3). */}
+          <Button
+            onClick={() => setReplayFormOpen(!isReplayFormOpen)}
+            disabled={startReplayMutation.isPending}
+            title="Abre una partida contra el motor desde la posición que estás viendo. No toca esta partida ni su análisis."
+          >
+            {isReplayFormOpen ? "Cancelar" : "Jugar desde aquí"}
+          </Button>
           <Button
             variant="primary"
             onClick={() => analyzeMutation.mutate()}
@@ -330,6 +366,27 @@ export function GameViewerPage() {
         </div>
       </div>
 
+      {isReplayFormOpen && (
+        <Panel title={`Jugar desde la jugada ${moveNumberLabel(currentPly + startingPly + 1)}`}>
+          {/* El bando que se ofrece es el que tiene el turno en esa posición,
+              que es lo que se viene a hacer: seguir desde ahí. Se puede
+              cambiar, y entonces abre el motor.
+
+              El botón dice "Retomar la partida", igual que en la lista de
+              re-jugar: es la misma acción desde otra pantalla (criterio C-2).
+              "Empezar partida" es la de Sparring, que es otra cosa —una
+              partida desde cero— y por eso conserva su nombre. */}
+          <SparringSetupForm
+            defaultPlayerColor={plyFromFen(currentFen) % 2 === 0 ? "white" : "black"}
+            submitLabel="Retomar la partida"
+            pendingLabel="Abriendo partida…"
+            isPending={startReplayMutation.isPending}
+            onSubmit={(setup) => startReplayMutation.mutate(setup)}
+          />
+        </Panel>
+      )}
+
+      {startReplayMutation.isError && <ErrorBox error={startReplayMutation.error} />}
       {analyzeMutation.isError && <ErrorBox error={analyzeMutation.error} />}
       {exportPgnMutation.isError && <ErrorBox error={exportPgnMutation.error} />}
       {openAsBoardMutation.isError && <ErrorBox error={openAsBoardMutation.error} />}

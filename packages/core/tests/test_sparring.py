@@ -11,6 +11,7 @@ import pytest
 from lucia_core.sparring import (
     GameEnding,
     board_after_moves,
+    board_at_ply,
     ending_of,
     moves_san,
     resignation_ending,
@@ -112,3 +113,34 @@ def test_a_game_from_another_position_declares_it_in_the_headers() -> None:
     pgn = to_pgn(fen, ["e2e4"], white="ana", black="Lc0 · Maia", ending=None)
     assert '[SetUp "1"]' in pgn
     assert f'[FEN "{fen}"]' in pgn
+
+
+def test_a_game_can_be_retaken_from_any_of_its_positions() -> None:
+    """RF-4.4: `ply` cuenta jugadas ya hechas, así que el ply de un error es
+    la posición **anterior** a ese error, la que hay que jugar de otra manera."""
+    pgn = '[White "ana"]\n[Black "beto"]\n[Result "*"]\n\n1. e4 e5 2. Nf3 Nc6 *\n'
+    assert board_at_ply(pgn, 0).fen() == chess.STARTING_FEN
+    assert board_at_ply(pgn, 2).fen().startswith(
+        "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w"
+    )
+    # Hasta el final de la partida, que es una posición legítima de la que
+    # seguir jugando.
+    assert board_at_ply(pgn, 4).fen().startswith("r1bqkbnr/pppp1ppp/2n5/4p3")
+
+
+def test_retaking_a_ply_the_game_never_reached_is_refused() -> None:
+    pgn = '[White "ana"]\n[Black "beto"]\n[Result "*"]\n\n1. e4 e5 *\n'
+    with pytest.raises(ValueError):
+        board_at_ply(pgn, 9)
+
+
+def test_a_text_without_a_game_is_refused() -> None:
+    with pytest.raises(ValueError):
+        board_at_ply("", 0)
+
+
+def test_a_text_that_is_not_a_game_has_no_position_to_retake() -> None:
+    """Un texto cualquiera se lee como una partida sin jugadas, así que lo que
+    lo delata es pedirle una jugada que no tiene."""
+    with pytest.raises(ValueError):
+        board_at_ply("esto no es un PGN", 1)

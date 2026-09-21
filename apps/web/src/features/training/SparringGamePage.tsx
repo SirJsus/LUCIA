@@ -1,6 +1,12 @@
 /** Una partida de sparring en marcha (RF-4.3): el tablero donde se juega y el
  * panel que dice contra quién, cómo va y cómo acabó.
  *
+ * **También las retomadas** (RF-4.4): una partida que empieza a mitad de una
+ * propia se juega aquí igual que cualquier otra, y lo único que añade es de
+ * dónde salió, con enlace de vuelta al visor. Quien mueve primero es quien
+ * tenga el turno en la posición de partida, que puede ser cualquiera de los
+ * dos.
+ *
  * **El servidor es el rival y también el árbitro.** Aquí no se guarda la
  * partida: se manda la jugada y vuelve el estado entero —posición, jugadas,
  * resultado— con la respuesta del motor ya dentro. Por eso la pantalla no
@@ -33,6 +39,7 @@ import {
 } from "../../components/styles";
 import { api } from "../../lib/api";
 import { formatBoardTitleFromPgnHeaders } from "../../lib/format";
+import { moveNumberLabel } from "../../lib/moves";
 import { fromPgn } from "../board/tree";
 import { outcomeFor, outcomeSentence, turnsOf } from "./sparring";
 import { SPARRING_GAMES_QUERY_KEY } from "./SparringPage";
@@ -152,6 +159,26 @@ export function SparringGamePage() {
                 ? "Stockfish jugando al Elo que le pediste: juega bien y se contiene."
                 : "Lc0 con una red Maia: imita a una persona de ~1500, con sus errores."}
             </p>
+            {/* De dónde salió, cuando se retomó una partida propia (RF-4.4):
+                sin esto, una partida que empieza a mitad no dice por qué
+                empieza ahí. El número se saca del `origin_ply`, que es
+                relativo al inicio de la partida de origen: si esa empezaba en
+                una posición dada, el visor la numera desde su jugada real y
+                aquí sale otro número (fila 101 del inventario, criterio
+                C-5). */}
+            {game.origin_game_id !== null && game.origin_ply !== null && (
+              <p className="mt-2 text-xs opacity-70">
+                Retomada desde la jugada {moveNumberLabel(game.origin_ply)} de{" "}
+                <Link
+                  to="/games/$gameId"
+                  params={{ gameId: String(game.origin_game_id) }}
+                  className="underline"
+                >
+                  una partida tuya
+                </Link>
+                .
+              </p>
+            )}
           </Panel>
 
           {moveMutation.isError && <ErrorBox error={moveMutation.error} />}

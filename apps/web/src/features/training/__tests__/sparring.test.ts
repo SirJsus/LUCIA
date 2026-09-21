@@ -14,6 +14,8 @@ function game(overrides: Partial<SparringGame>): SparringGame {
     player_color: "white",
     engine: "stockfish",
     engine_elo: 1500,
+    origin_game_id: null,
+    origin_ply: null,
     opponent_name: "Stockfish (1500)",
     fen: "",
     moves_san: [],

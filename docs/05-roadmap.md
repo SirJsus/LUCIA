@@ -757,15 +757,15 @@ entregado. Lo que sí es alcance —RF-3.8— se dice expresamente.
 
 ## Fase 3 · Entrenamiento (P1/P2)
 
-> **Abierta.** De sus cinco ítems están cerrados los tres primeros —puzzles
-> (2026-09-19, versión `0.4.1`), sparring (2026-09-21, versión `0.4.2`) y drill
-> de aperturas (2026-09-21, versión `0.4.3`)—; quedan los dos siguientes
-> —"re-juega desde el error" (RF-4.4) y plan semanal (RF-4.5)—, más enchufar la
-> capa de ocupación de RF-7 en esta tercera pantalla, que la fase 2 dejó dicho
-> que se haría cuando existiera. Eran cuatro ítems hasta el **2026-09-21**:
-> RF-4.2 y RF-4.4 compartían uno y se separaron al entregarse el primero, para
-> no marcar como hecho lo que no lo está — el mismo criterio con el que RF-6.5
-> se separó de los extras del tablero en la fase 2.
+> **Abierta.** De sus cinco ítems están cerrados los cuatro primeros —puzzles
+> (2026-09-19, versión `0.4.1`), sparring (2026-09-21, versión `0.4.2`), drill
+> de aperturas (2026-09-21, versión `0.4.3`) y "re-juega desde el error"
+> (2026-09-21, versión `0.4.4`)—; queda el plan semanal (RF-4.5), más enchufar
+> la capa de ocupación de RF-7 en las pantallas de entrenamiento, que la fase 2
+> dejó dicho que se haría cuando existieran. Eran cuatro ítems hasta el
+> **2026-09-21**: RF-4.2 y RF-4.4 compartían uno y se separaron al entregarse
+> el primero, para no marcar como hecho lo que no lo estaba — el mismo criterio
+> con el que RF-6.5 se separó de los extras del tablero en la fase 2.
 
 - [x] Puzzles desde mis errores con repetición espaciada, aceptando como buena
       cualquier jugada equivalente y no solo la única del motor (RF-4.1 con
@@ -941,13 +941,62 @@ entregado. Lo que sí es alcance —RF-3.8— se dice expresamente.
         la partida, y recorrerla otra vez desde el drill sería hacer dos veces
         el mismo trabajo con el riesgo de que las dos pantallas no coincidan.
       - 23 tests nuevos —11 de API y 12 del núcleo— más 6 del front.
-- [ ] "Re-juega desde el error" (**RF-4.4**). Separado del ítem anterior el
-      **2026-09-21**, al entregarse RF-4.2: los dos compartían casilla y
-      marcarla habría dado por cerrado algo que no lo está. Sigue siendo
-      alcance congelado de v1.0 y sigue en esta fase. Lo que daba por pendiente
-      —que el motor **juegue** y no solo analice— ya lo resolvió RF-4.3 con
-      `EngineBridge.play`, y `sparring_games.starting_fen` es columna
-      precisamente para poder arrancar desde la posición del error.
+- [x] "Re-juega desde el error" (**RF-4.4**). Separado del ítem anterior el
+      **2026-09-21**, al entregarse RF-4.2 —los dos compartían casilla y
+      marcarla habría dado por cerrado algo que no lo estaba—, y cerrado ese
+      mismo día: la pestaña "Re-jugar" dentro de Entrenamiento
+      (`/training/replays`) con los errores propios que más caros salieron, el
+      botón "Jugar desde aquí" en el visor, `GET /training/replays` —que solo
+      lista y no crea nada—, un `origin` nuevo en `POST /sparring/games`, las
+      columnas `origin_game_id` y `origin_ply` de `sparring_games` (migración
+      `d5a81c6e3f04`) y la regla pura que saca la posición de un PGN,
+      `board_at_ply`, en `lucia_core.sparring`. Las reglas que el texto del RF
+      no fijaba están en la nota "Con qué reglas se cumplió RF-4.4" de
+      [02-requerimientos.md](02-requerimientos.md), y por qué esto no es una
+      tabla nueva ni mete RF-11 dentro de v1.0, en
+      [ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md).
+
+      - **Retomar es sparring desde otra posición**, no otra forma de jugar:
+        misma tabla, mismos endpoints, misma pantalla de juego y mismo
+        listado, donde una partida retomada se distingue con una insignia. Lo
+        que este ítem daba por pendiente —que el motor **juegue** y no solo
+        analice— lo había resuelto RF-4.3 con `EngineBridge.play`, y
+        `starting_fen` ya era columna precisamente para esto; lo que se añade
+        es de dónde sale la posición y de dónde salió la partida. Una partida
+        retomada **tampoco cuenta** en estadísticas ni en patrones (RF-3), por
+        la misma frontera que el sparring de RF-4.3.
+      - **La lista de errores no se guarda**: se deduce de los análisis cada
+        vez que se pregunta ([ADR-0008](adr/0008-patrones-deducidos-al-leer.md)),
+        que es la decisión **contraria** a la de los puzzles y los drills
+        ([ADR-0017](adr/0017-puzzle-persistido-con-su-solucion-congelada.md)).
+        La diferencia es el estado propio: una posición desde la que re-jugar
+        no se repasa, no vence y no acumula intentos, así que persistirla solo
+        daría una segunda copia que envejece en cuanto se reanaliza la
+        partida. Por lo mismo no hay botón de generar: la pestaña está llena
+        en cuanto hay una partida analizada.
+      - **Por HTTP se manda de qué partida y de qué jugada, nunca un FEN.** La
+        posición la deriva el servidor del PGN que ya tiene (`board_at_ply`
+        sobre `games.pgn`), y eso es deliberado: es lo que mantiene la
+        frontera con **RF-11.1**, que sigue congelado fuera de v1.0 (ver la
+        fase 6 en Post 1.0, actualizada con esto).
+      - **Se retoma cualquier posición y con cualquier bando** desde el visor,
+        que es una lectura generosa de "desde la posición del blunder": una
+        apertura que va mal se rehace desde la jugada 6 y no desde la 24.
+        Quién abre no es "las blancas" sino quien tenga el turno en esa
+        posición. La pestaña sí se ciñe a los errores graves, los mismos que
+        dan puzzle (`PUZZLE_CLASSIFICATIONS`) y ordenados por lo que costaron:
+        la libertad está en el visor y la lista curada responde a "¿por dónde
+        empiezo?".
+      - **`origin_game_id` / `origin_ply` son procedencia, no dependencia**:
+        `ON DELETE SET NULL` y sin cascada, porque borrar la partida de origen
+        no invalida lo jugado —la posición vive en `starting_fen`, que es lo
+        que hace la partida jugable—, solo deja de haber adónde volver.
+      - **El formulario de dificultad pasa a ser compartido** por las tres
+        pantallas desde las que se abre una partida contra el motor
+        (`features/training/SparringSetupForm.tsx`). El inventario de RNF-11
+        gana tres filas (101 a 103) y se cierran ocho arreglos en el mismo
+        commit; ver [07-coherencia-ui.md](07-coherencia-ui.md).
+      - 13 tests nuevos: 9 de API, 3 del núcleo y 1 del front.
 - [ ] Plan semanal de entrenamiento (RF-4.5).
 - [ ] Capa de ocupación (RF-7.1 a 7.7) en la pantalla de entrenamiento, que la
       fase 2 dejó pendiente de que esa pantalla existiera.
@@ -1024,6 +1073,19 @@ así que lo que le queda a RF-11 es solo suyo: arrancar de una posición elegida
 con ventaja material y la segunda perilla de dificultad. Sigue fuera del
 alcance de v1.0 —se planteó después del corte y esto no lo cambia—, solo que
 ahora no lo bloquea nada.
+
+**Y jugar desde una posición que no es la inicial también quedó resuelto** el
+**2026-09-21**, con RF-4.4: `sparring_games.starting_fen` ya lleva posiciones
+que no son la estándar, el PGN de esas partidas ya sale con `[SetUp "1"]` y el
+turno de salida ya lo decide la posición. **RF-11.1 sigue entero fuera de
+v1.0**, y comprobado sobre el código lo que le falta son dos cosas que ningún
+requerimiento de 1.0 adelanta: la **posición inventada** —hoy la deriva siempre
+el servidor del PGN de una partida propia ya guardada y por HTTP no se acepta
+un FEN, a propósito
+([ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md))—
+y la **ventaja material como perilla** (RF-11.2), de la que no existe nada.
+RF-11.3 tampoco está adelantado: una partida de sparring, retomada o no, no se
+escribe en `games`, y publicarla sigue siendo el acto explícito de RF-6.5.
 
 - [ ] Jugar contra el motor desde una posición inicial personalizada, eligiendo
       color y bando con ventaja (RF-11.1).

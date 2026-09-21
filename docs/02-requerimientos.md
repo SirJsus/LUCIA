@@ -514,7 +514,72 @@ encima un historial de repasos que no está en ninguna otra parte. De dónde
 sale el material y cómo se mide "peor" está razonado en
 [ADR-0019](adr/0019-el-drill-de-aperturas-se-construye-sobre-las-salidas-de-la-teoria.md).
 
-RF-4.4 y RF-4.5 siguen pendientes.
+**Con qué reglas se cumplió RF-4.4** (**2026-09-21**). El texto dice "retomar
+una partida propia desde la posición del blunder contra el motor" y no dice si
+eso es una forma distinta de jugar, desde cuántas posiciones se puede retomar
+ni de dónde sale la posición. Esta es la lectura que se le dio; los topes son
+constantes con nombre en `lucia_api.routers.replays`, ajustables sin tocar el
+requerimiento ni
+[ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md).
+
+- **Retomar es sparring desde otra posición, no otra cosa.** Misma tabla
+  (`sparring_games`, que gana `origin_game_id` y `origin_ply`), mismo ciclo de
+  endpoints, misma pantalla de juego y mismo listado, donde una partida
+  retomada se distingue con una insignia. Se abre con `POST /sparring/games`
+  pasando un `origin`, y a partir de ahí no hay nada distinto que hacer: las
+  reglas, el árbitro, el final y el camino para analizarla después (RF-6.6 +
+  RF-6.9) son los de RF-4.3. Una partida retomada **tampoco cuenta** en
+  estadísticas ni en patrones, por el mismo motivo.
+- **`origin_game_id`/`origin_ply` son procedencia, no dependencia.** Sirven
+  para decir en pantalla de dónde salió la partida y llevar de vuelta al
+  visor. La clave foránea es `ON DELETE SET NULL` y no hay cascada: borrar la
+  partida de origen no invalida lo jugado —la posición vive en `starting_fen`,
+  que es lo que hace la partida jugable—, solo deja de haber adónde volver.
+- **La lista de errores desde los que re-jugar no se guarda**: se deduce de
+  los análisis al leer (`GET /training/replays`), como los patrones de RF-3
+  ([ADR-0008](adr/0008-patrones-deducidos-al-leer.md)). Es la decisión
+  **contraria** a la de los puzzles (RF-4.1) y los drills (RF-4.2), y la
+  diferencia es el estado propio: un puzzle arrastra un historial de repasos
+  SM-2 que no está en ninguna otra parte y por eso se persiste con su solución
+  congelada ([ADR-0017](adr/0017-puzzle-persistido-con-su-solucion-congelada.md));
+  una posición desde la que re-jugar no se repasa, no vence y no acumula
+  intentos, así que guardarla solo daría una segunda copia que envejece en
+  cuanto se reanaliza la partida. No hay botón de generar: la pestaña está
+  llena en cuanto hay una partida analizada.
+- **La posición la deriva el servidor del PGN guardado** (`board_at_ply` sobre
+  `games.pgn`). Por HTTP se manda **de qué partida y de qué jugada**, nunca un
+  FEN, y esto es deliberado: es lo que mantiene la frontera con **RF-11.1**
+  (jugar desde una posición inicial personalizada), que sigue congelado fuera
+  de v1.0. `ply` cuenta jugadas ya hechas, así que retomar justo antes de un
+  error es pedir el ply de ese error, que es como lo numera `AnalyzedMove`.
+- **Se puede retomar cualquier posición de la partida y con cualquier bando**,
+  desde el botón "Jugar desde aquí" del visor. Es una lectura generosa de
+  "desde la posición del blunder", que se toma como el caso que importa y no
+  como una restricción: una apertura que va mal se rehace desde la jugada 6 y
+  no desde la 24. **No invade RF-11.1** porque las posiciones siguen saliendo
+  de partidas propias ya guardadas —no de un FEN pegado ni del editor de
+  posición de RF-6.1—, no hay ninguna perilla de ventaja material (RF-11.2) y
+  la partida no se guarda en `games` con `[SetUp "1"]` (RF-11.3). La pestaña
+  "Re-jugar" sí se ciñe a los errores graves, los mismos que dan puzzle
+  (`PUZZLE_CLASSIFICATIONS`), ordenados por lo que costaron: la libertad está
+  en el visor, la lista curada responde a "¿por dónde empiezo?".
+- **Quién abre no es "las blancas"** sino quien tenga el turno en la posición
+  de partida, que retomando a mitad puede ser cualquiera de los dos. El bando
+  que la pantalla ofrece por defecto es el que se jugaba en la partida
+  original —en el visor, el que tiene el turno en la posición que se está
+  viendo—, y se puede cambiar.
+- **Lo que costó el error viaja en la lista**, al revés que en un puzzle
+  abierto: no hay nada que adivinar —la jugada que se hizo está a la vista y
+  de lo que se trata es de jugar la posición mejor de lo que se jugó— y saber
+  cuánto costó es lo que dice por cuál empezar. No contradice a RF-4.1: allí
+  se esconde lo que resuelve el ejercicio, y aquí el ejercicio es la partida
+  entera.
+
+Razonado en
+[ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md),
+que también deja escrito por qué esto no mete RF-11 dentro de v1.0.
+
+RF-4.5 sigue pendiente.
 
 ### RF-5 · Interfaz
 
@@ -1006,13 +1071,34 @@ Notas técnicas, para cuando se retome:
   el servidor y PGN derivado. RF-11.1 hereda eso resuelto y lo que le queda es
   su parte propia: arrancar de una posición con ventaja (`starting_fen` ya es
   columna, precisamente para esto) y la segunda perilla de dificultad.
+- **Y jugar desde una posición que no es la inicial también está resuelto**
+  (**2026-09-21**, con RF-4.4). "Re-juega desde el error" retoma una partida
+  propia desde cualquiera de sus posiciones: `starting_fen` ya lleva
+  posiciones que no son la estándar, `to_pgn` ya escribe `[SetUp "1"]` +
+  `[FEN ...]`, el turno de salida ya sale de la posición y no del color, y la
+  pantalla de juego ya no da por hecho que una partida empieza por el
+  principio. **RF-11.1 sigue entero fuera de v1.0**, y lo que le falta de
+  verdad después de esto son dos cosas, ninguna de ellas casual:
+  - **La posición inventada.** Hoy la posición la deriva siempre el servidor
+    del PGN de una partida propia ya guardada (`{game_id, ply}`); por HTTP
+    **no se acepta un FEN**, a propósito, que es justamente lo que mantiene la
+    frontera ([ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md)).
+    RF-11.1 pide lo contrario: la posición del editor de RF-6.1 o un FEN
+    pegado, es decir, una posición que nunca se jugó.
+  - **La ventaja material como perilla** (RF-11.2). No existe nada de esto:
+    ni quitar piezas antes de empezar, ni elegir qué bando va con ventaja, ni
+    la pantalla que distingue "motor débil" de "motor fuerte con una torre de
+    menos". Es el corazón de RF-11 y no lo adelanta ningún requerimiento de
+    v1.0.
 - **RF-11.3 está medio adelantado.** La frontera que pide —una partida contra
   el motor que se guarda y se analiza pero **no cuenta** en RF-3— ya se trazó
   para el sparring en
   [ADR-0018](adr/0018-sparring-en-su-propia-tabla-y-el-servidor-como-arbitro.md):
   tabla propia y análisis por el camino de RF-6.6 + RF-6.9. Lo que falta por
   decidir es si una partida con ventaja se guarda en esa misma tabla o en
-  `games` con `[SetUp "1"]`, como dice hoy el texto del requerimiento.
+  `games` con `[SetUp "1"]`, como dice hoy el texto del requerimiento. RF-4.4
+  empuja hacia lo primero: `sparring_games` ya guarda partidas que empiezan en
+  cualquier posición y ya sabe de dónde salió cada una.
 
 ### Requerimientos no funcionales (Post 1.0)
 

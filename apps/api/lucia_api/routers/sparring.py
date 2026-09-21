@@ -6,6 +6,11 @@ El ciclo de la pantalla es el de estos endpoints: se abre una partida
 eligiendo color y rival, se manda una jugada y en la misma respuesta vuelve la
 del motor, y se abandona si uno quiere.
 
+**Retomar una partida propia es este mismo ciclo** (RF-4.4): `POST
+/sparring/games` acepta un `origin` —de qué partida y de qué jugada— y a
+partir de ahí no hay nada distinto que hacer. Qué posiciones merecen retomarse
+las lista `routers/replays.py`, que es solo una lista y no crea nada.
+
 **Aquí el servidor valida las jugadas**, al revés que en el tablero de
 análisis, donde quien sabe de reglas es chess.js y la API solo guarda el árbol
 que le mandan. La diferencia es que aquí el servidor juega: para contestar
@@ -36,6 +41,7 @@ from lucia_api.services.sparring import (
     STOCKFISH_ELO_RANGE,
     create_game,
     current_board,
+    get_game_position,
     list_games,
     missing_requirement,
     play_player_move,
@@ -60,6 +66,13 @@ class SparringGameOut(BaseModel):
     engine_elo: int | None
     """Solo con Stockfish. `null` con Lc0, cuya fuerza es la de la red Maia
     cargada y no un número que se le pueda pedir."""
+    origin_game_id: int | None
+    origin_ply: int | None
+    """De qué partida propia y de qué jugada se retomó esta (RF-4.4), o `null`
+    si empieza desde el principio. Con ellos la pantalla puede decir de dónde
+    salió y llevar de vuelta al visor. `origin_game_id` queda a `null` si esa
+    partida se borró del historial: lo jugado aquí sigue valiendo, pero ya no
+    hay adónde volver."""
     opponent_name: str
     """Cómo se llama el rival en pantalla y en el PGN: "Stockfish (1500)" o
     "Lc0 · Maia". Se compone aquí para que no haya dos versiones del nombre,
@@ -92,12 +105,30 @@ class SparringGameOut(BaseModel):
     updated_at: dt.datetime
 
 
+class GamePositionIn(BaseModel):
+    """Desde qué posición de qué partida propia se retoma (RF-4.4)."""
+
+    game_id: int
+    ply: int = Field(ge=0)
+    """Jugadas ya hechas: 0 es el principio de la partida, y `ply` es la
+    posición **anterior** a la jugada número `ply`. Retomar justo antes de un
+    error es pedir el ply de ese error, que es como lo numera `AnalyzedMove`."""
+
+
 class SparringGameCreate(BaseModel):
     player_color: str = Field(pattern="^(white|black)$")
     engine: str = Field(default="stockfish")
     engine_elo: int | None = None
     """Obligatorio con Stockfish, ignorado con Lc0. El rango se comprueba en
     el endpoint, contra `STOCKFISH_ELO_RANGE`."""
+    origin: GamePositionIn | None = None
+    """De dónde se retoma (RF-4.4). Sin esto la partida empieza en la posición
+    inicial, que es el sparring de siempre (RF-4.3).
+
+    Se manda **de qué partida y de qué jugada**, y no un FEN: la posición la
+    deriva el servidor del PGN que ya tiene. Aceptar una posición cualquiera
+    por HTTP sería empezar desde una posición inventada, que es RF-11.1 y está
+    fuera del alcance de v1.0."""
 
 
 class SparringMoveIn(BaseModel):
@@ -111,14 +142,23 @@ async def start_sparring_game(
     session: Annotated[AsyncSession, Depends(get_session)],
     username: str | None = None,
 ) -> SparringGameOut:
-    """Abre una partida contra el motor. Si el motor lleva blancas, ya ha
-    movido cuando la respuesta llega."""
+    """Abre una partida contra el motor, desde el principio o retomando una
+    partida propia (RF-4.4). Si al motor le toca mover, ya ha movido cuando la
+    respuesta llega."""
     if body.engine not in SPARRING_ENGINE_NAMES:
         raise HTTPException(
             status_code=404,
             detail=f"motor desconocido: {body.engine!r}. Conocidos: {list(SPARRING_ENGINE_NAMES)}",
         )
     engine_elo = _validated_elo(body) if body.engine == "stockfish" else None
+    try:
+        origin = (
+            await get_game_position(session, body.origin.game_id, body.origin.ply)
+            if body.origin
+            else None
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=422, detail=str(error)) from error
     missing_engine_requirement = missing_requirement(body.engine)
     if missing_engine_requirement is not None:
         raise HTTPException(
@@ -131,6 +171,7 @@ async def start_sparring_game(
         player_color=body.player_color,
         engine_name=body.engine,
         engine_elo=engine_elo,
+        origin=origin,
     )
     return _to_out(game, resolved_username(username))
 
@@ -232,6 +273,8 @@ def _to_out(game: SparringGame, player_name: str) -> SparringGameOut:
         player_color=game.player_color,
         engine=game.engine,
         engine_elo=game.engine_elo,
+        origin_game_id=game.origin_game_id,
+        origin_ply=game.origin_ply,
         opponent_name=opponent,
         fen=board.fen(),
         moves_san=moves_san(game.starting_fen, game.moves_uci_json),

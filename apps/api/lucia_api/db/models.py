@@ -12,7 +12,8 @@ RF-4.1 (entrenamiento desde los errores propios): `Puzzle`, con su estado de
 repetición espaciada.
 RF-4.2 (drill de aperturas): `OpeningDrill`, la línea que se repite y su
 estado de repaso.
-RF-4.3 (sparring contra el motor con fuerza calibrada): `SparringGame`.
+RF-4.3 y RF-4.4 (sparring contra el motor con fuerza calibrada, y retomar
+una partida propia desde una de sus posiciones): `SparringGame`.
 
 Las columnas que no se explican solas llevan su porqué al lado; el mapa
 completo, con las relaciones y las reglas entre tablas, está en
@@ -493,7 +494,9 @@ class Puzzle(Base):
 
 
 class SparringGame(Base):
-    """Una partida jugada contra el motor con fuerza calibrada (RF-4.3).
+    """Una partida jugada contra el motor con fuerza calibrada (RF-4.3), sea
+    desde el principio o retomando una partida propia desde una de sus
+    posiciones (RF-4.4).
 
     **Guarda lo mínimo del que todo lo demás se deriva**: la posición de
     partida y las jugadas en UCI, en orden. La posición actual, el PGN y si la
@@ -521,11 +524,31 @@ class SparringGame(Base):
     Maia, cuya fuerza es la de la red que se cargó y no un número que se le
     pueda pedir, así que ahí queda a `None` (ver `services/sparring.py`)."""
     starting_fen: Mapped[str]
-    """Hoy siempre la inicial. Está en columna y no dado por supuesto porque
-    RF-4.4 ("re-juega desde el error") y RF-11.1 arrancan de otra posición, y
-    entonces no habría que migrar nada."""
+    """Desde dónde se juega: la posición inicial en una partida de sparring
+    normal (RF-4.3), o la posición de una partida propia cuando se retoma
+    desde ahí (RF-4.4). Se guarda la posición y no solo de dónde salió porque
+    es lo que define la partida: si la de origen se borra o se reanaliza, esta
+    sigue siendo jugable."""
     moves_uci_json: Mapped[list] = mapped_column(JSON, default=list)
     """Las jugadas de la partida, en UCI y en orden, las de ambos bandos."""
+
+    origin_game_id: Mapped[int | None] = mapped_column(
+        ForeignKey("games.id", ondelete="SET NULL"), default=None
+    )
+    origin_ply: Mapped[int | None] = mapped_column(default=None)
+    """De qué partida propia y de qué jugada se retomó (RF-4.4), o `None` en
+    una partida de sparring que empieza desde el principio.
+
+    Es **procedencia, no dependencia**: sirve para poder decir en pantalla de
+    dónde salió esta partida y volver a verla en el visor. `SET NULL` porque
+    borrar la partida de origen no invalida lo que se jugó después —la
+    posición está en `starting_fen`—, solo deja de haber adónde volver. Por lo
+    mismo tampoco hay cascada: al contrario que un puzzle (ADR-0017), aquí no
+    hay nada que reconstruir desde la jugada analizada.
+
+    `ply` cuenta jugadas **ya hechas**: es la posición anterior a la jugada
+    número `ply`, que es como las numera `AnalyzedMove`. Por qué esto son dos
+    columnas aquí y no una tabla nueva, en ADR-0020."""
 
     result: Mapped[str | None] = mapped_column(default=None)
     """"1-0" | "0-1" | "1/2-1/2", o `None` mientras se juega.

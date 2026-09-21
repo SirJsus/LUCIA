@@ -565,6 +565,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/training/replays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Player Replay Positions
+         * @description Los errores propios desde los que se puede retomar, del más caro al más
+         *     barato.
+         */
+        get: operations["player_replay_positions_training_replays_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sparring/games": {
         parameters: {
             query?: never;
@@ -581,8 +602,9 @@ export interface paths {
         put?: never;
         /**
          * Start Sparring Game
-         * @description Abre una partida contra el motor. Si el motor lleva blancas, ya ha
-         *     movido cuando la respuesta llega.
+         * @description Abre una partida contra el motor, desde el principio o retomando una
+         *     partida propia (RF-4.4). Si al motor le toca mover, ya ha movido cuando la
+         *     respuesta llega.
          */
         post: operations["start_sparring_game_sparring_games_post"];
         delete?: never;
@@ -1133,6 +1155,16 @@ export interface components {
             /** Clocks Json */
             clocks_json: unknown[] | null;
         };
+        /**
+         * GamePositionIn
+         * @description Desde qué posición de qué partida propia se retoma (RF-4.4).
+         */
+        GamePositionIn: {
+            /** Game Id */
+            game_id: number;
+            /** Ply */
+            ply: number;
+        };
         /** GameSummary */
         GameSummary: {
             /** Id */
@@ -1506,6 +1538,35 @@ export interface components {
             /** Seconds Between Positions */
             seconds_between_positions: number;
         };
+        /**
+         * ReplayPositionOut
+         * @description Un error propio desde el que se puede retomar la partida.
+         */
+        ReplayPositionOut: {
+            /** Game Id */
+            game_id: number;
+            /** Ply */
+            ply: number;
+            /** Fen */
+            fen: string;
+            /** Player Color */
+            player_color: string;
+            /** San */
+            san: string;
+            /** Classification */
+            classification: string;
+            /** Win Percent Before */
+            win_percent_before: number;
+            /** Win Percent After */
+            win_percent_after: number;
+            /** Opponent */
+            opponent: string;
+            /**
+             * Played At
+             * Format: date-time
+             */
+            played_at: string;
+        };
         /** SparringGameCreate */
         SparringGameCreate: {
             /** Player Color */
@@ -1517,6 +1578,7 @@ export interface components {
             engine: string;
             /** Engine Elo */
             engine_elo?: number | null;
+            origin?: components["schemas"]["GamePositionIn"] | null;
         };
         /**
          * SparringGameOut
@@ -1531,6 +1593,10 @@ export interface components {
             engine: string;
             /** Engine Elo */
             engine_elo: number | null;
+            /** Origin Game Id */
+            origin_game_id: number | null;
+            /** Origin Ply */
+            origin_ply: number | null;
             /** Opponent Name */
             opponent_name: string;
             /** Fen */
@@ -2684,6 +2750,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DrillMoveOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    player_replay_positions_training_replays_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayPositionOut"][];
                 };
             };
             /** @description Validation Error */

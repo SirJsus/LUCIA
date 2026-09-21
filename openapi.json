@@ -3,7 +3,7 @@
   "info": {
     "title": "L.U.C.I.A. API",
     "description": "Logic & Ultimate Chess Insight Algorithm",
-    "version": "0.4.3"
+    "version": "0.4.4"
   },
   "paths": {
     "/health": {
@@ -1684,13 +1684,79 @@
         }
       }
     },
+    "/training/replays": {
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Player Replay Positions",
+        "description": "Los errores propios desde los que se puede retomar, del más caro al más\nbarato.",
+        "operationId": "player_replay_positions_training_replays_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ReplayPositionOut"
+                  },
+                  "title": "Response Player Replay Positions Training Replays Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/sparring/games": {
       "post": {
         "tags": [
           "sparring"
         ],
         "summary": "Start Sparring Game",
-        "description": "Abre una partida contra el motor. Si el motor lleva blancas, ya ha\nmovido cuando la respuesta llega.",
+        "description": "Abre una partida contra el motor, desde el principio o retomando una\npartida propia (RF-4.4). Si al motor le toca mover, ya ha movido cuando la\nrespuesta llega.",
         "operationId": "start_sparring_game_sparring_games_post",
         "parameters": [
           {
@@ -3393,6 +3459,26 @@
         ],
         "title": "GameDetail"
       },
+      "GamePositionIn": {
+        "properties": {
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "ply": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ply"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game_id",
+          "ply"
+        ],
+        "title": "GamePositionIn",
+        "description": "Desde qué posición de qué partida propia se retoma (RF-4.4)."
+      },
       "GameSummary": {
         "properties": {
           "id": {
@@ -4433,6 +4519,66 @@
         ],
         "title": "RepertoireOut"
       },
+      "ReplayPositionOut": {
+        "properties": {
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "player_color": {
+            "type": "string",
+            "title": "Player Color"
+          },
+          "san": {
+            "type": "string",
+            "title": "San"
+          },
+          "classification": {
+            "type": "string",
+            "title": "Classification"
+          },
+          "win_percent_before": {
+            "type": "number",
+            "title": "Win Percent Before"
+          },
+          "win_percent_after": {
+            "type": "number",
+            "title": "Win Percent After"
+          },
+          "opponent": {
+            "type": "string",
+            "title": "Opponent"
+          },
+          "played_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Played At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game_id",
+          "ply",
+          "fen",
+          "player_color",
+          "san",
+          "classification",
+          "win_percent_before",
+          "win_percent_after",
+          "opponent",
+          "played_at"
+        ],
+        "title": "ReplayPositionOut",
+        "description": "Un error propio desde el que se puede retomar la partida."
+      },
       "SparringGameCreate": {
         "properties": {
           "player_color": {
@@ -4455,6 +4601,16 @@
               }
             ],
             "title": "Engine Elo"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GamePositionIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "type": "object",
@@ -4487,6 +4643,28 @@
               }
             ],
             "title": "Engine Elo"
+          },
+          "origin_game_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Game Id"
+          },
+          "origin_ply": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Ply"
           },
           "opponent_name": {
             "type": "string",
@@ -4561,6 +4739,8 @@
           "player_color",
           "engine",
           "engine_elo",
+          "origin_game_id",
+          "origin_ply",
           "opponent_name",
           "fen",
           "moves_san",

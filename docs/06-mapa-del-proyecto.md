@@ -31,7 +31,7 @@ flowchart TB
     end
 
     subgraph Servidor["apps/api (FastAPI)"]
-        ROUTERS["routers/<br/>health · sync · pgn_import · games · analysis<br/>stats · engines · boards · repertoire<br/>training · drills · sparring<br/>(drills comparte el prefijo /training)"]
+        ROUTERS["routers/<br/>health · sync · pgn_import · games · analysis<br/>stats · engines · boards · repertoire<br/>training · drills · replays · sparring<br/>(drills y replays comparten el prefijo /training)"]
         WORKER["worker/<br/>cola de análisis en background<br/>_load_pgn_to_analyze: partida o tablero"]
         SVC_ANALYSIS["services/analysis.py<br/>run_analysis(pgn) · analyze_position<br/>+ lectura de alternativas guardadas"]
         SVC_BOARDS["services/boards.py<br/>historial lineal de versiones<br/>record_version · undo/redo (RF-6.8)"]
@@ -39,7 +39,8 @@ flowchart TB
         SVC_INSIGHTS["services/insights.py<br/>lee el análisis guardado<br/>latest_analysis_ids: solo los que tienen game_id<br/>mover_win_percent (pública desde RF-4.1)"]
         SVC_TRAINING["services/training.py<br/>errores propios → puzzles (RF-4.1)<br/>generate_puzzles · get_puzzle_queue · answer_puzzle"]
         SVC_DRILLS["services/drills.py<br/>líneas de apertura que se repiten (RF-4.2)<br/>generate_drills · get_drill_queue<br/>drill_line · record_review · count_drills<br/>sin red: solo lo que la caché ya sabe"]
-        SVC_SPARRING["services/sparring.py<br/>jugar contra el motor (RF-4.3)<br/>engine_config: calibra la fuerza · missing_requirement<br/>create_game · play_player_move · resign"]
+        SVC_SPARRING["services/sparring.py<br/>jugar contra el motor (RF-4.3) y retomar<br/>una partida propia desde una posición (RF-4.4)<br/>engine_config: calibra la fuerza · missing_requirement<br/>GamePosition · get_game_position<br/>create_game(origin) · play_player_move · resign"]
+        SVC_REPLAYS["services/replays.py<br/>desde qué errores propios re-jugar (RF-4.4)<br/>replay_positions: solo elige, no crea nada<br/>sin tabla: se deduce al leer (ADR-0008, ADR-0020)"]
         SVC_OWN["services/own_games.py<br/>publica el tablero como partida<br/>del historial (RF-6.5, ADR-0014)"]
         SVC_SYNC["services/chesscom_sync.py<br/>importa partidas y les pone apertura"]
         SVC_PGN["services/pgn_import.py<br/>archivo PGN → las mismas filas<br/>(platform=manual, RF-1.5)"]
@@ -59,7 +60,7 @@ flowchart TB
         OPENINGS["openings/<br/>tabla ECO versionada (ADR-0009)<br/>identify_opening · opening_of_pgn"]
         TRAINING["training/<br/>SM-2 (next_review) y qué respuestas<br/>se aceptan (equivalent_solutions, RF-10.3)<br/>puro, sin base de datos<br/>reparte puzzles y drills por igual"]
         DRILLS["drills/<br/>reglas de una línea de apertura (RF-4.2)<br/>DrillLine: is_player_ply · first_player_ply<br/>expected_uci_at · reply_uci_after · board_at · moves_san<br/>line_uci_from_departure · points_lost · is_worth_drilling<br/>puro: sin base de datos, sin motor y sin red"]
-        SPARRING["sparring/<br/>reglas de una partida contra el motor (RF-4.3)<br/>board_after_moves · moves_san · ending_of<br/>resignation_ending · to_pgn<br/>puro: sin motor, sin base de datos y sin reloj"]
+        SPARRING["sparring/<br/>reglas de una partida contra el motor (RF-4.3)<br/>board_after_moves · moves_san · ending_of<br/>resignation_ending · to_pgn<br/>board_at_ply: la posición de un PGN tras N<br/>jugadas, de donde se retoma (RF-4.4)<br/>puro: sin motor, sin base de datos y sin reloj"]
     end
 
     CHESSCOM["packages/chesscom<br/>ChessComClient"]
@@ -131,11 +132,16 @@ flowchart TB
     SVC_DRILLS -- "get_player_stats: las aperturas<br/>que cuestan puntos (RF-3.2)" --> SVC_STATS
     SVC_DRILLS -- "identify_opening: cómo se llama la línea" --> OPENINGS
     SVC_DRILLS -- "opening_drills: la línea y su estado<br/>de repaso (ADR-0019)" --> DB
-    ROUTERS -- "POST · GET /sparring/games<br/>POST /sparring/games/{id}/moves · /resign (RF-4.3)" --> SVC_SPARRING
-    SVC_SPARRING -- "board_after_moves · ending_of ·<br/>resignation_ending" --> SPARRING
+    ROUTERS -- "POST · GET /sparring/games (con origin, RF-4.4)<br/>POST /sparring/games/{id}/moves · /resign (RF-4.3)" --> SVC_SPARRING
+    SVC_SPARRING -- "board_after_moves · ending_of ·<br/>resignation_ending<br/>board_at_ply: la posición sale del PGN guardado,<br/>nunca de un FEN por HTTP (RF-4.4)" --> SPARRING
     ROUTERS -- "moves_san · to_pgn: la partida entera<br/>se deriva al servir, no se guarda" --> SPARRING
     SVC_SPARRING -- "EngineBridge.play: el motor mueve<br/>UCI_Elo (Stockfish) o red Maia a 1 nodo (Lc0)<br/>se abre y se cierra en cada jugada" --> BRIDGE
-    SVC_SPARRING -- "sparring_games: starting_fen + moves_uci_json<br/>fuera de games: no cuenta en RF-3 (ADR-0018)" --> DB
+    SVC_SPARRING -- "sparring_games: starting_fen + moves_uci_json<br/>+ origin_game_id/origin_ply: de dónde se retomó (RF-4.4)<br/>fuera de games: no cuenta en RF-3 (ADR-0018)" --> DB
+    ROUTERS -- "GET /training/replays<br/>(solo lista; retomar es POST /sparring/games)" --> SVC_REPLAYS
+    SVC_REPLAYS -- "latest_analysis_ids" --> SVC_INSIGHTS
+    SVC_REPLAYS -- "player_color · player_side" --> SVC_GAMES
+    SVC_REPLAYS -- "PUZZLE_CLASSIFICATIONS: los mismos<br/>errores que dan puzzle" --> SVC_TRAINING
+    SVC_REPLAYS -- "analyzed_moves + games (solo lectura):<br/>la lista no se guarda (ADR-0020)" --> DB
 ```
 
 Detalle narrativo y modelo de datos completo: [03-arquitectura.md](03-arquitectura.md).
@@ -148,7 +154,7 @@ graph LR
         subgraph WEB["@lucia/web"]
             board["features/board<br/>tablero de análisis<br/>tree.ts: fromPgn · toPgn · matchAnalyzedLine<br/>useUndoRedoKeys (RF-6.8)<br/>position.ts + PositionEditor (RF-6.1)<br/>OwnGamePanel · OwnGameStatus (RF-6.5)"]
             viewer["features/viewer<br/>visor de partidas<br/>+ CriticalMoments"]
-            training["features/training<br/>TrainingHeader (cabecera + pestañas<br/>Puzzles · Aperturas · Sparring)<br/>TrainingPage (cola y generación)<br/>PuzzleSolver · arrows.ts (RF-4.1)<br/>DrillsPage · DrillRunner · drills.ts (RF-4.2)<br/>SparringPage · SparringGamePage · sparring.ts (RF-4.3)"]
+            training["features/training<br/>TrainingHeader (cabecera + pestañas<br/>Puzzles · Aperturas · Re-jugar · Sparring)<br/>TrainingPage (cola y generación)<br/>PuzzleSolver · arrows.ts (RF-4.1)<br/>DrillsPage · DrillRunner · drills.ts (RF-4.2)<br/>SparringPage · SparringGamePage · sparring.ts (RF-4.3)<br/>ReplaysPage (RF-4.4)<br/>SparringSetupForm: elegir rival y bando,<br/>compartido por tres pantallas"]
             screens["features/dashboard (+ RepertoireSection)<br/>games · engines · otras pantallas"]
             boardui["components/board<br/>Chessboard (hueco overlay) · EvalBar · boardConfig<br/>BoardWithEvalBar · MoveNavigator<br/>MoveButton · EngineLineList<br/>useMoveNavigationKeys<br/>squares · pieces · SquareKeyboardGrid<br/>legalMoves: legalMovesByOrigin (RF-6.2 y RF-4.1)<br/>occupancy · useOccupancy · OccupancyLayer<br/>OccupancyPanel (RF-7.1-7.7)"]
             ui["components/<br/>Button · Panel · Feedback · DataTable<br/>Badge (Classification · CustomPosition)<br/>EngineSelect · FilterBar · FieldLabel<br/>RecordBadges · Layout · styles"]
@@ -171,8 +177,9 @@ graph LR
             api_repertoire["services/repertoire.py<br/>comparación + refresh"]
             api_comparison["services/comparison.py<br/>discrepancias entre motores (RF-2.6)"]
             api_training["services/training.py<br/>puzzles desde los errores propios (RF-4.1)"]
-            api_drills["services/drills.py<br/>líneas de apertura que se repiten (RF-4.2)<br/>dos servicios y tres módulos del núcleo:<br/>el que más mira hacia dentro"]
-            api_sparring["services/sparring.py<br/>partida contra el motor y calibración<br/>de su fuerza (RF-4.3)"]
+            api_drills["services/drills.py<br/>líneas de apertura que se repiten (RF-4.2)<br/>dos servicios y tres módulos del núcleo:<br/>cinco flechas, más que ningún otro"]
+            api_sparring["services/sparring.py<br/>partida contra el motor y calibración<br/>de su fuerza (RF-4.3), desde el principio<br/>o retomada (get_game_position, RF-4.4)"]
+            api_replays["services/replays.py<br/>desde qué errores re-jugar (RF-4.4)<br/>tres servicios hermanos: ningún otro<br/>servicio de la API importa tantos"]
             api_engines["services/engines.py<br/>config efectiva del motor<br/>limit_kind · WeightsFile"]
             api_deps["dependencies.py<br/>resolved_username · clientes"]
         end
@@ -182,7 +189,7 @@ graph LR
             core_openings["openings<br/>+ data/openings.tsv"]
             core_training["training<br/>SM-2 + equivalencia (RF-10.3)"]
             core_drills["drills<br/>la línea de apertura (RF-4.2)"]
-            core_sparring["sparring<br/>reglas de la partida (RF-4.3)"]
+            core_sparring["sparring<br/>reglas de la partida (RF-4.3)<br/>board_at_ply: desde dónde se retoma (RF-4.4)"]
         end
         chesscom["lucia_chesscom"]
         lichess["lucia_lichess<br/>Opening Explorer"]
@@ -191,6 +198,7 @@ graph LR
     board --> boardui
     viewer --> boardui
     viewer -- "fromPgn (RF-6.6)" --> board
+    viewer -- "SparringSetupForm (RF-4.4):<br/>Jugar desde aquí" --> training
     board --> ui
     viewer --> ui
     boardui --> ui
@@ -232,6 +240,9 @@ graph LR
     api_drills -- "get_player_stats:<br/>peores aperturas (RF-3.2)" --> api_stats
     api_sparring --> core_sparring
     api_sparring -- "EngineBridge.play" --> core_analysis
+    api_replays -- "latest_analysis_ids" --> api_insights
+    api_replays -- "player_color · player_side" --> api_games
+    api_replays -- "PUZZLE_CLASSIFICATIONS" --> api_training
     types -. "make types:<br/>export-openapi.py + openapi-typescript" .-> API
 ```
 
@@ -503,9 +514,66 @@ tampoco lo resuelve, y sigue siendo una señal para el agente `minimalista`.
 `TrainingHeader.tsx` absorbió la pestaña "Aperturas" sin cambiar de sitio: son
 cuatro pantallas con la misma cabecera y la misma sub-navegación.
 
+Re-jugar desde el error (RF-4.4) no añade capa ni tabla: añade **un servicio de
+lectura** y dos columnas. Las reglas puras crecen dentro de
+`packages/core/lucia_core/sparring/` —`board_at_ply(pgn_text, ply)`, la posición
+de una partida tras sus primeras `ply` jugadas— porque leer un PGN y contar
+jugadas es lo mismo que ya hacía `board_after_moves` con las de UCI, y sigue sin
+base de datos, sin motor y sin red. Arriba, `services/sparring.py` gana
+`GamePosition` y `get_game_position`, y `create_game` un `origin`: retomar es la
+misma partida empezada en otro sitio, así que comparte tabla, ciclo y pantalla
+con RF-4.3 y no hay un segundo servicio de juego
+([ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md)).
+En `sparring_games` eso son `origin_game_id` (FK a `games`, `SET NULL`) y
+`origin_ply` —procedencia, no dependencia— con la migración `d5a81c6e3f04`.
+
+Lo que sí es nuevo es `services/replays.py` (`replay_positions`), y es el
+servicio de `lucia_api` **que más servicios hermanos importa**: tres
+—`services/insights.py` (`latest_analysis_ids`), `services/games.py`
+(`player_color`, `player_side`) y `services/training.py`
+(`PUZZLE_CLASSIFICATIONS`)—, por delante de los dos de `services/drills.py`, que
+sigue siendo el de más flechas en total al sumar sus tres módulos del núcleo.
+Las tres van hacia abajo y ninguna vuelve: ni `insights`, ni `games`, ni
+`training` saben que existe `replays`. La que conviene mirar es la tercera:
+`PUZZLE_CLASSIFICATIONS` se importa en vez de copiarse porque "error grave
+propio" tiene que significar lo mismo en las dos pantallas que lo usan; si un
+día dejaran de coincidir, sería una constante en cada sitio y no esta flecha. Y
+la diferencia de fondo con sus dos hermanas de entrenamiento **no está en el
+grafo sino en la persistencia**: los puzzles (RF-4.1) y los drills (RF-4.2)
+tienen tabla, y la lista de errores desde los que re-jugar no —se deduce al
+leer los análisis, como los patrones de RF-3
+([ADR-0008](adr/0008-patrones-deducidos-al-leer.md))—, porque no arrastra
+repasos ni progreso. `routers/replays.py` (`GET /training/replays`,
+`ReplayPositionOut`, `player_replay_positions`, `DEFAULT_POSITIONS_LIMIT`)
+comparte el prefijo `/training` con los puzzles y los drills, como ya hacía
+`routers/drills.py`, y no crea nada: quien abre la partida sigue siendo
+`POST /sparring/games`.
+
+En `@lucia/web` hay **una flecha nueva entre `features/`**, y esta vez en la
+dirección contraria a las anteriores: `features/viewer/GameViewerPage.tsx`
+importa `SparringSetupForm` de `features/training/`, para que "Jugar desde aquí"
+pida el rival y el bando exactamente como los pide la sección de
+entrenamiento. El formulario se **extrajo** de `SparringPage.tsx` en este mismo
+commit y lo usan tres pantallas: `SparringPage`, la `ReplaysPage` nueva y el
+visor. Que sean tres es justo el umbral que este documento viene dando para
+subir algo a la capa común, y el paso de coherencia de interfaz recomendó
+moverlo a `components/`; **no se hizo en este commit**, así que queda como
+señal viva para el agente `minimalista`, no como decisión tomada. Con ella,
+entre `features/` hay ya dos préstamos vivos y en sentidos opuestos:
+`features/training` → `features/board` (`fromPgn` en `SparringGamePage.tsx`,
+tercer consumidor de `tree.ts` después de `board` y `viewer`) y
+`features/viewer` → `features/training` (`SparringSetupForm`). Lo que sí siguió
+la regla es el formateo: la frase de lo que costó un error, que estaba escrita
+dos veces, es `formatOwnWinPercentLossSentence` en `lib/format.ts` y la
+comparten `PuzzleSolver.tsx` y `ReplaysPage.tsx` —dos `features/` que comparten
+algo sin pantalla propia van a `lib/`, el mismo viaje que hicieron
+`useTrackedAnalysis` e `isTypingTarget`—. La pestaña "Re-jugar" y la ruta
+`/training/replays` entran en `TrainingHeader.tsx` y `router.tsx` sin mover nada
+más.
+
 ## 3 · Flujos principales
 
-Son diecisiete secuencias, agrupadas aquí por lo que hacen —el índice es
+Son dieciocho secuencias, agrupadas aquí por lo que hacen —el índice es
 la agrupación: cada flujo sigue teniendo su diagrama, porque juntar dos en uno
 solo haría un diagrama ilegible—:
 
@@ -528,8 +596,11 @@ solo haría un diagrama ilegible—:
   repertorio comparado (RF-3.6) y de las aperturas (RF-3.2), sin motor y sin
   red.
 - **Entrenar jugando**: sparring contra el motor con la fuerza calibrada
-  (RF-4.3). La única secuencia en la que el motor **mueve** en vez de opinar, y
-  la única en la que el servidor valida jugadas.
+  (RF-4.3) · re-jugar desde el error, retomar una partida propia desde donde se
+  torció (RF-4.4). La única secuencia en la que el motor **mueve** en vez de
+  opinar, y la única en la que el servidor valida jugadas; re-jugar es esa misma
+  secuencia empezada en otra posición, con un paso más por delante —elegir desde
+  dónde— que, al revés que los puzzles y los drills, **no persiste nada**.
 - **Llevar un PGN al tablero de análisis** (RF-6.6 · RF-6.7) y **encender la
   capa de ocupación** (RF-7.1 a RF-7.7): las dos secuencias que no pasan por
   servicio alguno del backend.
@@ -1417,7 +1488,7 @@ sequenceDiagram
     end
 ```
 
-### Jugar contra el motor con la fuerza calibrada (RF-4.3, implementado)
+### Jugar contra el motor con la fuerza calibrada (RF-4.3 · RF-4.4, implementado)
 
 La única secuencia en la que el motor **mueve** (`EngineBridge.play`) en vez de
 opinar, y la única en la que el servidor valida las jugadas: aquí es el rival y
@@ -1426,7 +1497,9 @@ el árbitro, no el archivador de un documento ajeno
 Por qué la partida vive en `sparring_games` y no en `games` ni en `boards`, y
 por qué la fuerza no es la misma perilla en los dos motores, está en ese ADR y
 en el flujo 12 de [03-arquitectura.md § Flujos principales](03-arquitectura.md);
-aquí solo el recorrido.
+aquí solo el recorrido. Desde RF-4.4 la apertura tiene una variante —con
+`origin` la partida empieza en la posición de una propia—, y de ahí en adelante
+todo es idéntico: quién elige esa posición es el flujo siguiente.
 
 ```mermaid
 sequenceDiagram
@@ -1440,15 +1513,22 @@ sequenceDiagram
     participant DB as SQLite
 
     Note over U,DB: Abrir la partida
-    U->>P: elegir rival (motor y Elo) y color
-    P->>AP: api.startSparringGame({player_color, engine, engine_elo})
+    U->>P: elegir rival (motor y Elo) y bando [SparringSetupForm]
+    P->>AP: api.startSparringGame({player_color, engine, engine_elo, origin?})
     AP->>R: POST /sparring/games
     R->>R: motor conocido · Elo dentro de STOCKFISH_ELO_RANGE<br/>(solo Stockfish) → 404 / 422
+    opt viene origin: game_id y ply (RF-4.4)
+        R->>SS: get_game_position(game_id, ply)
+        SS->>DB: select games.pgn
+        SS->>CS: board_at_ply(pgn, ply)
+        CS-->>SS: la posición desde la que se retoma
+        Note over R,SS: se manda partida y jugada, nunca un FEN:<br/>la posición la deriva el servidor de lo que ya tiene<br/>(la frontera con RF-11.1) · 422 si no existe o no llega
+    end
     R->>SS: missing_requirement(engine)
     Note over R,SS: sin binario o sin red Maia: 422 con qué falta<br/>("ejecuta make engines"), no la traza del proceso
-    R->>SS: create_game(player_color, engine, engine_elo)
-    SS->>DB: insert sparring_games (starting_fen inicial,<br/>moves_uci_json vacío, result null)
-    alt el motor lleva blancas
+    R->>SS: create_game(player_color, engine, engine_elo, origin)
+    SS->>DB: insert sparring_games (starting_fen: la inicial<br/>o la del origin, con origin_game_id/origin_ply,<br/>moves_uci_json vacío, result null)
+    alt al motor le toca mover en la posición de partida
         SS->>E: play(board) [engine_config: fuerza calibrada]
         E-->>SS: jugada
         SS->>DB: moves_uci_json += uci
@@ -1477,8 +1557,8 @@ sequenceDiagram
         end
     end
     R->>CS: moves_san · to_pgn (nada de esto se guarda)
-    R-->>P: la partida entera: fen, jugadas en SAN, turno,<br/>resultado, termination y PGN
-    P-->>U: tablero actualizado y, si acabó, cómo acabó (sparring.ts)
+    R-->>P: la partida entera: fen, jugadas en SAN, turno,<br/>resultado, termination, PGN y la procedencia<br/>(origin_game_id/origin_ply, RF-4.4)
+    P-->>U: tablero actualizado, de dónde salió si se retomó<br/>y, si acabó, cómo acabó (sparring.ts)
 
     Note over U,DB: Acabar o llevársela
     alt abandonar
@@ -1492,6 +1572,56 @@ sequenceDiagram
         P->>R: POST /boards → analizar desde ahí (RF-6.6 · RF-6.9)
         Note over P,R: no entra en estadísticas ni en patrones (RF-3)<br/>mientras no se publique como partida propia (RF-6.5)
     end
+```
+
+### Re-jugar desde el error (RF-4.4, implementado)
+
+Dos pasos, y el segundo es el flujo de arriba entero: **elegir** desde dónde y
+**retomar**. Lo único propio es el primero, y es una lectura: no hay tabla, ni
+botón de generar, ni nada que guardar —al revés que los puzzles y los drills—.
+Por qué se decidió así, y por qué la posición se manda como partida + jugada y
+nunca como FEN, en
+[ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md)
+y en el flujo 14 de [03-arquitectura.md § Flujos principales](03-arquitectura.md).
+
+```mermaid
+sequenceDiagram
+    participant U as Usuario
+    participant RP as ReplaysPage (la lista)<br/>GameViewerPage (Jugar desde aquí)
+    participant AP as lib/api.ts<br/>getReplayPositions · startSparringGame
+    participant R as apps/api (routers/replays.py)
+    participant SR as services/replays.py
+    participant SI as services/insights.py · services/games.py<br/>services/training.py
+    participant SP as routers/sparring.py + services/sparring.py
+    participant CS as lucia_core.sparring
+    participant DB as SQLite
+
+    Note over U,DB: Elegir desde dónde (solo la lista curada)
+    U->>RP: abrir la pestaña "Re-jugar"
+    RP->>AP: api.getReplayPositions()
+    AP->>R: GET /training/replays?limit=20
+    R->>SR: replay_positions(session, username, limit)
+    SR->>SI: latest_analysis_ids · player_color · player_side<br/>PUZZLE_CLASSIFICATIONS
+    SR->>DB: analyzed_moves + games: errores propios graves<br/>de los análisis terminados más recientes
+    Note over SR,DB: solo lectura: la lista se deduce cada vez<br/>(ADR-0008), no hay tabla que envejezca
+    DB-->>SR: filas ordenadas por lo que costó el error
+    SR-->>R: jugada + partida + rival
+    R-->>RP: ReplayPositionOut[] (con win_percent antes/después:<br/>aquí sí se enseña, no hay nada que adivinar)
+    RP-->>U: los errores más caros, el peor primero
+
+    Note over U,DB: Retomar (de aquí en adelante, el flujo del sparring)
+    alt desde la lista curada
+        U->>RP: "Retomar la partida" en un error [SparringSetupForm]
+    else desde el visor, cualquier posición
+        U->>RP: "Jugar desde aquí" [SparringSetupForm]<br/>ply = el de la posición en pantalla
+    end
+    RP->>AP: api.startSparringGame({...setup, origin: {game_id, ply}})
+    AP->>SP: POST /sparring/games
+    SP->>CS: board_at_ply(games.pgn, ply)
+    CS-->>SP: la posición → starting_fen
+    SP->>DB: insert sparring_games (+ origin_game_id/origin_ply)
+    SP-->>RP: SparringGameOut
+    RP-->>U: navegar a /training/sparring/{id}<br/>se juega, se acaba y se analiza como cualquier otra
 ```
 
 ## 4 · Ubicación por requerimiento
@@ -1516,8 +1646,9 @@ amplía a medida que se implementa cada RF (ver [05-roadmap.md](05-roadmap.md)).
 | Lectura de patrones sin persistirlos | `apps/api/lucia_api/services/insights.py` (`latest_analysis_ids` —que desde RF-6.9 deja fuera los análisis de tablero, `game_id` nulo; los de un tablero publicado como partida propia sí lo llevan, RF-6.5—, `player_move_contexts`, `analysis_critical_moments`): traduce filas de `analyzed_moves` a `MoveContext` para que `lucia_core.insights` no sepa de SQLite ni vuelva a llamar al motor. Desde RF-4.1 comparte dos piezas con los puzzles: `mover_win_percent` (pública, la vuelta a la perspectiva de quien mueve) y `services/analysis.py::cached_alternatives_by_analysis` (agrupar por análisis las jugadas de muchas partidas antes de rescatar sus alternativas de `position_cache`), que salió de dentro de `player_move_contexts` | [ADR-0008](adr/0008-patrones-deducidos-al-leer.md) |
 | RF-4.1 · Puzzles desde los errores propios con repetición espaciada (con RF-10.3) | `packages/core/lucia_core/training/__init__.py` (las dos reglas puras, sin base de datos ni reloj: `SpacedRepetitionState`, `NEW_PUZZLE_STATE`, `next_review` y `ReviewGrade` —SM-2, con `_QUALITY_BY_GRADE`, `_MIN_EASE_FACTOR`, `_FIRST_INTERVAL_DAYS`/`_SECOND_INTERVAL_DAYS`—, y `equivalent_solutions` con `EQUIVALENT_MOVE_MAX_WIN_PERCENT_LOSS` = 2 puntos de win%, el mismo margen que `classification.ClassificationThresholds.excellent_max_loss`), con `packages/core/tests/test_training.py`; `apps/api/lucia_api/db/models.py` (`Puzzle`, tabla `puzzles`, única por `(game_id, ply)` y con `due_at` indexada, migración `apps/api/migrations/versions/e1a7c93d40b2_agrega_puzzles_entrenamiento.py`); `apps/api/lucia_api/services/training.py` (`generate_puzzles` con `PUZZLE_CLASSIFICATIONS` y `_solutions_of`, `get_puzzle_queue`/`PuzzleQueue`, `answer_puzzle`/`PuzzleAnswer`, `_record_review`, `solver_color`, `opponent_username`; se apoya en `services/analysis.py::cached_alternatives_by_analysis` y `alternatives_of` y en `services/insights.py::latest_analysis_ids` y `mover_win_percent`); `apps/api/lucia_api/routers/training.py` (`POST /training/puzzles`, `GET /training/puzzles` con `DEFAULT_QUEUE_LIMIT`/`MAX_QUEUE_LIMIT`, `POST /training/puzzles/{puzzle_id}/answer`; `PuzzleOut`, `PuzzleQueueOut`, `PuzzleGenerationOut`, `PuzzleAnswerIn`, `PuzzleAnswerOut`: un puzzle abierto viaja sin solución, sin la jugada de la partida, sin clasificación y sin probabilidades) con `apps/api/tests/test_training.py`; en la web, `apps/web/src/features/training/TrainingPage.tsx` (la cola y el botón de generar), `PuzzleSolver.tsx` (el tablero y el panel de resultado, con `ClassificationBadge`) y `arrows.ts` (`arrowsFromPuzzleAnswer`, con `__tests__/arrows.test.ts`) —inventario de la carpeta en su [README](../apps/web/src/features/training/README.md), que deja de ser un sitio reservado—, `apps/web/src/components/board/legalMoves.ts` (`legalMovesByOrigin`, extraída de `BoardPage.tsx` y compartida con el tablero de análisis), el pincel `red` de `EngineArrow` en `apps/web/src/components/board/boardConfig.ts`, la ruta `/training` de `apps/web/src/router.tsx`, el enlace "Entrenamiento" de `apps/web/src/components/Layout.tsx` y `apps/web/src/lib/api.ts` (`generatePuzzles`, `getPuzzleQueue`, `answerPuzzle`) | [ADR-0017](adr/0017-puzzle-persistido-con-su-solucion-congelada.md), [02-requerimientos.md § RF-4](02-requerimientos.md), [03-arquitectura.md § flujo 11](03-arquitectura.md), [07-coherencia-ui.md](07-coherencia-ui.md) |
 | RF-4.2 · Drill de aperturas: repetir jugando las líneas donde peor se rinde | `packages/core/lucia_core/drills/__init__.py` (las reglas puras de una línea, sin base de datos, sin motor y sin red: `DrillLine` con `is_player_ply`, `first_player_ply`, `expected_uci_at`, `reply_uci_after`, `board_at` y `moves_san` —derivada al servir, como en `sparring/`—; `line_uci_from_departure`, que compone la línea desde una salida de la teoría de RF-3.6; `points_lost` e `is_worth_drilling` con `MIN_GAMES_TO_DRILL` = 3 y `EVEN_SCORE_PERCENT` = 50, que son la lectura de "peor" en **puntos perdidos** y no en porcentaje), con `packages/core/tests/test_drills.py`; `apps/api/lucia_api/db/models.py` (`OpeningDrill`, tabla `opening_drills`, única por `(player_color, line_uci)` —lo que hace idempotente el generar— con `due_at` indexada y el estado SM-2, migración `apps/api/migrations/versions/c7b2e9f05a31_agrega_opening_drills.py`); `apps/api/lucia_api/services/drills.py` (`generate_drills`/`DrillGeneration`, `_candidate_drills` —las **dos barajas** del mismo material, `reason="departure"` de RF-3.6 y `reason="opening"` de RF-3.2, con `MAX_OPENINGS_CONSIDERED`—, `get_drill_queue`/`DrillQueue`, `drill_line`, `record_review`, `count_drills`; se apoya en `services/repertoire.py::compare_repertoire` —sin red— y `services/stats.py::get_player_stats`, y en `lucia_core.training::next_review` y `lucia_core.openings::identify_opening`); `apps/api/lucia_api/routers/drills.py` (`POST /training/drills`, `GET /training/drills` con `DEFAULT_QUEUE_LIMIT`/`MAX_QUEUE_LIMIT` y `POST /training/drills/{drill_id}/moves`; `DrillOut`, `DrillQueueOut`, `DrillGenerationOut`, `DrillMoveIn`, `DrillMoveOut`, con `_open_move_out`/`_close_drill`/`_grade_of`: un drill abierto viaja sin la línea, y el `ply` lo lleva la pantalla porque el servidor no guarda progreso; comparte el prefijo `/training` con el router de los puzzles) con `apps/api/tests/test_drills.py`; `apps/api/lucia_api/services/repertoire.py` (`Departure.master_moves_uci` y `Departure.preceding_moves_uci`, más `PlayerMove.preceding_moves_uci`: el material del drill, que la comparación de repertorio no mira); en la web, `apps/web/src/features/training/DrillsPage.tsx` (la cola, el botón de generar y el aviso de teoría incompleta), `DrillRunner.tsx` (el tablero de la línea, con `legalMovesByOrigin` y `moveNumberOf` de `lib/moves.ts`, montado con `key={drill.id}`) y `drills.ts` (`reasonLabel`, `reasonSentence`, `playerMoveCount`, con `__tests__/drills.test.ts`) —inventario en el [README](../apps/web/src/features/training/README.md) de la carpeta—, la pestaña "Aperturas" de `TrainingHeader.tsx`, la ruta `/training/drills` de `apps/web/src/router.tsx` y `apps/web/src/lib/api.ts` (`generateDrills`, `getDrillQueue`, `playDrillMove`) | [ADR-0019](adr/0019-el-drill-de-aperturas-se-construye-sobre-las-salidas-de-la-teoria.md), [02-requerimientos.md § RF-4](02-requerimientos.md), [03-arquitectura.md § flujo 13](03-arquitectura.md), [07-coherencia-ui.md](07-coherencia-ui.md) |
-| RF-4.3 · Sparring contra el motor con la fuerza calibrada | `packages/core/lucia_core/sparring/__init__.py` (las reglas puras de una partida, sin motor ni base de datos ni reloj: `board_after_moves` y `moves_san` la rehacen desde `starting_fen` + las jugadas en UCI, `ending_of` dice si acabó y por qué —`GameEnding`, `GameResult`, `Termination`, con las tablas reclamables contadas como automáticas—, `resignation_ending` cubre el abandono y `to_pgn` la escribe, con `[SetUp "1"]`/`[FEN ...]` solo si no arranca de la estándar), con `packages/core/tests/test_sparring.py`; `packages/core/lucia_core/engine/bridge.py` (`EngineBridge.play(board)`: el motor **mueve** en vez de opinar, con el `_require_open_engine` que comparte con `analyze` y la misma negativa a preguntar en posición terminal — es la carencia que RF-4.3, RF-4.4 y RF-11.1 compartían); `apps/api/lucia_api/db/models.py` (`SparringGame`, tabla `sparring_games`, migración `apps/api/migrations/versions/f3d9a1c47b58_agrega_sparring_games.py`: fuera de `games` y de `boards` a propósito, y `result` como única marca de que terminó); `apps/api/lucia_api/services/sparring.py` (`engine_config` —la **calibración de la fuerza**: `UCI_LimitStrength` + `UCI_Elo` con `STOCKFISH_ELO_RANGE` y `STOCKFISH_MOVE_SECONDS` en Stockfish, red Maia a `MAIA_NODES` = 1 en Lc0—, `missing_requirement`, `create_game`, `play_player_move`, `resign`, `list_games`, `current_board`; el motor se abre y se cierra en cada jugada); `apps/api/lucia_api/routers/sparring.py` (`POST /sparring/games`, `GET /sparring/games`, `GET /sparring/games/{id}`, `POST /sparring/games/{id}/moves`, `POST /sparring/games/{id}/resign`; `SparringGameOut` lleva la partida entera derivada al servir —posición, SAN, turno, resultado y PGN—) con `apps/api/tests/test_sparring.py`; `apps/api/lucia_api/settings.py` (`maia_weights`, red distinta de la del análisis); en la web, `apps/web/src/features/training/SparringPage.tsx` (antesala: elegir rival y color, y el listado para retomar), `SparringGamePage.tsx` (la partida en marcha, sin barra de evaluación y con "Abrir como tablero" vía `fromPgn`), `sparring.ts` (`outcomeFor`, `outcomeSentence`, `turnsOf`, con `__tests__/sparring.test.ts`) y `TrainingHeader.tsx` (cabecera común de la sección y sub-navegación Puzzles \| Sparring, con `NAV_LINK_CLASSES` de `components/styles.ts`), las rutas `/training/sparring` y `/training/sparring/$sparringGameId` de `apps/web/src/router.tsx` y `apps/web/src/lib/api.ts` (`startSparringGame`, `getSparringGames`, `getSparringGame`, `playSparringMove`, `resignSparringGame`) | [ADR-0018](adr/0018-sparring-en-su-propia-tabla-y-el-servidor-como-arbitro.md), [02-requerimientos.md § RF-4](02-requerimientos.md), [03-arquitectura.md § flujo 12](03-arquitectura.md), [07-coherencia-ui.md](07-coherencia-ui.md) |
-| RF-4.4 · Re-jugar desde el error · RF-4.5 · Plan de entrenamiento semanal | pendiente (fase 3). Se montarán sobre lo ya entregado en RF-4.1, RF-4.2 y RF-4.3 —las tablas `puzzles` y `opening_drills`, `services/training.py` y `services/drills.py`, las reglas puras de `lucia_core.training`, `lucia_core.drills` y `lucia_core.sparring`, y las pantallas de `/training` bajo su `TrainingHeader`—; lo que RF-4.4 daba por pendiente, que el motor **juegue** y no solo analice, ya está resuelto (`EngineBridge.play`), y `sparring_games.starting_fen` es columna precisamente para poder arrancar desde la posición del error | [02-requerimientos.md § RF-4](02-requerimientos.md), [05-roadmap.md § fase 3](05-roadmap.md) |
+| RF-4.3 · Sparring contra el motor con la fuerza calibrada | `packages/core/lucia_core/sparring/__init__.py` (las reglas puras de una partida, sin motor ni base de datos ni reloj: `board_after_moves` y `moves_san` la rehacen desde `starting_fen` + las jugadas en UCI, `ending_of` dice si acabó y por qué —`GameEnding`, `GameResult`, `Termination`, con las tablas reclamables contadas como automáticas—, `resignation_ending` cubre el abandono y `to_pgn` la escribe, con `[SetUp "1"]`/`[FEN ...]` solo si no arranca de la estándar), con `packages/core/tests/test_sparring.py`; `packages/core/lucia_core/engine/bridge.py` (`EngineBridge.play(board)`: el motor **mueve** en vez de opinar, con el `_require_open_engine` que comparte con `analyze` y la misma negativa a preguntar en posición terminal — es la carencia que RF-4.3, RF-4.4 y RF-11.1 compartían); `apps/api/lucia_api/db/models.py` (`SparringGame`, tabla `sparring_games`, migración `apps/api/migrations/versions/f3d9a1c47b58_agrega_sparring_games.py`: fuera de `games` y de `boards` a propósito, y `result` como única marca de que terminó); `apps/api/lucia_api/services/sparring.py` (`engine_config` —la **calibración de la fuerza**: `UCI_LimitStrength` + `UCI_Elo` con `STOCKFISH_ELO_RANGE` y `STOCKFISH_MOVE_SECONDS` en Stockfish, red Maia a `MAIA_NODES` = 1 en Lc0—, `missing_requirement`, `create_game`, `play_player_move`, `resign`, `list_games`, `current_board`; el motor se abre y se cierra en cada jugada); `apps/api/lucia_api/routers/sparring.py` (`POST /sparring/games`, `GET /sparring/games`, `GET /sparring/games/{id}`, `POST /sparring/games/{id}/moves`, `POST /sparring/games/{id}/resign`; `SparringGameOut` lleva la partida entera derivada al servir —posición, SAN, turno, resultado y PGN—) con `apps/api/tests/test_sparring.py`; `apps/api/lucia_api/settings.py` (`maia_weights`, red distinta de la del análisis); en la web, `apps/web/src/features/training/SparringPage.tsx` (antesala: elegir rival y color, y el listado para retomar; desde RF-4.4 el formulario de dificultad es `SparringSetupForm.tsx`, extraído de aquí y compartido con otras dos pantallas), `SparringGamePage.tsx` (la partida en marcha, sin barra de evaluación y con "Abrir como tablero" vía `fromPgn`), `sparring.ts` (`outcomeFor`, `outcomeSentence`, `turnsOf`, con `__tests__/sparring.test.ts`) y `TrainingHeader.tsx` (cabecera común de la sección y su sub-navegación, con `NAV_LINK_CLASSES` de `components/styles.ts`; hoy cuatro pestañas: Puzzles \| Aperturas \| Re-jugar \| Sparring), las rutas `/training/sparring` y `/training/sparring/$sparringGameId` de `apps/web/src/router.tsx` y `apps/web/src/lib/api.ts` (`startSparringGame`, `getSparringGames`, `getSparringGame`, `playSparringMove`, `resignSparringGame`) | [ADR-0018](adr/0018-sparring-en-su-propia-tabla-y-el-servidor-como-arbitro.md), [02-requerimientos.md § RF-4](02-requerimientos.md), [03-arquitectura.md § flujo 12](03-arquitectura.md), [07-coherencia-ui.md](07-coherencia-ui.md) |
+| RF-4.4 · Re-jugar desde el error: retomar una partida propia desde donde se torció | `packages/core/lucia_core/sparring/__init__.py` (`board_at_ply(pgn_text, ply)`: la posición de una partida escrita en PGN tras sus primeras `ply` jugadas —`ply` cuenta jugadas **ya hechas**, así que es la anterior a la jugada número `ply`, que es como las numera `AnalyzedMove`—, con `ValueError` si el texto no trae partida o si la que trae no llega a esa jugada), con `packages/core/tests/test_sparring.py`; `apps/api/lucia_api/db/models.py` (`SparringGame.origin_game_id` —FK a `games`, `SET NULL`: procedencia y no dependencia, borrar la partida de origen no invalida lo jugado porque la posición está en `starting_fen`— y `SparringGame.origin_ply`, migración `apps/api/migrations/versions/d5a81c6e3f04_sparring_desde_una_partida_propia.py`: **dos columnas en la tabla de RF-4.3 y no una tabla nueva**); `apps/api/lucia_api/services/sparring.py` (`GamePosition`, `get_game_position` —deriva la posición del PGN guardado— y `create_game(..., origin=...)`, que guarda esa posición como `starting_fen` y pide ya la jugada al motor si le toca mover, que retomando a mitad puede ser cualquiera de los dos); `apps/api/lucia_api/routers/sparring.py` (`GamePositionIn`, el `origin` opcional de `SparringGameCreate` y la procedencia en `SparringGameOut`); `apps/api/lucia_api/services/replays.py` (`replay_positions`: **solo elige**, y no guarda nada —la lista se deduce al leer `analyzed_moves`, como los patrones de RF-3—; es el servicio de la API que más servicios hermanos importa, `services/insights.py::latest_analysis_ids`, `services/games.py::player_color`/`player_side` y `services/training.py::PUZZLE_CLASSIFICATIONS`, los mismos errores que dan puzzle); `apps/api/lucia_api/routers/replays.py` (`GET /training/replays`, `ReplayPositionOut` —con `win_percent_before`/`after` a la vista, al revés que un puzzle abierto—, `player_replay_positions`, `DEFAULT_POSITIONS_LIMIT` = 20 y `MAX_POSITIONS_LIMIT`; comparte el prefijo `/training` con puzzles y drills) y `apps/api/lucia_api/main.py` (alta del router), con `apps/api/tests/test_replays.py`; en la web, `apps/web/src/features/training/ReplaysPage.tsx` (la lista curada), `SparringSetupForm.tsx` (elegir rival y bando, **extraído** de `SparringPage.tsx` y compartido por esa pantalla, `ReplaysPage` y el visor), `SparringGamePage.tsx` (de dónde salió la partida, con enlace de vuelta al visor), `apps/web/src/features/viewer/GameViewerPage.tsx` ("Jugar desde aquí", que retoma **cualquier** posición y manda `currentPly + 1`), `apps/web/src/lib/format.ts` (`formatOwnWinPercentLossSentence`, compartida con `PuzzleSolver.tsx`), la pestaña "Re-jugar" de `TrainingHeader.tsx`, la ruta `/training/replays` de `apps/web/src/router.tsx` y `apps/web/src/lib/api.ts` (`getReplayPositions`, y el `origin` de `startSparringGame`) | [ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md), [02-requerimientos.md § RF-4](02-requerimientos.md), [03-arquitectura.md § flujo 14](03-arquitectura.md), [07-coherencia-ui.md](07-coherencia-ui.md) |
+| RF-4.5 · Plan de entrenamiento semanal | pendiente (fase 3). Se montará sobre lo ya entregado en RF-4.1, RF-4.2, RF-4.3 y RF-4.4 —las tablas `puzzles` y `opening_drills`, `services/training.py`, `services/drills.py` y `services/replays.py`, las reglas puras de `lucia_core.training`, `lucia_core.drills` y `lucia_core.sparring`, y las cuatro pantallas de `/training` bajo su `TrainingHeader`—: lo que falta es qué repartir cada día, no de dónde sacarlo | [02-requerimientos.md § RF-4](02-requerimientos.md), [05-roadmap.md § fase 3](05-roadmap.md) |
 | RF-5.1 · Visor de partida | `apps/web/src/features/viewer/` (`GameViewerPage`, con `parsePgn` sacando de ahí la posición inicial de la partida; `MoveList`, `EvalChart`); el seguimiento del análisis en curso ya no vive aquí: es `apps/web/src/lib/useTrackedAnalysis.ts` (`useTrackedAnalysis`, `useElapsedSeconds`), compartido con el tablero desde RF-6.9; la numeración de las jugadas sale de `apps/web/src/lib/moves.ts` y los colores del gráfico de `lib/chartTheme.ts`; tablero, barra, botón de jugada (`MoveButton`), lista de líneas del motor (`EngineLineList`) y navegación —con `useMoveNavigationKeys`— se importan de `apps/web/src/components/board/` | [03-arquitectura.md § web](03-arquitectura.md) |
 | RF-5.2 · Análisis en vivo y flechas del motor | entregado en el tablero de análisis y, desde RF-10.2, con flechas múltiples y previsualización también en el visor (sobre el análisis guardado, sin llamar al motor); "explorar variantes desde el visor" lo cubre RF-6.6 ("Abrir como tablero", fila RF-6). `apps/api/lucia_api/routers/analysis.py` (`POST /analysis/position`) + `services/analysis.py::analyze_position`; `apps/web/src/components/board/` (`boardConfig.ts` con `arrowsFromEngineLines` y `arrowsFromPreviewLine`, `EvalBar.tsx`, `Chessboard.tsx` con la prop `engineArrows`, `BoardWithEvalBar.tsx`); con qué motor se pide lo elige `apps/web/src/components/EngineSelect.tsx` en las dos pantallas | [03-arquitectura.md § flujo 3](03-arquitectura.md) |
 | RF-5.3 · Listado de partidas con filtros | `apps/api/lucia_api/routers/games.py` (nueve filtros: `username`, `color`, `result`, `opponent`, `opening`, `since`, `until`, `time_class`, `rated`, con `_filter_conditions` compartido entre la página y el conteo, y la cabecera `X-Total-Count`), `apps/api/lucia_api/services/games.py` (el lado del jugador en SQL, compartido con `services/stats.py`), `apps/web/src/features/games/GamesPage.tsx` (tabla con `components/DataTable.tsx`, campos con `components/FilterBar.tsx` y `components/FieldLabel.tsx`, total en `lib/api.ts::GamePage`) | [02-requerimientos.md § RF-5](02-requerimientos.md) (reglas de los filtros), [03-arquitectura.md](03-arquitectura.md) |

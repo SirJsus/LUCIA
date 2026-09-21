@@ -29,6 +29,7 @@ import type {
   PuzzleQueue,
   RepertoireComparison,
   RepertoireRefresh,
+  ReplayPosition,
   SparringGame,
   SparringGameCreate,
   SyncSummary,
@@ -301,6 +302,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  /** Los errores propios desde los que se puede retomar una partida contra el
+   * motor (RF-4.4), del que más caro salió al que menos. Es la lista curada;
+   * desde el visor se puede retomar cualquier posición. */
+  getReplayPositions: () => request<ReplayPosition[]>("/training/replays"),
 
   /** Las partidas de sparring, la de la última jugada primero. Las que siguen
    * vivas son las que tienen `result` a `null`. */

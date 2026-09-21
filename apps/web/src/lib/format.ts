@@ -48,6 +48,26 @@ export function formatWinPercentPoints(points: number): string {
   return `${points.toFixed(0)} pts de prob. de victoria`;
 }
 
+/** Lo que costó un error propio, en una frase: "Tu probabilidad de victoria
+ * pasó de 72.0 % a 31.0 %: 41 pts de prob. de victoria menos."
+ *
+ * Es la misma frase en las dos pantallas que dicen lo que costó un error del
+ * usuario —el puzzle ya resuelto (RF-4.1) y la lista de errores desde los que
+ * re-jugar (RF-4.4)—, y estaba escrita dos veces con su resta incluida, que es
+ * la forma de que dos sitios acaben diciendo lo mismo de dos maneras (criterio
+ * C-5).
+ *
+ * Va **desde quien jugó** y no desde las blancas, que es lo que discute la
+ * fila 92 del inventario: mientras se decide, al menos el punto de vista es
+ * uno solo y cambiarlo será un solo cambio.
+ */
+export function formatOwnWinPercentLossSentence(before: number, after: number): string {
+  return `Tu probabilidad de victoria pasó de ${formatPercent(before, 1)} a ${formatPercent(
+    after,
+    1,
+  )}: ${formatWinPercentPoints(before - after)} menos.`;
+}
+
 /** Los motores que LUCIA sabe usar, en el orden en que se ofrecen.
  *
  * El desplegable de las dos pantallas que eligen motor sale de esta lista: los

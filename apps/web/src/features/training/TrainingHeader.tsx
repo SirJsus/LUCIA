@@ -25,6 +25,7 @@ import { buttonClasses, NAV_LINK_CLASSES } from "../../components/styles";
 const TRAINING_TABS = [
   { to: "/training", label: "Puzzles", exact: true },
   { to: "/training/drills", label: "Aperturas", exact: false },
+  { to: "/training/replays", label: "Re-jugar", exact: false },
   { to: "/training/sparring", label: "Sparring", exact: false },
 ] as const;
 

@@ -32,7 +32,7 @@ import {
   buttonClasses,
 } from "../../components/styles";
 import { api } from "../../lib/api";
-import { formatDate, formatPercent, formatWinPercentPoints } from "../../lib/format";
+import { formatDate, formatOwnWinPercentLossSentence } from "../../lib/format";
 import { moveNumberLabel, plyFromFen } from "../../lib/moves";
 
 export function PuzzleSolver({ puzzle, onNext }: { puzzle: Puzzle; onNext: () => void }) {
@@ -249,7 +249,6 @@ function PuzzleResult({
   answer: ReviewedPuzzleAnswer;
   onNext: () => void;
 }) {
-  const lostPoints = answer.win_percent_before - answer.win_percent_after;
   return (
     <>
       {answer.correct ? (
@@ -263,9 +262,11 @@ function PuzzleResult({
           <span>Jugaste {answer.played_san}</span>
           <ClassificationBadge classification={answer.classification} />
         </p>
+        {/* La frase sale de `lib/format.ts`, que es donde vive el formateo, y
+            no escrita aquí: la lista de re-jugar (RF-4.4) dice exactamente lo
+            mismo del mismo dato (criterio C-5). */}
         <p className="mt-1 text-xs opacity-70">
-          Tu probabilidad de victoria pasó de {formatPercent(answer.win_percent_before, 1)} a{" "}
-          {formatPercent(answer.win_percent_after, 1)}: {formatWinPercentPoints(lostPoints)} menos.
+          {formatOwnWinPercentLossSentence(answer.win_percent_before, answer.win_percent_after)}
         </p>
         {answer.solutions_san.length > 1 && (
           <p className="mt-2 text-xs opacity-70">

@@ -1,9 +1,17 @@
-"""Jugar contra el motor con la fuerza calibrada (RF-4.3).
+"""Jugar contra el motor con la fuerza calibrada (RF-4.3), desde el principio o
+retomando una partida propia desde donde se torció (RF-4.4).
 
 Aquí se juntan las tres piezas: las reglas puras de `lucia_core.sparring` —qué
 posición hay ahora y si la partida acabó—, el motor de `lucia_core.engine` —que
 desde RF-4.3 sabe **jugar** además de analizar— y la fila de `sparring_games`,
 que guarda la posición de partida y las jugadas y nada más.
+
+**Retomar no es otra forma de jugar**, es la misma empezada en otro sitio: la
+misma tabla, el mismo ciclo y la misma pantalla, con `starting_fen` en otra
+posición y `origin_game_id`/`origin_ply` diciendo de dónde salió. Por eso vive
+en este módulo y no en uno propio; quién elige *qué* posición merece retomarse
+es `services/replays.py`, que solo lista. Razonado en
+[ADR-0020](../../../../docs/adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md).
 
 **Quién calibra la fuerza es este módulo**, y no el núcleo: depende de qué
 motor haya instalado y de con qué red, que es información de la instalación
@@ -27,14 +35,21 @@ tenga que decirlo en vez de enseñar un deslizador muerto.
 from __future__ import annotations
 
 import datetime as dt
+from dataclasses import dataclass
 
 import chess
 from lucia_core.engine import EngineBridge, EngineConfig
-from lucia_core.sparring import GameEnding, board_after_moves, ending_of, resignation_ending
+from lucia_core.sparring import (
+    GameEnding,
+    board_after_moves,
+    board_at_ply,
+    ending_of,
+    resignation_ending,
+)
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from lucia_api.db.models import SparringGame
+from lucia_api.db.models import Game, SparringGame
 from lucia_api.settings import settings
 
 SPARRING_ENGINE_NAMES = ("stockfish", "lc0")
@@ -108,30 +123,67 @@ def missing_requirement(engine_name: str) -> str | None:
     return None
 
 
+@dataclass(frozen=True)
+class GamePosition:
+    """Una posición de una partida propia, para retomarla desde ahí (RF-4.4)."""
+
+    game_id: int
+    ply: int
+    """Jugadas ya hechas: 0 es el principio, y `ply` es la posición **anterior**
+    a la jugada número `ply`. Así, retomar justo antes de un error es pedir el
+    ply de ese error, que es como lo numera `AnalyzedMove`."""
+    fen: str
+
+
+async def get_game_position(session: AsyncSession, game_id: int, ply: int) -> GamePosition:
+    """La posición de una partida propia en esa jugada (RF-4.4).
+
+    La posición se deriva del PGN que ya está guardado en vez de pedírsela a
+    la pantalla: el servidor es quien va a jugar desde ahí, y aceptar un FEN
+    cualquiera por HTTP sería otra cosa —empezar desde una posición inventada,
+    que es RF-11.1 y está fuera del alcance de v1.0—.
+
+    Lanza `ValueError` si la partida no existe o no llega a esa jugada.
+    """
+    game = await session.get(Game, game_id)
+    if game is None:
+        raise ValueError(f"no existe la partida {game_id}")
+    return GamePosition(game_id=game_id, ply=ply, fen=board_at_ply(game.pgn, ply).fen())
+
+
 async def create_game(
     session: AsyncSession,
     *,
     player_color: str,
     engine_name: str,
     engine_elo: int | None,
+    origin: GamePosition | None = None,
 ) -> SparringGame:
-    """Abre una partida y, si el motor lleva blancas, le pide ya su jugada.
+    """Abre una partida y, si le toca mover al motor, le pide ya su jugada.
 
     Que el motor abra aquí y no en la primera petición de la pantalla es lo
-    que hace que la partida llegue lista para mover: si no, quien juega con
-    negras vería un tablero inicial esperando a nadie.
+    que hace que la partida llegue lista para mover: si no, quien juega con el
+    otro bando vería un tablero esperando a nadie.
+
+    Con `origin` la partida no empieza en la posición inicial sino en la de una
+    partida propia (RF-4.4): se guarda esa posición y de dónde salió, para
+    poder decirlo en pantalla y volver a ver la partida en el visor.
     """
     game = SparringGame(
         player_color=player_color,
         engine=engine_name,
         engine_elo=engine_elo if engine_name == "stockfish" else None,
-        starting_fen=chess.STARTING_FEN,
+        starting_fen=origin.fen if origin else chess.STARTING_FEN,
         moves_uci_json=[],
+        origin_game_id=origin.game_id if origin else None,
+        origin_ply=origin.ply if origin else None,
     )
     session.add(game)
     await session.flush()
 
-    if player_color == "black":
+    # Quién abre no es "las blancas": es quien tenga el turno en la posición de
+    # partida, que retomando una partida a mitad puede ser cualquiera.
+    if current_board(game).turn != _color_of(player_color):
         await _play_engine_move(game)
     await session.commit()
     return game

@@ -67,9 +67,11 @@ export function turnsOf(movesSan: string[]): SparringTurn[] {
   for (let index = 0; index < movesSan.length; index += 2) {
     turns.push({
       // El número de jugada sale de `lib/moves.ts`, que es de donde sale en las
-      // otras cinco pantallas que numeran (criterio C-5). Una partida de
-      // sparring siempre arranca en la posición estándar, así que el índice es
-      // ya el ply absoluto.
+      // otras cinco pantallas que numeran (criterio C-5). El índice se toma
+      // como ply absoluto, que solo es cierto cuando la partida arranca en la
+      // posición estándar: desde RF-4.4 una partida retomada empieza a mitad y
+      // su lista se numera igualmente desde 1. Es la fila 101 del inventario;
+      // el ply de salida no viaja todavía en `SparringGameOut`.
       number: moveNumberOf(index),
       white: movesSan[index] ?? null,
       black: movesSan[index + 1] ?? null,

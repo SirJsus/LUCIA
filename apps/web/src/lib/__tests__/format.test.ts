@@ -4,6 +4,7 @@ import {
   formatDate,
   formatDuration,
   formatEngineName,
+  formatOwnWinPercentLossSentence,
   formatPercent,
   formatPerHundredMoves,
   formatBoardTitleFromPgnHeaders,
@@ -112,6 +113,14 @@ describe("formatPercent", () => {
   it("pone la unidad, con el espacio que pide la ortografía española", () => {
     expect(formatPercent(54.28)).toBe("54 %");
     expect(formatPercent(54.28, 1)).toBe("54.3 %");
+  });
+});
+
+describe("formatOwnWinPercentLossSentence", () => {
+  it("dice lo que costó el error con la resta ya hecha", () => {
+    expect(formatOwnWinPercentLossSentence(72, 31)).toBe(
+      "Tu probabilidad de victoria pasó de 72.0 % a 31.0 %: 41 pts de prob. de victoria menos.",
+    );
   });
 });
 

@@ -53,7 +53,11 @@ tablero donde se juega y dejó ocho arreglos en el mismo commit. El drill de
 aperturas (RF-4.2), del mismo día, es la tercera pestaña de Entrenamiento y la
 pantalla gemela de la de puzzles: abrió las filas **97 a 100** —todas de lo
 que separa a las dos gemelas—, amplió otra vez la 91 y dejó tres arreglos en el
-mismo commit.
+mismo commit. Re-jugar desde el error (RF-4.4), del mismo día, es la cuarta
+pestaña y la primera acción de Entrenamiento que se ofrece también desde fuera
+de la sección —desde el visor de una partida propia—: abrió las filas **101 a
+103**, amplió la 92 a la pantalla nueva y la 95 al cuarto listado, y dejó ocho
+arreglos en el mismo commit.
 
 **Qué es cada mitad de este documento.** Los criterios C-1 a C-7 son
 **RNF-11**, que vive en la sección Post 1.0 de
@@ -86,8 +90,9 @@ antes de comitear cambios de front — ver [Cómo se verifica](#cómo-se-verific
 
 ## Inventario de incoherencias abiertas (al 2026-09-21)
 
-**Nueve**: las dos de la pantalla de puzzles (91 y 92), las tres que abrió el
-sparring (94 a 96) y las cuatro del drill de aperturas (97 a 100). Llegó a
+**Doce**: las dos de la pantalla de puzzles (91 y 92), las tres que abrió el
+sparring (94 a 96), las cuatro del drill de aperturas (97 a 100) y las tres de
+re-jugar desde el error (101 a 103). Llegó a
 estar vacío el 2026-09-19 —las cuatro últimas
 heredadas, la 65 y la 67 de la pantalla de Partidas y la 68 y la 70 del control
 de exportar del visor, se cerraron al recorrer el apéndice de la fase 2—, y
@@ -109,27 +114,34 @@ pantalla es gemela de la de puzzles y el parecido se rompe en el panel lateral
 —lo que pasa al fallar, lo que dice el encabezado del panel y cómo se leen las
 jugadas de la línea—, más el aviso de teoría incompleta, que pide un campo
 nuevo en la cola. Se dejan para el final de la fase 3, cuando estén todas las
-pantallas de Entrenamiento y se pueda decidir de una vez cómo se parecen.
+pantallas de Entrenamiento y se pueda decidir de una vez cómo se parecen. Las
+tres de re-jugar (RF-4.4), del 2026-09-21, son las tres de la misma clase: dos
+piden un campo más en la API —el ply desde el que arranca una partida retomada
+y cuántos errores hay en total— y la tercera es la ayuda de la cabecera del
+visor, que lleva ahí desde RF-5.5 y que este cambio agranda con un botón más.
 
 | # | Incoherencia | Dónde | Criterio |
 | --- | --- | --- | --- |
 | 91 | Los tres tableros donde se mueve una pieza —el puzzle, la partida de sparring y la línea del drill de aperturas— solo se pueden usar con el ratón: la única vía es arrastrar. Las otras dos capas que se dibujan sobre un tablero —el editor de posición y la ocupación— tienen su rejilla enfocable (`SquareKeyboardGrid`), pero esa rejilla activa **una** casilla y una jugada son dos (origen y destino), así que no sirve tal cual. | `apps/web/src/features/training/PuzzleSolver.tsx`, `apps/web/src/features/training/SparringGamePage.tsx` y `apps/web/src/features/training/DrillRunner.tsx` (los tres `Chessboard` van sin `overlay`) | C-1 |
-| 92 | La probabilidad de victoria del puzzle se da desde quien resolvió ("Tu probabilidad de victoria pasó de…") y no desde las blancas. La misma jugada de las negras sale como 31 % aquí y como 69 % en el visor al que lleva "Ver partida", que es justo lo que corrigió la fila 52 en los momentos críticos. | `apps/web/src/features/training/PuzzleSolver.tsx::PuzzleResult` | C-5 |
+| 92 | La probabilidad de victoria del puzzle se da desde quien resolvió ("Tu probabilidad de victoria pasó de…") y no desde las blancas. La misma jugada de las negras sale como 31 % aquí y como 69 % en el visor al que lleva "Ver partida", que es justo lo que corrigió la fila 52 en los momentos críticos. Desde RF-4.4 lo dice también la lista de errores para re-jugar, con la misma frase y desde el mismo lado —la frase está ya en un solo sitio (`formatOwnWinPercentLossSentence`), así que girarla es un solo cambio—, y ahí el choque es más corto: la propia fila lleva al lado el enlace "Ver partida" que enseña el otro número. | `apps/web/src/lib/format.ts::formatOwnWinPercentLossSentence`, que usan `features/training/PuzzleSolver.tsx::PuzzleResult` y `features/training/ReplaysPage.tsx` | C-5 |
 | 94 | La pantalla de una partida de sparring no se encabeza como las otras dos pantallas de detalle: su título es "Entrenamiento" —el de la sección— en vez del de la partida, y la vuelta atrás es un botón al final del lateral ("Volver a Sparring") en lugar del enlace de texto sobre el título que usan el visor y el tablero de análisis ("← Volver a partidas", "← Volver a tableros"). Encima la pestaña "Sparring" de la sub-navegación lleva al mismo sitio con otro nombre: dos controles para lo mismo. | `apps/web/src/features/training/SparringGamePage.tsx` (la `TrainingHeader` y el `Link` del final del lateral) | C-2 |
-| 95 | El listado de partidas de sparring es la tercera forma de pintar un listado: Partidas usa `DataTable`, Tableros una `<ul>` de tarjetas con `PANEL_CLASSES`, y este una `<ul>` de filas separadas por línea dentro de un `Panel`. Los datos son tabulares —fecha, color, rival, resultado— y la fila acaba igual que las otras dos, con un enlace con aspecto de botón. | `apps/web/src/features/training/SparringPage.tsx::SparringGameRow` | C-2 |
-| 96 | El nombre del rival se compone dos veces y de dos lados: el formulario de "Nueva partida" lo arma en el front con `formatEngineName` ("Lc0 · Maia") y la partida lo recibe ya armado del servidor (`opponent_name`, "Stockfish (1500)"). Hoy coinciden carácter a carácter y nada lo garantiza; el front ya recibe `engine` y `engine_elo`, que es todo lo que hace falta para componerlo una sola vez. | `apps/api/lucia_api/routers/sparring.py::_opponent_name` y `apps/web/src/features/training/SparringPage.tsx` | C-5 |
+| 95 | El listado de partidas de sparring es la tercera forma de pintar un listado: Partidas usa `DataTable`, Tableros una `<ul>` de tarjetas con `PANEL_CLASSES`, y este una `<ul>` de filas separadas por línea dentro de un `Panel`. Los datos son tabulares —fecha, color, rival, resultado— y la fila acaba igual que las otras dos, con un enlace con aspecto de botón. El listado de re-jugar (RF-4.4) es ya el cuarto y copia carácter a carácter la receta de fila de este —el mismo `className` del `<li>`, el mismo `ml-auto` para la fecha, el mismo `Panel` con `bodyClassName=""`—: dos listas iguales sostenidas a mano, que es la familia de las filas 39 a 41. | `apps/web/src/features/training/SparringPage.tsx::SparringGameRow` y `apps/web/src/features/training/ReplaysPage.tsx::ReplayRow` | C-2 |
+| 96 | El nombre del rival se compone dos veces y de dos lados: el formulario de "Nueva partida" lo arma en el front con `formatEngineName` ("Lc0 · Maia") y la partida lo recibe ya armado del servidor (`opponent_name`, "Stockfish (1500)"). Hoy coinciden carácter a carácter y nada lo garantiza; el front ya recibe `engine` y `engine_elo`, que es todo lo que hace falta para componerlo una sola vez. Desde RF-4.4 el formulario es compartido, así que la versión del front es una sola y sale de tres pantallas. | `apps/api/lucia_api/routers/sparring.py::_opponent_name` y `apps/web/src/features/training/SparringSetupForm.tsx` | C-5 |
 | 97 | Fallar deja el tablero de dos maneras distintas en las dos pantallas gemelas. En el puzzle la jugada errónea se queda puesta a propósito —"borrarla al instante da la sensación de que la pieza rebotó y no de que la respuesta era otra"— y hace falta pulsar «Volver a intentarlo» para recuperar la posición; en el drill el servidor devuelve la posición de antes, la pieza rebota y se puede volver a arrastrar sin pulsar nada. Una de las dos está mal, y la razón escrita está del lado del puzzle. | `apps/web/src/features/training/DrillRunner.tsx::applyResult` y `apps/web/src/features/training/PuzzleSolver.tsx` | C-2 / C-3 |
 | 98 | El encabezado del panel lateral dice una cosa distinta en cada una de las tres pantallas con tablero de Entrenamiento. El título: "Juegan blancas" en el puzzle, "Juegas con blancas" en el sparring y el nombre de la apertura en el drill, que baja el color a la primera línea del cuerpo. La insignia de al lado: en el puzzle es en qué repaso va ("nuevo", "repaso 3"), en el sparring es lo que está haciendo el sistema ("el motor piensa…", "te toca") y en el drill es de qué baraja salió la línea. Como consecuencia, el drill no enseña su `repetitions` —que la API manda— y es el único de los tres que no dice que está esperando al servidor mientras el rival contesta. | `apps/web/src/features/training/DrillRunner.tsx` (el `Panel` del lateral), comparado con `PuzzleSolver.tsx` y `SparringGamePage.tsx` | C-2 / C-3 |
 | 99 | Que la teoría esté a medias solo se dice **después** de pulsar «Generar líneas», y es una condición de la pantalla entera: las líneas salen del repertorio comparado, que se llena a trozos (ADR-0010), así que una cola corta puede serlo porque falta teoría y no porque se juegue bien. `positions_missing` solo viaja en `DrillGenerationOut`; la cola (`DrillQueueOut`) no lo trae. | `apps/api/lucia_api/routers/drills.py::DrillQueueOut` y `apps/web/src/features/training/DrillsPage.tsx` | C-3 |
 | 100 | Las jugadas de la línea se pintan como una cadena suelta —"e4 e5 Nf3 Nc6"—, sin número de jugada y sin la tipografía monoespaciada con la que la aplicación enseña notación en todas partes (`MoveButton`, la tabla de salidas del repertorio, la lista de jugadas del sparring, que numera desde `lib/moves.ts`). Es la única secuencia de jugadas de la aplicación que se lee como prosa. | `apps/web/src/features/training/DrillRunner.tsx` (`line_san.join(" ")` en `DrillResult` y `preceding_moves_san.join(" ")` en el panel) | C-5 |
+| 101 | Una partida retomada se numera desde 1. La lista de jugadas de una partida de sparring que empieza en la jugada 23 (RF-4.4) dice "1. 2. 3.", dos centímetros debajo del panel que dice "Retomada desde la jugada 23.". Y ese número del origen sale de `origin_ply`, que es relativo al inicio de la partida de origen: si esa empezaba en una posición dada, el visor la numera desde su jugada real y aquí sale otra. El front no puede arreglarlo solo: `SparringGameOut` manda la posición de ahora y las jugadas, pero no desde qué ply arranca la partida. | `apps/web/src/features/training/sparring.ts::turnsOf` y `features/training/SparringGamePage.tsx`, con `apps/api/lucia_api/routers/sparring.py::SparringGameOut` | C-5 |
+| 102 | El listado de re-jugar no dice cuántos errores hay ni que está recortado. La API devuelve los veinte más caros (`DEFAULT_POSITIONS_LIMIT`) y la pantalla los enseña sin más, mientras sus tres pestañas hermanas dicen siempre cuántas quedan de cuántas ("N por repasar de M", "N sin terminar"), y el listado de Partidas trae su total en `X-Total-Count` desde la fila 59. Con trescientos errores se ven veinte y nada dice que haya más. | `apps/web/src/features/training/ReplaysPage.tsx` y `apps/api/lucia_api/routers/replays.py` | C-3 |
+| 103 | Tres de las acciones de la cabecera del visor explican qué hacen solo en un `title` —"Exportar PGN anotado", "Abrir como tablero" y, desde RF-4.4, "Jugar desde aquí"—, que con teclado no aparece nunca y en un botón deshabilitado tampoco. Es lo mismo que corrigieron las filas 56 y 57 en la barra de filtros de Partidas y el editor de posición con su "Goma": la ayuda va a la vista bajo el control, como ya la ponen Puzzles y Aperturas bajo su botón de generar. | `apps/web/src/features/viewer/GameViewerPage.tsx` (la fila de acciones de la cabecera) | C-6 / C-7 |
 
 ## Lo que se cerró
 
 Las 90 primeras filas de este inventario, todas cerradas, se cerraron en doce
 pasadas, y aquí queda el rastro de qué se hizo, para que un
-`git blame` no sea la única forma de averiguarlo. Las dos últimas pasadas, la
-de Entrenamiento y la del sparring, están al final: no cerraron filas, las
-abrieron.
+`git blame` no sea la única forma de averiguarlo. Las cuatro últimas pasadas
+—la de Entrenamiento, la del sparring, la del drill de aperturas y la de
+re-jugar desde el error— están al final: no cerraron filas, las abrieron.
 
 **2026-09-06 · legibilidad del análisis.** Apareció la barra de evaluación, el
 tablero de análisis empezó a dibujar las flechas del motor, los vacíos del
@@ -1004,6 +1016,88 @@ Y cuatro rupturas del patrón que se revisaron y se dejan como están:
   (RF-3.6) y las aperturas que rinden mal (RF-3.2)— ordenadas por cuándo tocan
   y no por su origen, que se dice con una insignia. Separarlas obligaría a
   elegir por cuál empezar cada día, y para quien entrena son lo mismo.
+
+**2026-09-21 · re-jugar desde el error (RF-4.4).** La cuarta pestaña de
+Entrenamiento —una lista de los errores propios más caros— y la primera acción
+de la sección que se ofrece además desde fuera de ella: el visor de una partida
+propia gana "Jugar desde aquí" junto a "Abrir como tablero". Lo que se retoma es
+una partida de sparring desde otra posición, así que se juega en la pantalla de
+RF-4.3 y el formulario de dificultad, que antes vivía dentro de `SparringPage`,
+es ya un componente que usan las tres pantallas que abren una partida
+(`features/training/SparringSetupForm.tsx`): esa extracción es la mitad del
+trabajo de coherencia de este cambio y se hizo antes de la revisión. Abrió las
+filas **101 a 103**, amplió la **92** —la lista repite el punto de vista del
+puzzle— y la **95** —el cuarto listado copia la receta de fila del tercero—, y
+dejó ocho arreglos en el mismo commit, sin nada que decidir. La **98** no se
+mueve: re-jugar no añade un cuarto tablero ni un cuarto panel lateral, lleva al
+del sparring, que sigue encabezándose como estaba.
+
+Los arreglos:
+
+- **C-5 · lo que costó el error se dice con una sola frase.** "Tu probabilidad
+  de victoria pasó de 72.0 % a 31.0 %: 41 pts de prob. de victoria menos"
+  estaba escrita dos veces, con su resta incluida, en el puzzle resuelto y en
+  la lista de re-jugar: dos sitios donde el mismo dato podía acabar diciéndose
+  de dos maneras. Sale de `formatOwnWinPercentLossSentence` en `lib/format.ts`,
+  que es donde vive el formateo y donde ya vivía `formatTrendSentence`. De paso
+  deja la fila 92 en un solo sitio: girar el punto de vista será un cambio y no
+  dos.
+- **C-5 · el número de jugada sale del FEN y no del `ply`.** La lista numeraba
+  con `moveNumberLabel(position.ply)`, que es relativo al inicio de la partida,
+  así que un error de la jugada 15 de una partida importada que empieza en la
+  12 salía como la 4. Es `plyFromFen(position.fen)`, exactamente lo que ya hace
+  el puzzle con la suya.
+- **C-2 · la acción se llama igual en las dos pantallas desde las que se
+  hace.** El botón que despliega el formulario decía "Re-jugar desde aquí" en
+  la lista y "Jugar desde aquí" en el visor; es "Jugar desde aquí" en los dos,
+  que es el nombre que funciona también donde no hubo ningún error que
+  rehacer.
+- **C-2 · y el botón que la ejecuta, también.** Decía "Retomar la partida" en
+  la lista y "Empezar partida" en el visor, en el mismo formulario. Los dos
+  dicen **retomar**; "Empezar partida" se queda en Sparring, que es la otra
+  cosa: una partida desde cero.
+- **C-2 · el control de la fila va en `sm`.** Iba en `md`, que es el tamaño de
+  una acción de cabecera, al lado de un "Ver partida" en `sm`: dos botones
+  contiguos de dos tamaños en la misma fila. Es el mismo arreglo que se hizo el
+  mismo día en la fila del listado de sparring.
+- **C-2 · el panel se llama "Tus errores".** Se llamaba "Tus peores momentos",
+  y "momento" ya nombra otra cosa en la aplicación —los momentos críticos del
+  visor (RF-2.8), que se eligen con otra regla—, mientras que esta pantalla
+  llama errores a lo que enseña en su frase de entrada y en su vacío. "Tus …"
+  es además como se titula el listado de la pestaña de al lado.
+- **C-3 · el fallo al retomar sale donde se pulsó.** El `ErrorBox` colgaba de
+  la cabecera de la pantalla, así que elegir el error decimoquinto y que
+  fallara dejaba el aviso fuera de la pantalla. Va bajo el formulario del error
+  elegido, y elegir otro hace `reset()`: un recuadro rojo sobre un formulario
+  recién abierto se lee como si acabara de fallar ese (es lo mismo que se
+  corrigió al abrir "Importar PGN" en el tablero de análisis).
+- **Y dos comentarios que ya no decían la verdad.** `turnsOf` afirmaba que "una
+  partida de sparring siempre arranca en la posición estándar, así que el
+  índice es ya el ply absoluto", que es justo lo que RF-4.4 acaba de romper:
+  dice ya lo que hay y remite a la fila 101, igual que el panel del origen en
+  `SparringGamePage`. Y el módulo de la pantalla nueva no explicaba por qué
+  enseña abierto lo que un puzzle esconde; ahora lo dice (ver abajo).
+
+Y tres rupturas del patrón que se revisaron y se dejan como están:
+
+- **La evaluación del error se enseña abierta**, y en el puzzle sin resolver se
+  esconde. No es la misma pantalla con dos reglas: en el puzzle el dato es
+  media respuesta —la API lo manda a `null` a propósito hasta que se cierra—, y
+  aquí no hay nada que adivinar, se viene a jugar otra vez la posición y es
+  justamente el número que dice por cuál empezar. Escrito en los dos lados,
+  `features/training/ReplaysPage.tsx` y `routers/replays.py::ReplayPositionOut`,
+  para que no se lea como un descuido.
+- **La lista no se genera ni se guarda**, al revés que las dos pestañas
+  gemelas, que tienen su botón "Generar puzzles" / "Generar líneas" y su cola
+  con repasos. No arrastra estado propio, así que se deduce de los análisis que
+  ya hay cada vez que se pregunta (ADR-0008). Por eso tampoco dice "N por
+  repasar de M": lo que sí debería decir es cuántos errores hay y que enseña
+  los veinte peores, y eso es la fila 102.
+- **La pestaña se llama "Re-jugar" y sus hermanas "Puzzles", "Aperturas" y
+  "Sparring".** Las otras tres nombran lo que se entrena; esta nombra lo que se
+  hace, porque lo que se entrena —los errores propios— ya es lo que dan los
+  puzzles, y la diferencia entre las dos pestañas está justamente en el verbo:
+  allí se busca la jugada, aquí se vuelve a jugar la partida.
 
 **Y un nombre que se revisó y se deja como está.** Que la acción se llame
 "Exportar PGN anotado" y no "Exportar PGN", teniendo Partidas un "Importar

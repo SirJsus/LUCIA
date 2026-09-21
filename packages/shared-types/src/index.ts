@@ -56,6 +56,7 @@ export type DrillQueue = Schemas["DrillQueueOut"];
 export type DrillGeneration = Schemas["DrillGenerationOut"];
 export type DrillMove = Schemas["DrillMoveOut"];
 export type SparringGame = Schemas["SparringGameOut"];
+export type ReplayPosition = Schemas["ReplayPositionOut"];
 export type SparringGameCreate = Schemas["SparringGameCreate"];
 
 /** Categorías de `classify_move` (lucia_core.classification). El OpenAPI las

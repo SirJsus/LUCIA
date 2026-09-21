@@ -1,5 +1,7 @@
 """Partidas de sparring contra el motor (RF-4.3): cómo se rehace una, cuándo
-se acabó y cómo se escribe en PGN.
+se acabó y cómo se escribe en PGN. Y, desde RF-4.4, desde dónde se retoma una
+partida propia: `board_at_ply()` saca del PGN guardado la posición en la que
+se torció, que es la que pasa a ser `starting_fen` de la nueva partida.
 
 Vive aquí y no en la API por lo mismo que `lucia_core.training`: son reglas de
 ajedrez puras, sin base de datos, sin motor y sin reloj, así que se pueden
@@ -16,6 +18,7 @@ jugada, y para contestar necesita saber que la jugada existía.
 
 from __future__ import annotations
 
+import io
 from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Literal
@@ -77,6 +80,37 @@ def board_after_moves(starting_fen: str, moves_uci: Sequence[str]) -> chess.Boar
     board = chess.Board(starting_fen)
     for uci in moves_uci:
         board.push_uci(uci)
+    return board
+
+
+def board_at_ply(pgn_text: str, ply: int) -> chess.Board:
+    """La posición de una partida escrita en PGN tras sus primeras `ply`
+    jugadas (RF-4.4).
+
+    `ply` cuenta jugadas **ya hechas**, de los dos bandos: 0 es la posición de
+    partida y `ply` es la posición **anterior** a la jugada número `ply`. Con
+    eso, retomar una partida justo antes de un error es pedir el ply de ese
+    error, que es como lo numera `AnalyzedMove`.
+
+    Es lo que permite re-jugar desde el error sin guardar la posición en
+    ninguna parte: la partida ya está en `games.pgn` y la posición se deriva.
+
+    Lanza `ValueError` si el texto no trae ninguna partida o si la que trae no
+    llega a esa jugada — pedir el ply 40 de una partida de 30 sería retomarla
+    desde una posición que nunca existió. Un texto que no es un PGN se lee
+    como una partida **sin jugadas**, así que lo delata pedirle una jugada que
+    no tiene y no la primera comprobación.
+    """
+    game = chess.pgn.read_game(io.StringIO(pgn_text))
+    if game is None:
+        raise ValueError("ese PGN no tiene ninguna partida que leer")
+
+    moves = list(game.mainline_moves())
+    if ply > len(moves):
+        raise ValueError(f"la partida no llega a la jugada {ply}")
+    board = game.board()
+    for move in moves[:ply]:
+        board.push(move)
     return board
 
 
