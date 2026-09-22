@@ -579,7 +579,78 @@ Razonado en
 [ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md),
 que también deja escrito por qué esto no mete RF-11 dentro de v1.0.
 
-RF-4.5 sigue pendiente.
+**Con qué reglas se cumplió RF-4.5** (**2026-09-21**). El texto dice "plan de
+entrenamiento semanal generado a partir de las debilidades detectadas", y no
+dice qué cuenta como debilidad, cuánto hay que hacer de cada cosa, quién marca
+lo hecho ni cuándo empieza la semana. Esta es la lectura que se le dio; los
+cinco umbrales y los cuatro topes semanales son constantes con nombre en
+`lucia_core.plan`, ajustables sin tocar el requerimiento ni
+[ADR-0021](adr/0021-el-plan-semanal-se-deduce-y-el-orden-de-las-debilidades-es-editorial.md).
+
+- **Las debilidades son cinco clases, una por cada cosa que RF-3 ya sabe
+  mirar**, y cada una entra solo si pasa **su** umbral: la fase donde se pierde
+  ventaja (RF-3.3, `MIN_PHASE_WIN_PERCENT_LOST` = 5 puntos de probabilidad de
+  victoria por jugada), el tipo de error que más pesa (RF-3.4,
+  `MIN_MISTAKE_TYPE_SHARE` = 33 % de los errores, cuando el reparto ciego entre
+  cuatro tipos sería el 25 %), la apertura que más cuesta (RF-3.2,
+  `MIN_OPENING_POINTS_LOST` = 1 punto de marcador, el mismo umbral con el que
+  el drill de RF-4.2 decide qué línea merece repetirse), los apuros de reloj
+  (RF-3.5, `MIN_TIME_TROUBLE_SHARE` = 30 % de las partidas) y la precisión que
+  cae (RF-3.7, `MIN_ACCURACY_DROP` = 2 puntos frente a los meses anteriores).
+  Un plan que enumera cinco debilidades siempre, las tenga o no, no ayuda a
+  decidir por dónde empezar.
+- **El orden en que se enseñan es fijo por clase y no sale de los números.**
+  Fase, tipo de error, apertura, apuros de reloj y tendencia: de lo más
+  estructural a lo más circunstancial. No puede salir de los números porque
+  cada debilidad se mide **en su propia unidad** —puntos de probabilidad,
+  porcentaje de errores, puntos de marcador, porcentaje de partidas, puntos de
+  precisión— y ordenarlas por ahí sería inventar una escala común en la que el
+  55 % de errores tácticos pesa más que perder 8 puntos de probabilidad por
+  jugada. La primera de la lista es la que lleva la insignia "lo primero", así
+  que ese orden es una recomendación y se responde de él.
+- **Cada deber nace de una debilidad concreta y la lleva encima.** La tabla
+  `_TASK_BY_WEAKNESS` es la lectura de "generado a partir de las debilidades
+  detectadas": lo táctico y el medio juego van a puzzles (RF-4.1), lo
+  posicional y la apertura a repetir líneas (RF-4.2), el final a re-jugar
+  posiciones (RF-4.4), y los apuros de reloj y la precisión que cae a partidas
+  enteras contra el motor (RF-4.3), que es lo único que reproduce la fatiga de
+  una partida de verdad. Una debilidad sin entrenamiento posible no genera
+  deber, y un deber sin motivo a la vista sería una cuota inventada.
+- **El objetivo nunca pide más de lo que hay**: `min(tope semanal, material
+  disponible)`, y un entrenamiento sin material no genera tarea. Un plan que
+  pide treinta puzzles cuando hay cuatro no es exigente, es falso. Puzzles y
+  líneas cuentan como material **solo lo que vence esta semana**: repasar antes
+  de tiempo no es entrenar, es adelantar trabajo que el SM-2 ya había colocado
+  en otra fecha.
+- **La semana empieza el lunes**, no "hace siete días". Con una ventana móvil,
+  lo entrenado el lunes dejaría de contar el martes siguiente y el avance
+  bajaría solo, sin que nadie hiciera nada.
+- **El plan no se guarda y nadie marca un deber a mano.** Se deduce en cada
+  visita de las estadísticas de RF-3 y de las colas de RF-4, y lo hecho sale de
+  fechas que la base ya tiene: `puzzles.last_reviewed_at`,
+  `opening_drills.last_reviewed_at` y `sparring_games.created_at`. Es la misma
+  decisión que los patrones ([ADR-0008](adr/0008-patrones-deducidos-al-leer.md))
+  y que la lista de re-jugar
+  ([ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md)):
+  **RF-4.5 es el único requerimiento de RF-4 que no toca el modelo de datos**.
+- **Un plan vacío no es un fallo, y hay dos vacíos distintos.** Sin partidas
+  analizadas la pantalla manda a analizar, porque no se sabe nada todavía; con
+  partidas analizadas y nada por encima de su umbral, dice que no ha encontrado
+  nada que destaque. Por eso la respuesta lleva sobre cuántas partidas se hizo
+  el diagnóstico.
+- **El plan es la portada de Entrenamiento**, que pasa a tener cinco pestañas
+  (Plan, Puzzles, Aperturas, Re-jugar, Sparring): es la pantalla que dice por
+  dónde empezar y las otras cuatro son adónde manda. `/training` es el plan y
+  los puzzles se mudan a `/training/puzzles`.
+
+Razonado en
+[ADR-0021](adr/0021-el-plan-semanal-se-deduce-y-el-orden-de-las-debilidades-es-editorial.md),
+que deja escrito por qué el plan no se persiste y por qué el orden de las
+debilidades es editorial y no numérico.
+
+**Con RF-4.5 queda cerrado RF-4 entero** (RF-4.1 a RF-4.5, todas entregadas
+entre el **2026-09-19** y el **2026-09-21**). El entrenamiento de v1.0 no tiene
+nada pendiente.
 
 ### RF-5 · Interfaz
 

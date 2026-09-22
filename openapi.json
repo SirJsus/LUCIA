@@ -3,7 +3,7 @@
   "info": {
     "title": "L.U.C.I.A. API",
     "description": "Logic & Ultimate Chess Insight Algorithm",
-    "version": "0.4.4"
+    "version": "0.4.5"
   },
   "paths": {
     "/health": {
@@ -1733,6 +1733,56 @@
                     "$ref": "#/components/schemas/ReplayPositionOut"
                   },
                   "title": "Response Player Replay Positions Training Replays Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/plan": {
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Player Weekly Plan",
+        "description": "El plan de esta semana: qué falla y qué hacer al respecto.",
+        "operationId": "player_weekly_plan_training_plan_get",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyPlanOut"
                 }
               }
             }
@@ -4037,6 +4087,38 @@
         ],
         "title": "PhaseStatsOut"
       },
+      "PlanTaskOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "weekly_target": {
+            "type": "integer",
+            "title": "Weekly Target"
+          },
+          "done_this_week": {
+            "type": "integer",
+            "title": "Done This Week"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/WeaknessOut"
+            },
+            "type": "array",
+            "title": "Reasons"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "weekly_target",
+          "done_this_week",
+          "reasons"
+        ],
+        "title": "PlanTaskOut",
+        "description": "Un deber de la semana: qué entrenar, cuánto y por qué."
+      },
       "PlayerStatsOut": {
         "properties": {
           "username": {
@@ -5041,6 +5123,70 @@
         ],
         "title": "WdlOut",
         "description": "Probabilidad de victoria, tablas y derrota **de las blancas** según el\nmotor, en partes por mil (RF-2.6).\n\nEs la opinión del motor, no la fórmula: `win_percent_*` sale de convertir\nel centipeón con el modelo de Lichess y es igual para cualquier motor,\nmientras que esto lo contesta cada uno por su cuenta y es donde Lc0 aporta\nuna segunda opinión de verdad. Los tres suman 1000."
+      },
+      "WeaknessOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "magnitude": {
+            "type": "number",
+            "title": "Magnitude"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "subject",
+          "magnitude",
+          "color"
+        ],
+        "title": "WeaknessOut",
+        "description": "Algo que se está haciendo mal, con su número y de dónde sale."
+      },
+      "WeeklyPlanOut": {
+        "properties": {
+          "week_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Week Start"
+          },
+          "weaknesses": {
+            "items": {
+              "$ref": "#/components/schemas/WeaknessOut"
+            },
+            "type": "array",
+            "title": "Weaknesses"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/PlanTaskOut"
+            },
+            "type": "array",
+            "title": "Tasks"
+          },
+          "analyzed_games": {
+            "type": "integer",
+            "title": "Analyzed Games"
+          }
+        },
+        "type": "object",
+        "required": [
+          "week_start",
+          "weaknesses",
+          "tasks",
+          "analyzed_games"
+        ],
+        "title": "WeeklyPlanOut"
       }
     }
   }

@@ -6,6 +6,11 @@
  * uno. Resolver un puzzle está en `PuzzleSolver`; aquí viven la cola, los
  * estados por los que pasa la pantalla y el botón de generar.
  *
+ * Es una pestaña de la sección y ya **no su portada**: desde RF-4.5 quien entra
+ * en Entrenamiento cae en el plan semanal (`PlanPage`, `/training`), que es
+ * quien manda aquí cuando toca entrenar táctica o medio juego. Esta pantalla
+ * vive en `/training/puzzles`.
+ *
  * **No genera sola.** Analizar una tanda de partidas no cambia la baraja por
  * sorpresa: quien entrena decide cuándo renovarla. Y como la generación no
  * toca lo que ya existe, pulsar de más no cuesta nada.
@@ -22,7 +27,7 @@ import { TrainingHeader } from "./TrainingHeader";
 
 const PUZZLE_QUEUE_QUERY_KEY = ["training", "puzzles"] as const;
 
-export function TrainingPage() {
+export function PuzzlesPage() {
   const queryClient = useQueryClient();
   const queueQuery = useQuery({ queryKey: PUZZLE_QUEUE_QUERY_KEY, queryFn: api.getPuzzleQueue });
   /** En qué puzzle de la tanda se está. Se reinicia al traer una tanda nueva. */

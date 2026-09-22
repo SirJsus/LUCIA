@@ -57,7 +57,16 @@ mismo commit. Re-jugar desde el error (RF-4.4), del mismo día, es la cuarta
 pestaña y la primera acción de Entrenamiento que se ofrece también desde fuera
 de la sección —desde el visor de una partida propia—: abrió las filas **101 a
 103**, amplió la 92 a la pantalla nueva y la 95 al cuarto listado, y dejó ocho
-arreglos en el mismo commit.
+arreglos en el mismo commit. El plan de entrenamiento semanal (RF-4.5), del
+mismo día, cierra **RF-4 entero** —no la fase 3, a la que le queda la capa de
+ocupación en las pantallas de entrenamiento— y **cambia la portada de la
+sección**: entrar en
+Entrenamiento ya no lleva a los puzzles sino al plan, que es la pantalla que
+dice por dónde empezar, y los puzzles se mudan a `/training/puzzles`. Abrió las
+filas **104 a 106** —las tres sobre las palabras con las que el plan cuenta lo
+que falla, de las cuales la 106 se cerró el mismo día— y dejó ocho arreglos en
+el commit, uno de ellos el primitivo `ProgressBar` que ahora comparten el
+recuadro de progreso y las tarjetas de deberes.
 
 **Qué es cada mitad de este documento.** Los criterios C-1 a C-7 son
 **RNF-11**, que vive en la sección Post 1.0 de
@@ -90,9 +99,13 @@ antes de comitear cambios de front — ver [Cómo se verifica](#cómo-se-verific
 
 ## Inventario de incoherencias abiertas (al 2026-09-21)
 
-**Doce**: las dos de la pantalla de puzzles (91 y 92), las tres que abrió el
-sparring (94 a 96), las cuatro del drill de aperturas (97 a 100) y las tres de
-re-jugar desde el error (101 a 103). Llegó a
+**Catorce**: las dos de la pantalla de puzzles (91 y 92), las tres que abrió el
+sparring (94 a 96), las cuatro del drill de aperturas (97 a 100), las tres de
+re-jugar desde el error (101 a 103) y las dos del plan semanal (104 y 105). La
+106, que era la única de las tres del plan que se leía como un defecto y no
+como un matiz —«el 55 % de tus errores son de tipo de final»—, se cerró el
+mismo día en el commit que la trajo.
+Llegó a
 estar vacío el 2026-09-19 —las cuatro últimas
 heredadas, la 65 y la 67 de la pantalla de Partidas y la 68 y la 70 del control
 de exportar del visor, se cerraron al recorrer el apéndice de la fase 2—, y
@@ -119,6 +132,11 @@ tres de re-jugar (RF-4.4), del 2026-09-21, son las tres de la misma clase: dos
 piden un campo más en la API —el ply desde el que arranca una partida retomada
 y cuántos errores hay en total— y la tercera es la ayuda de la cabecera del
 visor, que lleva ahí desde RF-5.5 y que este cambio agranda con un botón más.
+Las tres del plan semanal (RF-4.5), del 2026-09-21, son las tres de palabras y
+no de forma: el plan es la primera pantalla que enseña **cinco magnitudes
+distintas seguidas**, y decidir cómo se llama cada una es una decisión de
+redacción que conviene tomar de una vez —y junto a las doce anteriores— en el
+barrido de cierre de la fase 3.
 
 | # | Incoherencia | Dónde | Criterio |
 | --- | --- | --- | --- |
@@ -134,14 +152,17 @@ visor, que lleva ahí desde RF-5.5 y que este cambio agranda con un botón más.
 | 101 | Una partida retomada se numera desde 1. La lista de jugadas de una partida de sparring que empieza en la jugada 23 (RF-4.4) dice "1. 2. 3.", dos centímetros debajo del panel que dice "Retomada desde la jugada 23.". Y ese número del origen sale de `origin_ply`, que es relativo al inicio de la partida de origen: si esa empezaba en una posición dada, el visor la numera desde su jugada real y aquí sale otra. El front no puede arreglarlo solo: `SparringGameOut` manda la posición de ahora y las jugadas, pero no desde qué ply arranca la partida. | `apps/web/src/features/training/sparring.ts::turnsOf` y `features/training/SparringGamePage.tsx`, con `apps/api/lucia_api/routers/sparring.py::SparringGameOut` | C-5 |
 | 102 | El listado de re-jugar no dice cuántos errores hay ni que está recortado. La API devuelve los veinte más caros (`DEFAULT_POSITIONS_LIMIT`) y la pantalla los enseña sin más, mientras sus tres pestañas hermanas dicen siempre cuántas quedan de cuántas ("N por repasar de M", "N sin terminar"), y el listado de Partidas trae su total en `X-Total-Count` desde la fila 59. Con trescientos errores se ven veinte y nada dice que haya más. | `apps/web/src/features/training/ReplaysPage.tsx` y `apps/api/lucia_api/routers/replays.py` | C-3 |
 | 103 | Tres de las acciones de la cabecera del visor explican qué hacen solo en un `title` —"Exportar PGN anotado", "Abrir como tablero" y, desde RF-4.4, "Jugar desde aquí"—, que con teclado no aparece nunca y en un botón deshabilitado tampoco. Es lo mismo que corrigieron las filas 56 y 57 en la barra de filtros de Partidas y el editor de posición con su "Goma": la ayuda va a la vista bajo el control, como ya la ponen Puzzles y Aperturas bajo su botón de generar. | `apps/web/src/features/viewer/GameViewerPage.tsx` (la fila de acciones de la cabecera) | C-6 / C-7 |
+| 104 | La palabra "puntos" nombra tres magnitudes distintas en la misma lista del plan, y dos de las tres se dicen exactamente igual. Seguidas se leen: «Pierdes 8 pts de prob. de victoria por jugada en final.», «Con Caro-Kann Defense de negras pierdes 2.5 puntos.» (puntos de marcador: victorias y tablas frente a empatarlas todas) y «Tu precisión ha bajado 3.2 puntos respecto a los meses anteriores.» (puntos de precisión, que son porcentaje). Las tres frases están una debajo de otra en el mismo panel, y la de la apertura además no dice frente a qué se pierden esos 2.5. Es lo mismo que resolvió `formatWinPercentPoints` cuando "pts" a secas se leía como puntos de material. Cada magnitud tiene ya su formateador, así que ponerle nombre a cada una es un cambio en un solo sitio. | `apps/web/src/lib/format.ts::formatScorePoints` y `formatAccuracyPoints`, que usa `features/training/plan.ts::formatWeaknessSentence` | C-5 / C-6 |
+| 105 | Las cuatro tarjetas de deberes llaman a las pantallas de entrenamiento con nombres que no son los de sus pestañas: "Líneas de apertura" lleva a «Aperturas», "Posiciones a re-jugar" a «Re-jugar» y "Partidas contra el motor" a «Sparring»; solo "Puzzles" coincide. Es la misma clase de choque que la fila 94 —la pestaña y el botón que llevan al mismo sitio con dos nombres—, y aquí el botón de la tarjeta dice además "Entrenar" en las cuatro, así que el nombre de la tarjeta es lo único que anticipa adónde se va. | `apps/web/src/features/training/plan.ts::TASK_DISPLAYS` frente a `features/training/TrainingHeader.tsx::TRAINING_TABS` | C-2 |
 
 ## Lo que se cerró
 
 Las 90 primeras filas de este inventario, todas cerradas, se cerraron en doce
 pasadas, y aquí queda el rastro de qué se hizo, para que un
-`git blame` no sea la única forma de averiguarlo. Las cuatro últimas pasadas
-—la de Entrenamiento, la del sparring, la del drill de aperturas y la de
-re-jugar desde el error— están al final: no cerraron filas, las abrieron.
+`git blame` no sea la única forma de averiguarlo. Las cinco últimas pasadas
+—la de Entrenamiento, la del sparring, la del drill de aperturas, la de
+re-jugar desde el error y la del plan semanal— están al final: no cerraron
+filas, las abrieron.
 
 **2026-09-06 · legibilidad del análisis.** Apareció la barra de evaluación, el
 tablero de análisis empezó a dibujar las flechas del motor, los vacíos del
@@ -1098,6 +1119,63 @@ Y tres rupturas del patrón que se revisaron y se dejan como están:
   hace, porque lo que se entrena —los errores propios— ya es lo que dan los
   puzzles, y la diferencia entre las dos pestañas está justamente en el verbo:
   allí se busca la jugada, aquí se vuelve a jugar la partida.
+
+**2026-09-21 · el plan de entrenamiento semanal (RF-4.5).** La pantalla que
+cierra RF-4 entero, y la primera de la sección que no entrena nada: dice **qué falla**, con su
+número, y debajo **los deberes que salen de ahí**, con su avance. Abrió las
+filas **104 a 106** —la 106 cerrada ese mismo día, cambiando el molde de la
+frase por «están clasificados como «De final»», que encaja con las cuatro
+etiquetas sin darles una segunda forma— y dejó ocho arreglos en el commit.
+
+**El cambio de portada se revisó y está bien.** Entrar en "Entrenamiento" ya no
+lleva a los puzzles sino al plan, y los puzzles pasan a `/training/puzzles`.
+Es coherente con cómo se entra en las otras secciones: la portada de una
+sección es la pantalla que da la vista de conjunto —Partidas es el listado,
+Estadísticas es el panel—, no una de las herramientas. Y las cuatro pestañas
+que quedan son justamente adonde manda el plan, así que la primera pantalla de
+la sección responde a "¿por dónde empiezo?" en vez de dar por supuesto que la
+respuesta son los puzzles. Nada enlazaba a `/training` contando con encontrar
+los puzzles: el único enlace externo es el de la navegación principal, que
+apunta a la sección y no a una pantalla.
+
+Los arreglos:
+
+- **C-2 · la barra de progreso es una sola.** La de las tarjetas de deberes
+  estaba escrita a mano con el mismo alto, el mismo redondeo y el mismo
+  `transition-all` que la de `ProgressBox`, cambiando solo de color: dos barras
+  idénticas sostenidas a mano, que es la familia de las filas 39 a 41. Sale ya
+  de `components/ProgressBar.tsx`, que usan las dos. Lo que las diferencia no
+  es la forma sino **de quién es el avance** —el sistema trabajando frente a lo
+  que lleva hecho quien entrena—, y eso es lo único que parametriza el tono.
+- **C-4 · el vacío de las debilidades es el recuadro compartido.** "No he
+  encontrado nada que destaque" era un `<p>` suelto dentro del panel, que es
+  exactamente lo que el criterio prohíbe; es un `EmptyState`, como el "Sin
+  discrepancias" de la comparación de motores, que fue la última frase suelta
+  que hacía de vacío.
+- **C-2 · el enlace de la tarjeta va en secundario.** Estaba en `primary`, así
+  que con cuatro deberes había cuatro acciones principales en la misma
+  pantalla, contra la regla escrita en `components/Button.tsx` —la misma que
+  cerró la fila 61 y que se aplicó en RF-1.5 y en RF-6.7—. Queda en
+  `secondary` y `sm`, que es como se ve el enlace que abre un elemento en los
+  cuatro listados de la aplicación.
+- **C-2 · el encabezado de sección, del tamaño de siempre.** "Tus deberes de
+  esta semana" iba a `text-lg font-medium` y las ocho secciones del panel de
+  estadísticas van a `font-semibold`: un noveno tamaño de rótulo para lo mismo.
+- **C-5 · los puntos de precisión salen de un solo sitio.** "Tu precisión ha
+  bajado 3.2 puntos" resolvía su decimal con un `.toFixed(1)` propio mientras
+  la frase de tendencia del panel de estadísticas tenía el suyo, escondido en
+  una función privada de `lib/insights.ts`. Sube a `formatAccuracyPoints` en
+  `lib/format.ts` y lo usan las dos, como ya se hizo con `formatPerHundredMoves`.
+- **C-5 · y los puntos de marcador también.** Lo que cuesta una apertura
+  —`points_lost`, victorias y tablas frente a empatarlas todas— se formateaba
+  a mano con su unidad pegada en la frase. Es `formatScorePoints`, para que
+  ponerle nombre a esa magnitud (fila 104) sea un cambio en un solo sitio.
+- **C-2 · la sub-navegación envuelve.** Con la quinta pestaña, `flex gap-1` sin
+  `flex-wrap` se desborda en una ventana estrecha. Es lo mismo que le pasó a la
+  fila de acciones del visor con su cuarto control, y se arregla igual.
+
+Y un comentario que ya no decía la verdad: el módulo de `TrainingHeader`
+afirmaba que a la sección "le falta todavía el plan semanal (RF-4.5)".
 
 **Y un nombre que se revisó y se deja como está.** Que la acción se llame
 "Exportar PGN anotado" y no "Exportar PGN", teniendo Partidas un "Importar

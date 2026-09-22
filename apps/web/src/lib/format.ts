@@ -1,7 +1,7 @@
 /** Formateo de datos para mostrar: fechas, resultados, control de tiempo,
  * porcentajes y nombres de motor. Todo lo que se enseña con un formato pasa
  * por aquí (criterio C-5 de docs/07-coherencia-ui.md). */
-import type { GameSummary } from "@lucia/shared-types";
+import type { GamePhase, GameSummary } from "@lucia/shared-types";
 
 export function formatDate(isoDate: string): string {
   return new Date(isoDate).toLocaleDateString("es", {
@@ -48,6 +48,30 @@ export function formatWinPercentPoints(points: number): string {
   return `${points.toFixed(0)} pts de prob. de victoria`;
 }
 
+/** Puntos de precisión ganados o perdidos, sin signo: "3.2".
+ *
+ * Un decimal, el mismo que enseña la columna "Precisión" de la tabla de
+ * tendencias. De si suben o bajan se encarga el verbo de la frase que lo
+ * rodea. Vive aquí porque lo dicen dos pantallas —la frase de tendencia del
+ * panel de estadísticas (RF-3.7) y la debilidad de precisión del plan semanal
+ * (RF-4.5)—, y dos sitios decidiendo por su cuenta cuántos decimales es justo
+ * lo que evita el criterio C-5. */
+export function formatAccuracyPoints(points: number): string {
+  return Math.abs(points).toFixed(1);
+}
+
+/** Puntos de partida perdidos frente a empatarlas todas: "2.5 puntos"
+ * (`lucia_core.drills.points_lost`, RF-4.2 y RF-4.5).
+ *
+ * No son los puntos de probabilidad de victoria de `formatWinPercentPoints` ni
+ * los de precisión de `formatAccuracyPoints`: son victorias y tablas, la
+ * moneda del marcador. Que las tres magnitudes se llamen "puntos" en la misma
+ * lista es la fila 104 del inventario; tenerlas en un solo sitio es lo que
+ * hará que decidirlo sea un solo cambio. */
+export function formatScorePoints(points: number): string {
+  return `${points.toFixed(1)} puntos`;
+}
+
 /** Lo que costó un error propio, en una frase: "Tu probabilidad de victoria
  * pasó de 72.0 % a 31.0 %: 41 pts de prob. de victoria menos."
  *
@@ -90,6 +114,22 @@ const ENGINE_DISPLAY_NAMES: Record<EngineId, string> = {
 
 export function formatEngineName(engine: string): string {
   return ENGINE_DISPLAY_NAMES[engine as EngineId] ?? capitalize(engine);
+}
+
+/** Fase de la partida tal como se enseña: "Apertura", "Medio juego", "Final"
+ * (RF-3.3).
+ *
+ * Vivía dentro del panel de estadísticas y subió aquí en cuanto la necesitó la
+ * segunda pantalla —el plan semanal de RF-4.5—, que es la regla de `lib/`: en
+ * cuanto algo lo usa un segundo sitio, sube en vez de copiarse. */
+const PHASE_DISPLAY_NAMES: Record<GamePhase, string> = {
+  opening: "Apertura",
+  middlegame: "Medio juego",
+  endgame: "Final",
+};
+
+export function formatPhase(phase: string): string {
+  return PHASE_DISPLAY_NAMES[phase as GamePhase] ?? phase;
 }
 
 /** Control de tiempo de chess.com tal como se enseña: "Blitz", "Rapid"…

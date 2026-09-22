@@ -11,20 +11,32 @@ SemVer para la serie `0.x`).
 
 ## [Sin publicar]
 
-Nada todavía: `0.4.4` acaba de cerrar el cuarto ítem de la fase 3 y lo
-siguiente es el resto de esa fase.
+Nada todavía. `0.4.5` cerró **RF-4 entero**, y lo que queda de la fase 3 es un
+solo ítem y no es de RF-4: enchufar la **capa de ocupación** (RF-7.1 a 7.7) en
+las pantallas de entrenamiento, que la fase 2 dejó pendiente de que existieran
+—ya existen las seis y ninguna la usa—. Ese ítem cierra la fase 3 y le toca el
+minor, `0.5.0`.
 
 Camino a v1.0.0 — ver progreso en [docs/05-roadmap.md](docs/05-roadmap.md) y
 alcance congelado en [docs/02-requerimientos.md](docs/02-requerimientos.md).
 Con `0.3.0` quedaron cerradas las **fases 0, 1 y 2**, con `0.4.0` su
-**apéndice** y con `0.4.1` a `0.4.4` los cuatro primeros ítems de la **fase
-3**: están entregados RF-1, RF-2, RF-5, RF-6, RF-10 —ya entero, porque RF-10.3
-llegó con los puzzles—, los siete puntos P1 de RF-7, todo RF-3 salvo su RF-3.8
-y, de RF-4, sus puntos 4.1, 4.2, 4.3 y 4.4. Para el corte de `1.0.0` falta el
-resto de la **fase 3**, que sigue abierta (RF-4.5 · plan semanal, más enchufar
-la capa de ocupación en las pantallas de entrenamiento) y la **fase 4** entera
-(RF-3.8 · rivales recurrentes, RF-7.8 y RF-7.9, explicaciones en lenguaje
-natural, empaquetado y soporte de macOS/Windows).
+**apéndice** y con `0.4.1` a `0.4.5` los cinco ítems de RF-4 de la **fase 3**.
+
+**Qué está entregado**: RF-1, RF-2, **RF-4 entero** (4.1 a 4.5, del 2026-09-19
+al 2026-09-21), RF-5, RF-6, RF-10 —entero desde que RF-10.3 llegó con los
+puzzles—, los siete puntos P1 de RF-7 y todo RF-3 salvo su RF-3.8. Con esto los
+requerimientos funcionales de v1.0 están entregados **salvo RF-3.8, RF-7.8 y
+RF-7.9**.
+
+**Qué falta para `1.0.0`**, que ahora se puede decir con dos líneas:
+
+1. El **último ítem de la fase 3** — la capa de ocupación en las pantallas de
+   entrenamiento. La fase **sigue abierta** por esto y solo por esto.
+2. La **fase 4 entera** — RF-3.8 (rivales recurrentes), RF-7.8 y RF-7.9
+   (recordar sub-modo y filtros de ocupación, y casillas críticas según motor),
+   explicaciones en lenguaje natural, empaquetado y soporte de macOS/Windows.
+   De los cinco, solo los tres primeros son requerimientos; los otros dos son
+   distribución.
 
 Fuera de ese camino, en Post 1.0: **RF-8 · Personalización de interfaz**
 (Fase 5), **RF-11 · Partidas con ventaja (odds) contra el motor** (Fase 6,
@@ -37,9 +49,137 @@ material como perilla; sigue fuera del alcance de 1.0 porque se planteó
 después del corte), **RF-9 · Comparación de evaluaciones
 entre motores** (ampliación de RF-2.6, sin fase propia) y **RNF-11 ·
 Coherencia de interfaz**, criterio permanente cuyos incumplimientos concretos
-se arreglan dentro de 1.0: las **90 filas** que su inventario en
-[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) ha llegado a tener están
-**todas cerradas** desde el 2026-09-19, la primera vez que queda vacío.
+se arreglan dentro de 1.0: su inventario en
+[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) llegó a estar **vacío** el
+2026-09-19 y hoy tiene **catorce filas abiertas**, todas abiertas por las
+pantallas de entrenamiento de la fase 3 y previstas para el barrido de cierre
+de esa fase.
+
+## [0.4.5] - 2026-09-21
+
+El entrenamiento deja de ser cuatro barajas sueltas y pasa a tener portada:
+el **plan de entrenamiento semanal** (**RF-4.5**), que junta lo que RF-3 sabe
+del jugador con lo que RF-4 sabe entrenar y dice **por dónde empezar esta
+semana**. **Con esto queda cerrado RF-4 entero** (RF-4.1 a RF-4.5, entregados
+entre el 2026-09-19 y el 2026-09-21).
+
+**La fase 3 no se cierra con esto, y conviene no leer lo uno como lo otro.** Le
+queda un ítem, y no es de RF-4: enchufar la capa de ocupación (RF-7.1 a 7.7) en
+las pantallas de entrenamiento, que la fase 2 dejó pendiente de que existieran.
+Ya existen las seis y **ninguna la usa** —comprobado sobre el código, no sobre
+la documentación: `OccupancyLayer` y `useOccupancy` solo se importan desde el
+visor y el tablero de análisis—. Por eso esto sube el **patch y no el minor**,
+mismo criterio que en `0.2.1` a `0.2.5` y en `0.4.1` a `0.4.4`; el minor
+`0.5.0` le toca a quien cierre esa casilla.
+
+**No hay alcance nuevo**: RF-4.5 es alcance congelado de v1.0 desde el corte
+del **2026-09-05** y es P2, que dentro de este proyecto significa "deseable
+dentro de 1.0" y no "para después". No se ha añadido ningún RF ni RNF, nada
+baja a Post 1.0 y nada sube a 1.0.
+
+### Añadido
+
+- **Plan de entrenamiento semanal** (RF-4.5): la pestaña "Plan" de
+  Entrenamiento, que dice **qué falla** —con su número y de qué requerimiento
+  de RF-3 sale— y debajo **los deberes que salen de ahí**, cada uno con su
+  objetivo de la semana y su avance. En la API, un solo endpoint y de solo
+  lectura, `GET /training/plan`
+  (`apps/api/lucia_api/services/plan.py` y `routers/plan.py`); en el núcleo,
+  `lucia_core.plan` con `detect_weaknesses`, `task_for_weakness` /
+  `_TASK_BY_WEAKNESS`, `build_weekly_tasks` y `week_start`, sin base de datos,
+  sin motor y sin red, para poder probarse solo (RNF-8). Razonado en
+  [ADR-0021](docs/adr/0021-el-plan-semanal-se-deduce-y-el-orden-de-las-debilidades-es-editorial.md),
+  y las reglas que el texto del requerimiento no fijaba, en la nota "Con qué
+  reglas se cumplió RF-4.5" de
+  [docs/02-requerimientos.md](docs/02-requerimientos.md).
+  - **Sin tabla y sin migración.** El plan **no se guarda**: se recalcula en
+    cada visita a partir de las estadísticas de RF-3 y de las colas de RF-4, y
+    lo hecho sale de fechas que la base ya tenía —`puzzles.last_reviewed_at`,
+    `opening_drills.last_reviewed_at` y `sparring_games.created_at`—, así que
+    **nadie marca un deber a mano**: entrenar en las otras pestañas es lo que
+    mueve la barra. Es la misma decisión que los patrones
+    ([ADR-0008](docs/adr/0008-patrones-deducidos-al-leer.md)) y la lista de
+    re-jugar
+    ([ADR-0020](docs/adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md)),
+    y la contraria a la de los puzzles y los drills
+    ([ADR-0017](docs/adr/0017-puzzle-persistido-con-su-solucion-congelada.md)).
+    **RF-4.5 es el único punto de RF-4 que no toca el modelo de datos.**
+  - **Cinco clases de debilidad, cada una con su umbral**, y ninguna aparece
+    por debajo del suyo: la fase donde se pierde ventaja (RF-3.3,
+    `MIN_PHASE_WIN_PERCENT_LOST` = 5 puntos de probabilidad de victoria por
+    jugada), el tipo de error que más pesa (RF-3.4, `MIN_MISTAKE_TYPE_SHARE`
+    = 33 %, cuando el reparto ciego entre cuatro tipos sería el 25 %), la
+    apertura que más cuesta (RF-3.2, `MIN_OPENING_POINTS_LOST` = 1 punto de
+    marcador, el mismo umbral con el que el drill de RF-4.2 decide qué línea
+    merece repetirse), los apuros de reloj (RF-3.5,
+    `MIN_TIME_TROUBLE_SHARE` = 30 % de las partidas) y la precisión que cae
+    (RF-3.7, `MIN_ACCURACY_DROP` = 2 puntos). Un plan que enumera cinco
+    debilidades siempre, las tenga o no, no ayuda a decidir por dónde empezar.
+  - **El orden de las debilidades es editorial y no numérico**, que es la
+    mitad de ADR-0021: cada una se mide **en su propia unidad** —puntos de
+    probabilidad, porcentaje de errores, puntos de marcador, porcentaje de
+    partidas, puntos de precisión— y ordenarlas por magnitud sería inventar
+    una escala común en la que el 55 % de errores tácticos pesa más que perder
+    8 puntos de probabilidad por jugada. El orden es fijo por clase, de lo más
+    estructural a lo más circunstancial, y la primera lleva la insignia "lo
+    primero": es una recomendación de la que se responde.
+  - **Cada deber nace de una debilidad concreta y la lleva encima**
+    (`_TASK_BY_WEAKNESS`, `reasons`), que es la lectura de "generado a partir
+    de las debilidades detectadas": lo táctico y el medio juego van a puzzles
+    (RF-4.1), lo posicional y la apertura a repetir líneas (RF-4.2), el final
+    a re-jugar posiciones (RF-4.4), y los apuros de reloj y la precisión que
+    cae a partidas enteras contra el motor (RF-4.3), que es lo único que
+    reproduce la fatiga de una partida de verdad. Una debilidad sin
+    entrenamiento posible no genera deber, y un deber sin motivo a la vista
+    sería una cuota inventada.
+  - **El objetivo nunca pide más de lo que hay**: `min(MAX_WEEKLY_TARGETS,
+    material disponible)`, y sin material no hay tarea. Un plan que pide
+    treinta puzzles cuando hay cuatro no es exigente, es falso. Puzzles y
+    líneas cuentan como material **solo lo que vence esta semana**: repasar
+    antes de tiempo no es entrenar, es adelantar trabajo que el SM-2 ya había
+    colocado en otra fecha.
+  - **La semana empieza el lunes** (`week_start`) y no "hace siete días": con
+    una ventana móvil, lo entrenado el lunes dejaría de contar el martes
+    siguiente y el avance bajaría solo, sin que nadie hiciera nada.
+  - **Un plan vacío no es un fallo, y hay dos vacíos distintos**: sin partidas
+    analizadas la pantalla manda a analizar, porque no se sabe nada todavía; y
+    con partidas analizadas y nada por encima de su umbral, dice que no ha
+    encontrado nada que destaque. Por eso la respuesta lleva sobre cuántas
+    partidas se hizo el diagnóstico.
+- **`ProgressBar`** (`apps/web/src/components/ProgressBar.tsx`): la barra de
+  avance, extraída de `ProgressBox` y compartida con las tarjetas de deberes
+  del plan, para que "cuánto llevas" se dibuje igual en toda la aplicación
+  (criterio C-5).
+
+### Cambiado
+
+- **La portada de Entrenamiento ya no son los puzzles, es el plan.** Es el
+  único cambio de comportamiento visible de esta versión y se dice aparte para
+  que no se lea como un alta más: **`/training` deja de abrir los puzzles y
+  abre el plan**, y los puzzles se mudan a **`/training/puzzles`**
+  (`TrainingPage` → `PuzzlesPage`). Quien tuviera `/training` guardado o
+  enlazado sigue entrando en Entrenamiento, pero cae en otra pantalla. El
+  motivo es cuál de las dos responde a "¿por dónde empiezo?": el plan es la
+  pantalla que lo dice y las otras cinco son adónde manda. La sección pasa a
+  tener cinco pestañas —Plan, Puzzles, Aperturas, Re-jugar, Sparring—, y la
+  fila de pestañas de `TrainingHeader` gana `flex-wrap` porque con la quinta ya
+  no cabe en una ventana estrecha. **No es alcance nuevo**: mueve una pantalla
+  que ya existía, no añade requerimiento ninguno.
+- **`formatPhase` sube a `lib/format.ts`** desde donde estaba: el plan nombra
+  las fases de la partida (RF-3.3) igual que el dashboard, y dos copias de la
+  misma traducción acaban diciendo lo mismo de dos maneras.
+- **Tres filas nuevas del inventario de RNF-11** (la 104 a la 106), abiertas
+  por esta pantalla, que es la primera que enseña **cinco magnitudes distintas
+  seguidas**: la 106 se cerró en el mismo commit y las otras dos quedan
+  **abiertas** —cómo se nombra cada magnitud y cómo se llaman los destinos de
+  las tarjetas—, para el barrido de cierre de la fase 3 junto a las doce
+  anteriores. Ocho arreglos más en el mismo commit; ver
+  [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md).
+- Contrato de la API: ruta y esquemas **nuevos** (`/training/plan`,
+  `WeeklyPlanOut`, `PlanTaskOut`, `WeaknessOut`), todos añadidos: nada de lo
+  que ya consumía la API se rompe, y no hay migración porque no hay tabla.
+  `openapi.json` y los tipos de `packages/shared-types` regenerados con
+  `make types`.
 
 ## [0.4.4] - 2026-09-21
 

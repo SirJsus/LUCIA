@@ -120,8 +120,8 @@ def test_a_game_can_be_retaken_from_any_of_its_positions() -> None:
     la posición **anterior** a ese error, la que hay que jugar de otra manera."""
     pgn = '[White "ana"]\n[Black "beto"]\n[Result "*"]\n\n1. e4 e5 2. Nf3 Nc6 *\n'
     assert board_at_ply(pgn, 0).fen() == chess.STARTING_FEN
-    assert board_at_ply(pgn, 2).fen().startswith(
-        "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w"
+    assert (
+        board_at_ply(pgn, 2).fen().startswith("rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w")
     )
     # Hasta el final de la partida, que es una posición legítima de la que
     # seguir jugando.

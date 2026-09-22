@@ -16,7 +16,7 @@
  */
 import type { CriticalMomentKind, MistakeType, TrendChange } from "@lucia/shared-types";
 import type { BadgeTone } from "../components/Badge";
-import { formatPerHundredMoves } from "./format";
+import { formatAccuracyPoints, formatPerHundredMoves } from "./format";
 
 export interface PatternStyle {
   label: string;
@@ -117,11 +117,4 @@ export function formatTrendSentence(change: TrendChange): string {
 
 function isNegligibleChange(change: number): boolean {
   return Math.abs(change) < TREND_NOISE_THRESHOLD;
-}
-
-/** Los puntos de precisión ganados o perdidos, sin el signo: de "sube" o
- * "baja" ya se encarga el verbo. Un decimal, el mismo que enseña la columna
- * "Precisión" de la tabla de tendencias. */
-function formatAccuracyPoints(change: number): string {
-  return Math.abs(change).toFixed(1);
 }

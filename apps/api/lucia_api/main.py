@@ -22,6 +22,7 @@ from .routers import (
     games,
     health,
     pgn_import,
+    plan,
     repertoire,
     replays,
     sparring,
@@ -63,4 +64,5 @@ app.include_router(repertoire.router)
 app.include_router(training.router)
 app.include_router(drills.router)
 app.include_router(replays.router)
+app.include_router(plan.router)
 app.include_router(sparring.router)

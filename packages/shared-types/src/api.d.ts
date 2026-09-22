@@ -586,6 +586,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/training/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Player Weekly Plan
+         * @description El plan de esta semana: qué falla y qué hacer al respecto.
+         */
+        get: operations["player_weekly_plan_training_plan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sparring/games": {
         parameters: {
             query?: never;
@@ -1381,6 +1401,20 @@ export interface components {
             /** Blunders */
             blunders: number;
         };
+        /**
+         * PlanTaskOut
+         * @description Un deber de la semana: qué entrenar, cuánto y por qué.
+         */
+        PlanTaskOut: {
+            /** Kind */
+            kind: string;
+            /** Weekly Target */
+            weekly_target: number;
+            /** Done This Week */
+            done_this_week: number;
+            /** Reasons */
+            reasons: components["schemas"]["WeaknessOut"][];
+        };
         /** PlayerStatsOut */
         PlayerStatsOut: {
             /** Username */
@@ -1733,6 +1767,34 @@ export interface components {
             draw: number;
             /** Loss */
             loss: number;
+        };
+        /**
+         * WeaknessOut
+         * @description Algo que se está haciendo mal, con su número y de dónde sale.
+         */
+        WeaknessOut: {
+            /** Kind */
+            kind: string;
+            /** Subject */
+            subject: string;
+            /** Magnitude */
+            magnitude: number;
+            /** Color */
+            color: string;
+        };
+        /** WeeklyPlanOut */
+        WeeklyPlanOut: {
+            /**
+             * Week Start
+             * Format: date-time
+             */
+            week_start: string;
+            /** Weaknesses */
+            weaknesses: components["schemas"]["WeaknessOut"][];
+            /** Tasks */
+            tasks: components["schemas"]["PlanTaskOut"][];
+            /** Analyzed Games */
+            analyzed_games: number;
         };
     };
     responses: never;
@@ -2782,6 +2844,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReplayPositionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    player_weekly_plan_training_plan_get: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyPlanOut"];
                 };
             };
             /** @description Validation Error */

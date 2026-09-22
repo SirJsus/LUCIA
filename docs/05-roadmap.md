@@ -757,15 +757,27 @@ entregado. Lo que sí es alcance —RF-3.8— se dice expresamente.
 
 ## Fase 3 · Entrenamiento (P1/P2)
 
-> **Abierta.** De sus cinco ítems están cerrados los cuatro primeros —puzzles
-> (2026-09-19, versión `0.4.1`), sparring (2026-09-21, versión `0.4.2`), drill
-> de aperturas (2026-09-21, versión `0.4.3`) y "re-juega desde el error"
-> (2026-09-21, versión `0.4.4`)—; queda el plan semanal (RF-4.5), más enchufar
-> la capa de ocupación de RF-7 en las pantallas de entrenamiento, que la fase 2
-> dejó dicho que se haría cuando existieran. Eran cuatro ítems hasta el
-> **2026-09-21**: RF-4.2 y RF-4.4 compartían uno y se separaron al entregarse
-> el primero, para no marcar como hecho lo que no lo estaba — el mismo criterio
-> con el que RF-6.5 se separó de los extras del tablero en la fase 2.
+> **RF-4 está cerrado entero. La fase 3 no.** Conviene no leer lo uno como lo
+> otro. Con el plan semanal (RF-4.5, 2026-09-21, versión `0.4.5`) quedan
+> entregados los cinco puntos de RF-4 —puzzles (2026-09-19, versión `0.4.1`),
+> sparring (2026-09-21, versión `0.4.2`), drill de aperturas (2026-09-21,
+> versión `0.4.3`), "re-juega desde el error" (2026-09-21, versión `0.4.4`) y
+> el plan—, y el entrenamiento de v1.0 no tiene nada pendiente.
+>
+> **Lo que mantiene la fase abierta es su sexto ítem, y es de RF-7, no de
+> RF-4**: enchufar la capa de ocupación (RF-7.1 a 7.7) en las pantallas de
+> entrenamiento, que la fase 2 dejó dicho que se haría cuando esas pantallas
+> existieran. Ahora existen las seis y **ninguna la usa** —comprobado sobre el
+> código el 2026-09-21: `OccupancyLayer` y `useOccupancy` solo aparecen en el
+> visor (`features/viewer/`) y en el tablero de análisis (`features/board/`)—,
+> así que la casilla sigue sin marcar y no se marca por simpatía con RF-4. Por
+> eso `0.4.5` sube el patch y no cierra fase.
+>
+> Eran cuatro ítems hasta el **2026-09-21**: RF-4.2 y RF-4.4 compartían uno y
+> se separaron al entregarse el primero, para no marcar como hecho lo que no lo
+> estaba — el mismo criterio con el que RF-6.5 se separó de los extras del
+> tablero en la fase 2, y el mismo por el que la capa de ocupación no se marca
+> ahora.
 
 - [x] Puzzles desde mis errores con repetición espaciada, aceptando como buena
       cualquier jugada equivalente y no solo la única del motor (RF-4.1 con
@@ -997,9 +1009,83 @@ entregado. Lo que sí es alcance —RF-3.8— se dice expresamente.
         gana tres filas (101 a 103) y se cierran ocho arreglos en el mismo
         commit; ver [07-coherencia-ui.md](07-coherencia-ui.md).
       - 13 tests nuevos: 9 de API, 3 del núcleo y 1 del front.
-- [ ] Plan semanal de entrenamiento (RF-4.5).
+- [x] Plan semanal de entrenamiento (**RF-4.5**). Hecho el 2026-09-21: la
+      pestaña "Plan", que pasa a ser **la portada de Entrenamiento**, un solo
+      endpoint de lectura `GET /training/plan`
+      (`services/plan.py` + `routers/plan.py`) y las reglas puras de qué es una
+      debilidad y qué se entrena con ella en `lucia_core.plan`. **Sin tabla y
+      sin migración: es el único punto de RF-4 que no toca el modelo de
+      datos.** Las reglas que el texto del RF no fijaba están en la nota "Con
+      qué reglas se cumplió RF-4.5" de
+      [02-requerimientos.md](02-requerimientos.md), y por qué el plan no se
+      persiste y por qué el orden de las debilidades es editorial, en
+      [ADR-0021](adr/0021-el-plan-semanal-se-deduce-y-el-orden-de-las-debilidades-es-editorial.md).
+
+      - **Es la primera pantalla de la sección que no entrena nada.** Dice qué
+        falla, con su número, y debajo los deberes que salen de ahí con su
+        avance; las otras cinco son adónde manda. Por eso es la portada:
+        `/training` deja de ser los puzzles y pasa a ser el plan, y los puzzles
+        se mudan a `/training/puzzles` (`TrainingPage` → `PuzzlesPage`). Es el
+        único cambio de comportamiento visible del ítem y está destacado como
+        tal en el [CHANGELOG](../CHANGELOG.md).
+      - **Cinco debilidades, una por cada cosa que RF-3 ya sabe mirar**, y cada
+        una entra solo si pasa **su** umbral (`MIN_PHASE_WIN_PERCENT_LOST`,
+        `MIN_MISTAKE_TYPE_SHARE`, `MIN_OPENING_POINTS_LOST`,
+        `MIN_TIME_TROUBLE_SHARE`, `MIN_ACCURACY_DROP`): la fase donde se pierde
+        ventaja (RF-3.3), el tipo de error que más pesa (RF-3.4), la apertura
+        que más cuesta (RF-3.2), los apuros de reloj (RF-3.5) y la precisión
+        que cae (RF-3.7). Enumerar las cinco siempre, las tenga o no, no
+        ayudaría a decidir por dónde empezar.
+      - **El orden es fijo por clase y no sale de los números**, y esto es la
+        mitad de ADR-0021: cada debilidad se mide en su propia unidad —puntos
+        de probabilidad, porcentaje de errores, puntos de marcador, porcentaje
+        de partidas, puntos de precisión—, así que ordenarlas por magnitud
+        sería inventar una escala común. De lo más estructural a lo más
+        circunstancial, y la primera lleva la insignia "lo primero".
+      - **Cada deber nace de una debilidad concreta y la lleva encima**
+        (`_TASK_BY_WEAKNESS`, `reasons`): eso es lo que dice "generado a partir
+        de las debilidades detectadas". Una debilidad sin entrenamiento posible
+        no genera deber, y un deber sin motivo a la vista sería una cuota
+        inventada. El objetivo es `min(MAX_WEEKLY_TARGETS, material
+        disponible)` y sin material no hay tarea: pedir treinta puzzles cuando
+        hay cuatro no es exigente, es falso.
+      - **El plan no se guarda y nadie marca un deber a mano.** Se deduce en
+        cada visita de las estadísticas de RF-3 y de las colas de RF-4, y lo
+        hecho sale de fechas que la base ya tiene —`puzzles.last_reviewed_at`,
+        `opening_drills.last_reviewed_at` y `sparring_games.created_at`—, así
+        que entrenar en las otras pestañas es lo que mueve la barra. Es la
+        misma decisión que los patrones
+        ([ADR-0008](adr/0008-patrones-deducidos-al-leer.md)) y la lista de
+        re-jugar ([ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md)),
+        y la contraria a la de los puzzles y los drills
+        ([ADR-0017](adr/0017-puzzle-persistido-con-su-solucion-congelada.md)).
+      - **La semana empieza el lunes** (`week_start`), no "hace siete días":
+        con una ventana móvil, lo entrenado el lunes dejaría de contar el
+        martes siguiente y el avance bajaría solo, sin que nadie hiciera nada.
+      - **Un plan vacío no es un fallo, y hay dos vacíos distintos**: sin
+        partidas analizadas la pantalla manda a analizar, y con partidas
+        analizadas y nada por encima de su umbral dice que no ha encontrado
+        nada que destaque. Por eso la respuesta lleva sobre cuántas partidas se
+        hizo el diagnóstico.
+      - **Con esto queda cerrado RF-4 entero** (RF-4.1 a RF-4.5). La fase no:
+        ver la cabecera y el ítem siguiente.
+      - 37 tests nuevos —21 del núcleo, 6 de API y 10 del front— y un primitivo
+        compartido nuevo, `components/ProgressBar.tsx`, más `formatPhase` subida
+        a `lib/format.ts`. El inventario de RNF-11 gana las filas 104 a 106, con
+        la 106 cerrada el mismo día; ver [07-coherencia-ui.md](07-coherencia-ui.md).
 - [ ] Capa de ocupación (RF-7.1 a 7.7) en la pantalla de entrenamiento, que la
-      fase 2 dejó pendiente de que esa pantalla existiera.
+      fase 2 dejó pendiente de que esa pantalla existiera. **Es el único ítem
+      que queda de la fase 3** desde el 2026-09-21, y no es de RF-4: las seis
+      pantallas de entrenamiento ya existen —plan, puzzles, aperturas,
+      re-jugar, antesala de sparring y partida de sparring— y **ninguna usa la
+      capa**. Comprobado sobre el código ese mismo día: `OccupancyLayer` y
+      `useOccupancy` solo se importan desde `features/viewer/GameViewerPage.tsx`
+      y `features/board/BoardPage.tsx`. Las pantallas con tablero de RF-4
+      renunciaron a propósito a la barra de evaluación —decir a cada jugada
+      quién va ganando convierte el ejercicio en un análisis asistido—, así que
+      al cerrarlo habrá que decidir en cuáles de ellas entra la capa y con qué
+      sub-modo, que es lectura de la posición y no opinión del motor. Con ese
+      ítem cerrado, la fase 3 cierra y le toca `0.5.0`.
 
 ## Fase 4 · Pulido y distribución
 

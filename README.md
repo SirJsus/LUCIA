@@ -3,12 +3,13 @@
 Plataforma personal de entrenamiento de ajedrez. Usa **Stockfish** y **Lc0 (Leela Chess Zero)** como "cerebro", importa tu perfil e historial de **chess.com**, y construye encima análisis, estadísticas y entrenamiento que en las plataformas comerciales están detrás de un muro de pago.
 
 > Estado: fases 0 a 2 del roadmap cerradas (importación, análisis con motor,
-> estadísticas, tablero de análisis y ocupación del tablero) y la **fase 3 en
-> marcha**: ya están los puzzles desde los errores propios con repetición
-> espaciada (RF-4.1), el drill de aperturas (RF-4.2), el sparring contra el
-> motor con fuerza calibrada (RF-4.3) y re-jugar desde el error (RF-4.4), y
-> quedan el plan semanal y el empaquetado (fase 4) para la v1.0.0. Ver
-> [docs/05-roadmap.md](docs/05-roadmap.md) y [CHANGELOG.md](CHANGELOG.md).
+> estadísticas, tablero de análisis y ocupación del tablero) y **RF-4 entero
+> entregado**: puzzles desde los errores propios con repetición espaciada
+> (RF-4.1), drill de aperturas (RF-4.2), sparring contra el motor con fuerza
+> calibrada (RF-4.3), re-jugar desde el error (RF-4.4) y el plan de
+> entrenamiento semanal (RF-4.5). Queda el empaquetado (fase 4) para la
+> v1.0.0. Ver [docs/05-roadmap.md](docs/05-roadmap.md) y
+> [CHANGELOG.md](CHANGELOG.md).
 
 ## Estructura del monorepo
 
@@ -20,7 +21,8 @@ LUCIA/
 ├── packages/
 │   ├── core/           # Python: puente UCI con Stockfish/Lc0, clasificación de jugadas, métricas,
 │   │                   #   patrones de juego, repetición espaciada de los puzzles,
-│   │                   #   reglas de una partida de sparring
+│   │                   #   reglas de una partida de sparring, del drill de aperturas
+│   │                   #   y del plan de entrenamiento semanal
 │   │                   #   y tabla ECO de aperturas (datos incluidos)
 │   ├── chesscom/       # Python: cliente de la API pública de chess.com (perfil, archivos PGN)
 │   ├── lichess/        # Python: cliente del Opening Explorer de Lichess (teoría de aperturas)
@@ -72,8 +74,13 @@ OTB, una de club— se marca como "partida propia" y pasa a contar en Partidas y
 en Estadísticas como cualquier otra), **Estadísticas** (marcador,
 ratings, aperturas con su código ECO, en qué fase se pierde más ventaja, de qué
 tipo son los errores, qué pasa cuando baja el reloj, si mejoras mes a mes y
-dónde te sales de la teoría de maestros), **Entrenamiento** (cuatro cosas:
-puzzles sacados de tus propios errores —la posición justo antes del blunder—,
+dónde te sales de la teoría de maestros), **Entrenamiento** (te recibe el **plan de
+la semana**: qué te está costando puntos —en qué fase pierdes ventaja, de qué
+tipo son tus errores, qué apertura te sale cara, si juegas con el reloj encima,
+si tu precisión está cayendo— y los deberes que salen de ahí, cada uno diciendo
+qué debilidad lo pide y cuánto llevas hecho. No hay nada que marcar: el avance
+sale de lo que ya entrenaste, y cada deber te lleva a su pestaña. Las cuatro
+pestañas a las que manda son: puzzles sacados de tus propios errores —la posición justo antes del blunder—,
 con repetición espaciada, donde los que aciertas vuelven cada vez más tarde y
 vale cualquier jugada tan buena como la del motor, no solo la suya; el **drill
 de aperturas**, que toma las líneas donde más puntos pierdes —los puntos donde

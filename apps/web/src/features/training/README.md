@@ -1,16 +1,19 @@
 # `features/training`
 
-Las cuatro formas de entrenar que ya existen (RF-4): puzzles sacados de los
-errores propios (RF-4.1, con RF-10.3), el drill de aperturas (RF-4.2),
-sparring contra el motor con la fuerza calibrada (RF-4.3) y re-jugar desde el
-error (RF-4.4). Las cinco pantallas —las cuatro más la de una partida de
-sparring— cuelgan de la misma sección y comparten cabecera; la elección entre
-ellas vive dentro, no en la navegación principal.
+RF-4 entero: el **plan de entrenamiento semanal** (RF-4.5), que es la portada
+de la sección, y las cuatro formas de entrenar a las que manda — puzzles
+sacados de los errores propios (RF-4.1, con RF-10.3), el drill de aperturas
+(RF-4.2), sparring contra el motor con la fuerza calibrada (RF-4.3) y re-jugar
+desde el error (RF-4.4). Las seis pantallas —las cinco pestañas más la de una
+partida de sparring— cuelgan de la misma sección y comparten cabecera; la
+elección entre ellas vive dentro, no en la navegación principal.
 
 | Archivo | Qué es |
 | --- | --- |
-| `TrainingHeader.tsx` | La cabecera común: el título de la sección, la frase de cada pantalla (`children`) y la sub-navegación Puzzles \| Aperturas \| Re-jugar \| Sparring. |
-| `TrainingPage.tsx` | Puzzles: el botón de generar, la cola del día y los estados por los que pasa (sin puzzles, por hoy terminado, resolviendo). |
+| `TrainingHeader.tsx` | La cabecera común: el título de la sección, la frase de cada pantalla (`children`) y la sub-navegación Plan \| Puzzles \| Aperturas \| Re-jugar \| Sparring. El plan va primero porque es la portada. |
+| `PlanPage.tsx` | El plan de la semana (RF-4.5) y **la portada de la sección** (`/training`): arriba qué te está costando puntos, debajo los deberes que salen de ahí, cada uno con su avance y con las debilidades que lo piden. No se hace nada aquí: cada tarjeta lleva a la pestaña donde se entrena. |
+| `plan.ts` | Cómo se lee el plan: cada debilidad en una frase con su número en **su** unidad (`formatWeaknessSentence`) y cómo se llama cada deber, en qué se cuenta y adónde lleva (`TASK_DISPLAYS`). Pura, probada en `__tests__/plan.test.ts`. |
+| `PuzzlesPage.tsx` | Puzzles: el botón de generar, la cola del día y los estados por los que pasa (sin puzzles, por hoy terminado, resolviendo). |
 | `PuzzleSolver.tsx` | Un puzzle: el tablero donde se responde y el panel que dice cómo fue. Se monta con `key={puzzle.id}`, así que cambiar de puzzle reinicia su estado. |
 | `arrows.ts` | Las flechas del puzzle cerrado: solución en verde, equivalentes atenuadas, la jugada de la partida en rojo. Pura, probada en `__tests__/arrows.test.ts`. |
 | `DrillsPage.tsx` | Drill de aperturas: el botón de generar líneas —con el aviso de cuánta teoría falta por consultar—, la cola del día y los estados por los que pasa (sin líneas, por hoy terminado, recorriendo una). |
@@ -83,10 +86,26 @@ sparring está el camino de siempre: abrirla como tablero desde su PGN (RF-6.6)
 y analizarla desde ahí (RF-6.9), que la deja fuera de las estadísticas por
 construcción.
 
+**El plan no se guarda, y sus deberes se marcan solos.** `PlanPage` solo lee:
+`GET /training/plan` recalcula el plan en cada visita a partir de las
+estadísticas (RF-3) y de las colas de estas mismas pestañas, y lo que llevas
+hecho sale de fechas que la base ya guarda —los puzzles y las líneas repasados
+desde el lunes, las partidas jugadas desde el lunes—. No hay casilla que
+marcar: entrenar en las otras pestañas es lo que mueve la barra. Tres cosas que
+conviene saber al leer esta pantalla: **(a)** cada deber enseña la debilidad
+que lo pide, porque un objetivo sin motivo a la vista sería una cuota
+inventada; **(b)** el orden de las debilidades —y con él la insignia "lo
+primero"— es fijo por clase y **no** va de mayor a menor número: los cinco
+números están en cinco unidades distintas y no se pueden comparar; y **(c)** el
+objetivo nunca pide más material del que hay, así que el 100 % siempre es
+alcanzable. Razonado en
+[ADR-0021](../../../../../docs/adr/0021-el-plan-semanal-se-deduce-y-el-orden-de-las-debilidades-es-editorial.md).
+
 Cuándo vuelve cada puzzle **y cada línea** lo decide el mismo SM-2 de
 `lucia_core.training` —un drill se repasa como se repasa un puzzle, así que no
 hay dos comportamientos que explicar—, las reglas de una línea están en
 `lucia_core.drills` y las de una partida en `lucia_core.sparring` —incluido
-`board_at_ply`, que saca del PGN la posición desde la que se retoma—. Del
-entrenamiento queda pendiente el plan semanal (RF-4.5) — ver
-[`docs/05-roadmap.md`](../../../../../docs/05-roadmap.md).
+`board_at_ply`, que saca del PGN la posición desde la que se retoma—, y las
+del plan en `lucia_core.plan` —qué cuenta como debilidad y qué entrenamiento le
+toca—. Con RF-4.5 **RF-4 queda cerrado entero**: esta carpeta ya no tiene nada
+pendiente.

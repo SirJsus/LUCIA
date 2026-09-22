@@ -57,6 +57,9 @@ export type DrillGeneration = Schemas["DrillGenerationOut"];
 export type DrillMove = Schemas["DrillMoveOut"];
 export type SparringGame = Schemas["SparringGameOut"];
 export type ReplayPosition = Schemas["ReplayPositionOut"];
+export type WeeklyPlan = Schemas["WeeklyPlanOut"];
+export type PlanTask = Schemas["PlanTaskOut"];
+export type Weakness = Schemas["WeaknessOut"];
 export type SparringGameCreate = Schemas["SparringGameCreate"];
 
 /** Categorías de `classify_move` (lucia_core.classification). El OpenAPI las
@@ -83,6 +86,23 @@ export type MistakeType = "time" | "tactical" | "endgame" | "positional";
  * valía una jugada, la partida cambió de manos, o había una ganada y se
  * escapó. */
 export type CriticalMomentKind = "only_move" | "swing" | "missed_chance";
+
+/** Qué clase de problema ha detectado el plan semanal (`lucia_core.plan`,
+ * RF-4.5). Cada uno viene de un requerimiento de RF-3 distinto, se cuenta en
+ * otra unidad y pide otro entrenamiento. El OpenAPI lo expone como `string` y
+ * este tipo es la fuente de verdad para la UI. */
+export type WeaknessKind =
+  | "phase"
+  | "mistake_type"
+  | "opening"
+  | "time_trouble"
+  | "accuracy_trend";
+
+/** Qué entrenar (RF-4.5): las cuatro formas que existen. Cada una es una
+ * pantalla de la sección de Entrenamiento. Lleva "training" en el nombre
+ * porque aquí conviven con los tipos de otros catorce endpoints, y "task" a
+ * secas no diría de qué sección es. */
+export type TrainingTaskKind = "puzzles" | "drills" | "replays" | "sparring";
 
 /** De qué baraja salió un drill de aperturas (RF-4.2): de un punto donde te
  * sales de la teoría (RF-3.6) o de una apertura que rinde mal (RF-3.2). El

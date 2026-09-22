@@ -33,6 +33,7 @@ import type {
   SparringGame,
   SparringGameCreate,
   SyncSummary,
+  WeeklyPlan,
 } from "@lucia/shared-types";
 
 const BASE_URL = "/api";
@@ -302,6 +303,11 @@ export const api = {
       method: "POST",
       body: JSON.stringify(body),
     }),
+
+  /** El plan de entrenamiento de esta semana (RF-4.5): qué falla y qué hacer
+   * al respecto. No se guarda ni se marca: se deduce de las estadísticas y de
+   * las colas de entrenamiento, y el avance sale de lo que ya se hizo. */
+  getWeeklyPlan: () => request<WeeklyPlan>("/training/plan"),
 
   /** Los errores propios desde los que se puede retomar una partida contra el
    * motor (RF-4.4), del que más caro salió al que menos. Es la lista curada;

@@ -46,6 +46,7 @@ import { useChartTheme } from "../../lib/chartTheme";
 import {
   formatAccuracy,
   formatPercent,
+  formatPhase,
   formatPerHundredMoves,
   formatRating,
   formatTimeClass,
@@ -84,12 +85,6 @@ const BLUNDER_RATE_HEADER = (
     De ellos, blunders / 100
   </abbr>
 );
-
-const PHASE_LABELS: Record<string, string> = {
-  opening: "Apertura",
-  middlegame: "Medio juego",
-  endgame: "Final",
-};
 
 export function DashboardPage() {
   // La espera de "deja de teclear y consulto" la hace `FilterText`, que es la
@@ -481,7 +476,7 @@ function TrendsSection({ trends }: { trends: Trends }) {
 function PhaseSection({ phases }: { phases: PhaseStats[] }) {
   const theme = useChartTheme();
   const data = phases.map((phase) => ({
-    label: PHASE_LABELS[phase.phase] ?? phase.phase,
+    label: formatPhase(phase.phase),
     lost: Number(phase.average_win_percent_lost.toFixed(2)),
     accuracy: phase.average_accuracy,
     moves: phase.moves,
