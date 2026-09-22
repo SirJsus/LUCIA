@@ -11,32 +11,27 @@ SemVer para la serie `0.x`).
 
 ## [Sin publicar]
 
-Nada todavía. `0.4.5` cerró **RF-4 entero**, y lo que queda de la fase 3 es un
-solo ítem y no es de RF-4: enchufar la **capa de ocupación** (RF-7.1 a 7.7) en
-las pantallas de entrenamiento, que la fase 2 dejó pendiente de que existieran
-—ya existen las seis y ninguna la usa—. Ese ítem cierra la fase 3 y le toca el
-minor, `0.5.0`.
+Nada todavía. `0.5.0` cerró la **fase 3** y, con ella, **las fases 0 a 3
+enteras**: para `1.0.0` queda la fase 4 y solo la fase 4.
 
 Camino a v1.0.0 — ver progreso en [docs/05-roadmap.md](docs/05-roadmap.md) y
 alcance congelado en [docs/02-requerimientos.md](docs/02-requerimientos.md).
 Con `0.3.0` quedaron cerradas las **fases 0, 1 y 2**, con `0.4.0` su
-**apéndice** y con `0.4.1` a `0.4.5` los cinco ítems de RF-4 de la **fase 3**.
+**apéndice**, con `0.4.1` a `0.4.5` los cinco ítems de RF-4 de la **fase 3** y
+con `0.5.0` el sexto y último, que no era de RF-4 sino de RF-7.
 
 **Qué está entregado**: RF-1, RF-2, **RF-4 entero** (4.1 a 4.5, del 2026-09-19
-al 2026-09-21), RF-5, RF-6, RF-10 —entero desde que RF-10.3 llegó con los
-puzzles—, los siete puntos P1 de RF-7 y todo RF-3 salvo su RF-3.8. Con esto los
-requerimientos funcionales de v1.0 están entregados **salvo RF-3.8, RF-7.8 y
-RF-7.9**.
+al 2026-09-21), RF-5, RF-6, RF-10 entero, los siete puntos P1 de **RF-7**
+—desde el 2026-09-22 en las cinco pantallas con tablero, no en dos— y todo RF-3
+salvo su RF-3.8. Con esto los requerimientos funcionales de v1.0 están
+entregados **salvo RF-3.8, RF-7.8 y RF-7.9**, los tres en la fase 4.
 
-**Qué falta para `1.0.0`**, que ahora se puede decir con dos líneas:
-
-1. El **último ítem de la fase 3** — la capa de ocupación en las pantallas de
-   entrenamiento. La fase **sigue abierta** por esto y solo por esto.
-2. La **fase 4 entera** — RF-3.8 (rivales recurrentes), RF-7.8 y RF-7.9
-   (recordar sub-modo y filtros de ocupación, y casillas críticas según motor),
-   explicaciones en lenguaje natural, empaquetado y soporte de macOS/Windows.
-   De los cinco, solo los tres primeros son requerimientos; los otros dos son
-   distribución.
+**Qué falta para `1.0.0`**, que ahora cabe en una línea: la **fase 4 entera**
+—RF-3.8 (rivales recurrentes), RF-7.8 y RF-7.9 (recordar sub-modo y filtros de
+ocupación entre sesiones, y casillas críticas según motor), explicaciones en
+lenguaje natural, empaquetado y soporte de macOS/Windows—. De esos cinco
+ítems, solo los tres primeros son requerimientos; los otros dos son
+distribución.
 
 Fuera de ese camino, en Post 1.0: **RF-8 · Personalización de interfaz**
 (Fase 5), **RF-11 · Partidas con ventaja (odds) contra el motor** (Fase 6,
@@ -51,9 +46,98 @@ entre motores** (ampliación de RF-2.6, sin fase propia) y **RNF-11 ·
 Coherencia de interfaz**, criterio permanente cuyos incumplimientos concretos
 se arreglan dentro de 1.0: su inventario en
 [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) llegó a estar **vacío** el
-2026-09-19 y hoy tiene **catorce filas abiertas**, todas abiertas por las
-pantallas de entrenamiento de la fase 3 y previstas para el barrido de cierre
-de esa fase.
+2026-09-19 y hoy tiene **quince filas abiertas** —catorce de las pantallas de
+entrenamiento de la fase 3 y la 107, que destapó la capa de ocupación al poner
+las cinco columnas construidas igual—. **La fase 3 cerró sin ese barrido**, que
+se le preveía: no bloquea el cierre, porque RNF-11 se planteó después del corte
+y no cuenta para el progreso hacia 1.0.0, pero las quince filas siguen siendo
+trabajo sobre RF ya congelados y se arreglan dentro de 1.0.
+
+## [0.5.0] - 2026-09-22
+
+**Cierra la fase 3 del roadmap**, y por eso sube el minor y no el patch: la
+capa de ocupación del tablero (**RF-7.1 a RF-7.7**) entra en las tres pantallas
+de entrenamiento que tienen tablero —el puzzle (RF-4.1), el drill de apertura
+(RF-4.2) y la partida de sparring (RF-4.3 y RF-4.4)—, que era el único ítem que
+le quedaba a la fase desde que `0.4.5` cerró **RF-4 entero** sin cerrarla. Con
+esto son **cinco pantallas con la misma capa**: el visor (RF-5), el tablero de
+análisis (RF-6) y esas tres. Es lo que la fase 2 dejó dicho que se haría cuando
+las pantallas de entrenamiento existieran.
+
+**Con la fase 3 cerrada quedan cerradas las fases 0 a 3**, y para `1.0.0` queda
+la **fase 4**: RF-3.8 (rivales recurrentes), RF-7.8 y RF-7.9 —que son los dos
+extras de esta misma capa: recordar el sub-modo entre sesiones y las casillas
+críticas según motor—, las explicaciones en lenguaje natural, el empaquetado y
+macOS/Windows.
+
+**No hay alcance nuevo**: RF-7 es alcance congelado de v1.0 desde el corte del
+**2026-09-05**. No se ha añadido ningún RF ni RNF, nada baja a Post 1.0 y nada
+sube a 1.0. **Sin cambios de API, de esquema ni de datos**: esta versión es
+cliente entero.
+
+### Añadido
+
+- **Capa de ocupación del tablero en el entrenamiento** (RF-7.1 a RF-7.7 sobre
+  RF-4.1 a RF-4.4): la misma tecla `O`, el mismo panel y el mismo cálculo de
+  `apps/web/src/components/board/` que ya tenían el visor y el tablero de
+  análisis, sin endpoint, sin migración y sin reglas de conteo nuevas — es lo
+  que hace que sean cinco pantallas y no cinco copias. **Entran las tres que
+  tienen tablero y ninguna más**: el plan (RF-4.5), la lista de re-jugar y la
+  antesala de sparring no lo tienen, y en el resto de la aplicación la capa no
+  pinta nada que mirar.
+  - **La capa entra donde la barra de evaluación no entró**, y esa es la línea
+    que se decidió aquí: las pantallas de RF-4 renunciaron a la barra a
+    propósito —decir a cada jugada quién va ganando convierte el ejercicio en
+    un análisis asistido—, pero la ocupación es **lectura de la posición que ya
+    está en pantalla y no opinión del motor**, y la cabecera de RF-7 dice desde
+    el primer día que se activa sobre **cualquier** tablero, entrenamiento
+    incluido.
+  - **Ahí las tres marcas arrancan apagadas** (`marksOnByDefault: false`), y
+    siguen arrancando encendidas en el visor y en el tablero de análisis:
+    rodear las piezas colgadas (RF-7.4) es media solución de un puzzle y, en
+    una partida de sparring, el aviso de blunder que un rival calibrado no debe
+    dar. Se apagan las tres a la vez —colgadas, clavadas (RF-7.6) y rayos X
+    (RF-7.5)— y no solo las que delatan, porque el panel las presenta como tres
+    controles iguales; quien las quiera las enciende a sabiendas, y el propio
+    panel dice ahí mismo que arrancan apagadas y por qué.
+  - **Las marcas gobiernan también lo que el panel dice**, no solo lo que
+    dibuja: con su marca apagada, la inspección calla "· colgada", "· clavada"
+    y la lista de rayos X. Sin eso, apagar una marca era un gesto sin efecto
+    —pulsar una casilla entregaba en palabras justo lo que se había pedido no
+    ver—. **El conteo de atacantes y defensores va siempre**: es el propio
+    RF-7.3 y no una marca.
+
+  Las decisiones que el texto del requerimiento no fijaba están en la nota
+  "Cómo se cumplieron los siete puntos P1" de
+  [docs/02-requerimientos.md](docs/02-requerimientos.md), ampliada con esta
+  fecha, y en el ítem de cierre de la fase 3 del
+  [roadmap](docs/05-roadmap.md). **No hay ADR nuevo**, por lo mismo que no lo
+  hubo en `0.3.0` cuando nació la capa: es una capa de lectura sobre la
+  posición que ya está en pantalla, sin endpoint, sin esquema y sin motor.
+
+### Cambiado
+
+- **`Chessboard` recibe la capa por una sola propiedad**,
+  `occupancyController`, en vez del trío `overlay` + `onSelectSquare` +
+  `onHoverSquare` con el que la montaban el visor y el tablero de análisis: las
+  tres piezas van siempre juntas, y repetirlas a mano en cinco pantallas era
+  poder equivocarse en una. **`overlay` queda para la rejilla del editor de
+  posición** (RF-6.1), que es lo único que la usa aparte. La frase que anuncia
+  el atajo `O` pasa a ser una constante compartida,
+  `OCCUPANCY_TOGGLE_KEY_HINT`, al lado de la tecla que nombra (criterios C-1 y
+  C-2).
+- **Inventario de RNF-11**: fila **107** nueva y **abierta** —el mismo tablero
+  se dibuja de dos tamaños, porque el visor y el análisis lo encierran en
+  `BoardWithEvalBar` y las tres pantallas de entrenamiento ponen el
+  `Chessboard` pelado; venía de antes y solo se ve ahora, con las cinco
+  columnas construidas igual—, la **108** abierta y cerrada el mismo día (era
+  el reverso de arrancar con las marcas apagadas: un control que no hace lo que
+  dice) y la **91** precisada. El inventario queda con **quince filas
+  abiertas**; ver [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md).
+- **Sin tests nuevos ni contrato tocado**: no hay lógica nueva que probar —el
+  cálculo de `occupancy.ts` y sus pruebas no se tocan— y `openapi.json` y los
+  tipos de `packages/shared-types` no cambian de contenido; lo único que se
+  mueve ahí es el número de versión de la cabecera.
 
 ## [0.4.5] - 2026-09-21
 

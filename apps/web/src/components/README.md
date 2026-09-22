@@ -27,15 +27,19 @@ haya un único sitio donde está escrita.
 
 ## `board/` — las piezas de ajedrez
 
-Las comparten el visor de partidas (`features/viewer`) y el tablero de análisis
-(`features/board`), que son dos pantallas distintas sobre el mismo tablero.
+Las comparten las **cinco pantallas con tablero**: el visor de partidas
+(`features/viewer`), el tablero de análisis (`features/board`) y las tres de
+entrenamiento que tienen tablero (`features/training`: el puzzle, el drill de
+apertura y la partida de sparring). No todas usan las mismas piezas —la barra
+de evaluación es de las dos primeras, a propósito—, pero lo que comparten sale
+de aquí y no se copia.
 
 | Archivo | Qué es |
 | --- | --- |
-| `Chessboard.tsx` | Envoltorio de **chessground**, cuya API es imperativa: se construye una vez con `useRef` y después solo se le pasan actualizaciones. Tiene un hueco `overlay` para lo que se dibuja encima del tablero, y es quien dice qué casilla hay bajo el puntero (`onSelectSquare`, `onHoverSquare`): lo calcula midiendo sobre el rectángulo del tablero, porque chessground no avisa de la selección cuando el tablero es de solo lectura ni tiene evento de hover. |
+| `Chessboard.tsx` | Envoltorio de **chessground**, cuya API es imperativa: se construye una vez con `useRef` y después solo se le pasan actualizaciones. Es quien dice qué casilla hay bajo el puntero (`onSelectSquare`, `onHoverSquare`): lo calcula midiendo sobre el rectángulo del tablero, porque chessground no avisa de la selección cuando el tablero es de solo lectura ni tiene evento de hover. Lo que se dibuja encima entra por dos sitios: `occupancyController` —la capa de ocupación entera, que él mismo pinta y a la que enchufa esas dos casillas— y el hueco `overlay`, que quedó para la rejilla del editor de posición. La capa va por propiedad propia y no por `overlay` porque sus tres piezas siempre viajan juntas, y enchufarlas a mano era repetirlas en cinco pantallas. |
 | `boardConfig.ts` | La configuración que se le da a chessground, y la traducción de líneas del motor a flechas (RF-5.2). Vive aparte porque tiene una trampa que conviene poder probar: ver su docstring. |
 | `EvalBar.tsx` | Barra de evaluación en probabilidad de victoria, orientada como el tablero: el bando de abajo es el del usuario, **y con su color**. La cifra es siempre la de las blancas, y lo dice. |
-| `BoardWithEvalBar.tsx` | Las dos anteriores juntas, que es como aparecen en las dos pantallas. |
+| `BoardWithEvalBar.tsx` | Las dos anteriores juntas, que es como aparecen en las dos pantallas que llevan barra: el visor y el tablero de análisis. Las tres de entrenamiento montan el `Chessboard` pelado a propósito (ver `features/training/README.md`). |
 | `MoveNavigator.tsx` | Los controles ⏮ ◀ ▶ ⏭ con el punto donde estás. |
 | `MoveButton.tsx` | El botón que lleva a una posición al pulsarlo. Es el control más repetido de la aplicación: lista de jugadas, lista sin analizar, árbol de variantes y líneas del motor. |
 | `EngineLineList.tsx` | Las líneas del motor: evaluación, su W/D/L (RF-2.6, con `WdlBar`, y solo si el motor la informa) y continuación propuesta. La usan el panel del motor en vivo (`features/board/EngineLines`) y las alternativas de una jugada en el visor (RF-10.2); es el mismo dato, así que se lee igual. Señalar la jugada n de una línea dibuja sus n primeras jugadas sobre el tablero. Con `onPlayLine`, pulsar lleva el tablero hasta ahí (lo que puede el tablero de análisis); sin él, pulsar solo dibuja (lo único que puede el visor de una partida terminada). `playedUci` marca la línea que empieza por la jugada que se jugó de verdad. |
@@ -44,9 +48,9 @@ Las comparten el visor de partidas (`features/viewer`) y el tablero de análisis
 | `squares.ts` | La geometría del tablero: las 64 casillas y dónde cae cada una en pantalla según la orientación. La usan todas las capas que se superponen al tablero, para que el tinte, la línea y la casilla enfocable señalen la misma. |
 | `SquareKeyboardGrid.tsx` | Las 64 casillas como botones enfocables encima del tablero, porque chessground no hace enfocable ninguna (criterio C-1). Va con `pointer-events-none`: solo aporta paradas de foco y la tecla Intro, y el ratón sigue llegando al tablero. Una sola parada de tabulador, flechas para moverse dentro. La usan el editor de posición (Intro coloca la pieza) y la capa de ocupación (Intro inspecciona la casilla); lo único que cambia es qué se lee de cada casilla (`describeSquare`). |
 | `occupancy.ts` | Quién ataca y quién defiende cada casilla de una posición (RF-7.1 a RF-7.7): lógica pura, sin motor y sin API. Probada aparte en `__tests__/occupancy.test.ts`. |
-| `useOccupancy.ts` | El estado de la capa —sub-modo, bando, marcas, casilla inspeccionada— y el atajo `O`. Un solo hook para las dos pantallas, que es lo que evita que la capa se comporte distinto en cada una (RNF-11). |
-| `OccupancyLayer.tsx` | Lo que se pinta encima del tablero: los tintes con su número, los conectores en SVG —continuos los directos, discontinuos los rayos X (RF-7.5)— y la rejilla enfocable. Se le pasa a `Chessboard` por `overlay`. |
-| `OccupancyPanel.tsx` | El control de la capa, la inspección de la casilla elegida (RF-7.3) y la leyenda de todo lo que se ve. Va **bajo** el tablero, no en el lateral: es la leyenda de lo que se está pintando sobre él. |
+| `useOccupancy.ts` | El estado de la capa —sub-modo, bando, marcas, casilla inspeccionada— y el atajo `O`, más la frase que lo anuncia (`OCCUPANCY_TOGGLE_KEY_HINT`, exportada al lado de la tecla que nombra). Un solo hook para las cinco pantallas, que es lo que evita que la capa se comporte distinto en cada una (RNF-11). Lo único que cada pantalla elige es `marksOnByDefault`: encendidas en el visor y en el tablero de análisis, apagadas en las tres de entrenamiento (ver abajo). |
+| `OccupancyLayer.tsx` | Lo que se pinta encima del tablero: los tintes con su número, los conectores en SVG —continuos los directos, discontinuos los rayos X (RF-7.5)— y la rejilla enfocable. No lo monta la pantalla: lo dibuja `Chessboard` en cuanto recibe un `occupancyController`. |
+| `OccupancyPanel.tsx` | El control de la capa, la inspección de la casilla elegida (RF-7.3) y la leyenda de todo lo que se ve. Va **bajo** el tablero, no en el lateral: es la leyenda de lo que se está pintando sobre él. Las tres casillas de "Qué se marca" gobiernan también lo que aquí se **dice** —con su marca apagada, la inspección calla "· colgada", "· clavada" y los rayos X—, porque si no, apagar una marca sería un gesto sin efecto; el conteo de atacantes y defensores no depende de ninguna, es RF-7.3. |
 
 De dónde salen los números de la barra: en el visor, del análisis guardado
 (`win_percent_after`, ya calculado por el backend); en el tablero de análisis,
@@ -56,12 +60,23 @@ de la evaluación en vivo, convertida en el cliente con
 
 ## La capa de ocupación (RF-7)
 
-Entra el FEN de la posición que se está mirando —la jugada del visor o el nodo
-del tablero de análisis— y sale el mapa de alcances; el visor y el tablero lo
-pintan igual porque es el mismo hook y los mismos componentes. **No pasa por la
-API ni por el motor** y no se guarda nada: se recalcula al cambiar de posición.
+Entra el FEN de la posición que se está mirando —la jugada del visor, el nodo
+del tablero de análisis o la posición en juego en las tres pantallas de
+entrenamiento con tablero— y sale el mapa de alcances; las cinco lo pintan
+igual porque es el mismo hook y los mismos componentes. **No pasa por la API ni
+por el motor** y no se guarda nada: se recalcula al cambiar de posición.
 Recordar el sub-modo entre sesiones es RF-7.8 y las casillas críticas según
 motor RF-7.9, los dos P2 y fuera de la v1.0.
+
+**Lo único que cambia entre pantallas es con qué arrancan las tres marcas**
+(colgadas RF-7.4, clavadas RF-7.6, rayos X RF-7.5): encendidas en el visor y en
+el tablero de análisis, porque son lo que la capa aporta sobre mirar el tablero
+a secas y apagadas de entrada nadie las descubriría; apagadas en las tres de
+entrenamiento, porque ahí señalan justo lo que se está entrenando a ver
+—una colgada rodeada es media solución del puzzle, y en sparring el aviso de
+blunder que un rival calibrado no debe dar—. Se apagan las tres a la vez y no
+solo las que delatan: el panel las presenta como tres controles iguales, y el
+propio panel dice ahí que arrancan apagadas y por qué.
 
 Los alcances se generan a mano en vez de usar `attackers()` de chess.js, que
 devuelve solo casillas de origen: hacen falta la pieza que ataca (para ordenar

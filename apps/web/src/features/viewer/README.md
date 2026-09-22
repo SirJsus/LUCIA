@@ -100,10 +100,17 @@ marcarla la contaría dos veces en el dashboard.
 La capa de RF-7 (quién controla cada casilla, piezas colgadas, clavadas y rayos
 X) se enciende con la tecla `O` o desde su panel, bajo el tablero. Esta pantalla
 no calcula nada: le pasa a `useOccupancy` el FEN de la jugada en la que está
-parada y pone `OccupancyLayer` en el hueco `overlay` de `Chessboard`. Todo lo
-demás vive en `components/board/`, compartido con el tablero de análisis, y no
-pasa por la API ni por el motor. Cambiar de jugada suelta la casilla
-inspeccionada: era de la posición anterior.
+parada y le da ese controlador a `Chessboard` por su propiedad
+`occupancyController`, que es quien dibuja `OccupancyLayer` encima. Todo lo
+demás vive en `components/board/`, compartido con las otras cuatro pantallas
+con tablero, y no pasa por la API ni por el motor. Cambiar de jugada suelta la
+casilla inspeccionada: era de la posición anterior.
+
+Aquí las tres marcas —colgadas, clavadas y rayos X— **arrancan encendidas**,
+que es el ajuste por omisión de `useOccupancy`: son lo que la capa aporta sobre
+mirar el tablero a secas y apagadas de entrada nadie las descubriría. En las
+tres pantallas de entrenamiento arrancan apagadas, y por qué está en
+`features/training/README.md`.
 
 ## Momentos críticos
 

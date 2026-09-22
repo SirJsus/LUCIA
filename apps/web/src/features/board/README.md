@@ -93,9 +93,14 @@ y los nombres y valores de las piezas, a `components/board/pieces.ts`.
 
 **La capa de ocupación se enciende sobre este tablero** (RF-7.1 a RF-7.7), con
 la tecla `O` o desde su panel, igual que en el visor: `BoardPage` solo le pasa
-el FEN del nodo actual a `useOccupancy` y enchufa `OccupancyLayer` en el hueco
-`overlay` de `Chessboard`. Todo lo demás —el cálculo, los sub-modos y la
-leyenda— es de `components/board/`, para que las dos pantallas la lean igual.
+el FEN del nodo actual a `useOccupancy` y le pasa ese controlador a
+`Chessboard` por su propiedad `occupancyController`, que es quien dibuja
+`OccupancyLayer` encima —el hueco `overlay` queda para la rejilla enfocable del
+editor de posición, que es lo otro que se pinta sobre este tablero—. Todo lo
+demás —el cálculo, los sub-modos y la leyenda— es de `components/board/`, para
+que las cinco pantallas con tablero la lean igual. Aquí las tres marcas
+arrancan encendidas, como en el visor; en las tres pantallas de entrenamiento
+arrancan apagadas (ver `features/training/README.md`).
 
 Un tablero no tiene por qué arrancar en la posición estándar (se crea desde
 un FEN o desde un PGN con `[SetUp "1"]`), así que la numeración de las

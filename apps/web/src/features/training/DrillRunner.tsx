@@ -1,5 +1,6 @@
 /** Un drill de apertura en pantalla (RF-4.2): el tablero donde se repite la
- * línea y el panel que dice qué se entrena y por qué.
+ * línea, la capa de ocupación que se enciende sobre él (RF-7) y el panel que
+ * dice qué se entrena y por qué.
  *
  * **La línea no está aquí.** Mientras el drill está abierto, el navegador solo
  * sabe la posición que tiene delante: cada jugada se manda al servidor, que
@@ -20,6 +21,8 @@ import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { Chessboard } from "../../components/board/Chessboard";
 import { legalMovesByOrigin } from "../../components/board/legalMoves";
+import { OccupancyPanel } from "../../components/board/OccupancyPanel";
+import { OCCUPANCY_TOGGLE_KEY_HINT, useOccupancy } from "../../components/board/useOccupancy";
 import { ErrorBox, SuccessBox, WarningBox } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
 import { BOARD_HINT_CLASSES, BOARD_SIDEBAR_GRID_CLASS } from "../../components/styles";
@@ -73,6 +76,12 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
    * pantalla (criterio C-3). */
   const canMove = finished === null && !moveMutation.isPending;
   const legalMoves = useMemo(() => (canMove ? legalMovesByOrigin(fen) : undefined), [canMove, fen]);
+  /** La capa de ocupación (RF-7) sobre la posición de la línea. Las marcas
+   * arrancan apagadas como en las otras dos pantallas de entrenamiento: aquí
+   * no delatan la jugada —lo que se entrena es recordar la línea—, pero que la
+   * capa se comporte igual en las tres es lo que evita explicar en cada una
+   * con qué arranca (criterio C-2). */
+  const occupancyController = useOccupancy(fen, { marksOnByDefault: false });
 
   function tryMove(from: string, to: string) {
     if (!canMove) return;
@@ -89,7 +98,7 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
   const totalMoves = playerMoveCount(drill);
   return (
     <div className={BOARD_SIDEBAR_GRID_CLASS}>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {/* Sin barra de evaluación, como en los puzzles: lo que se entrena es
             recordar la línea, y una evaluación en pantalla la delata. */}
         <Chessboard
@@ -99,12 +108,19 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
           legalMoves={legalMoves}
           onMove={tryMove}
           lastMoveUci={lastMoveUci}
+          occupancyController={occupancyController}
         />
+        {/* Lo que hay que saber del tablero, en la misma frase y en el mismo
+            sitio que en las otras cuatro pantallas con tablero, y el atajo
+            anunciado ahí y no solo en el panel (criterio C-1). */}
         <p className={BOARD_HINT_CLASSES}>
           {finished
             ? "La línea terminó: el tablero ya no se mueve."
-            : "Arrastra una pieza para seguir la línea. Las promociones se coronan en dama."}
+            : "Arrastra una pieza para seguir la línea. Las promociones se coronan en dama."}{" "}
+          {OCCUPANCY_TOGGLE_KEY_HINT}
         </p>
+
+        <OccupancyPanel controller={occupancyController} />
       </div>
 
       <aside className="space-y-3">

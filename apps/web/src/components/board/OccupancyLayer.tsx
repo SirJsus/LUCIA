@@ -1,9 +1,10 @@
 /** La capa de ocupación dibujada **encima** del tablero (RF-7.1 a RF-7.7).
  *
- * Se le pasa a `Chessboard` por su hueco `overlay`, así que ocupa exactamente
- * el cuadrado del tablero y no le quita el ratón a chessground: todo lo que
- * pinta va con `pointer-events-none` y la casilla bajo el puntero la resuelve
- * el propio `Chessboard` por geometría.
+ * La dibuja `Chessboard` cuando se le pasa un controlador por su propiedad
+ * `occupancyController`, así que ocupa exactamente el cuadrado del tablero en
+ * las cinco pantallas que la tienen y no le quita el ratón a chessground: todo
+ * lo que pinta va con `pointer-events-none` y la casilla bajo el puntero la
+ * resuelve el propio `Chessboard` por geometría.
  *
  * Son tres capas apiladas, cada una con un trabajo:
  *

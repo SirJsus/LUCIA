@@ -517,8 +517,8 @@
       colgadas, rayos X aparte y clavadas marcadas, reglas de conteo (rey,
       peones en diagonal, al paso). Hecho el 2026-09-19: se enciende con la
       tecla O o desde su panel, en el visor (RF-5) y en el tablero de análisis
-      (RF-6); en el entrenamiento (RF-4) se enchufará cuando esa pantalla
-      exista, en la fase 3.
+      (RF-6); en el entrenamiento (RF-4) se enchufó el 2026-09-22, en el último
+      ítem de la fase 3.
 
       - **Cálculo propio de los alcances, no `attackers()` de chess.js.** El
         atajo de la librería devuelve solo las casillas de origen, y aquí hacen
@@ -755,29 +755,29 @@ entregado. Lo que sí es alcance —RF-3.8— se dice expresamente.
         (`analyzed_move_lines`, `mistake_types`, `board_analyses`), que es como
         deben estar.
 
-## Fase 3 · Entrenamiento (P1/P2)
+## Fase 3 · Entrenamiento (P1/P2) ✅
 
-> **RF-4 está cerrado entero. La fase 3 no.** Conviene no leer lo uno como lo
-> otro. Con el plan semanal (RF-4.5, 2026-09-21, versión `0.4.5`) quedan
-> entregados los cinco puntos de RF-4 —puzzles (2026-09-19, versión `0.4.1`),
-> sparring (2026-09-21, versión `0.4.2`), drill de aperturas (2026-09-21,
-> versión `0.4.3`), "re-juega desde el error" (2026-09-21, versión `0.4.4`) y
-> el plan—, y el entrenamiento de v1.0 no tiene nada pendiente.
+> **RF-4 se cerró antes que la fase, y conviene no leer lo uno como lo otro.**
+> Con el plan semanal (RF-4.5, 2026-09-21, versión `0.4.5`) quedaron entregados
+> los cinco puntos de RF-4 —puzzles (2026-09-19, versión `0.4.1`), sparring
+> (2026-09-21, versión `0.4.2`), drill de aperturas (2026-09-21, versión
+> `0.4.3`), "re-juega desde el error" (2026-09-21, versión `0.4.4`) y el
+> plan—, y aun así la fase siguió abierta cuatro días más.
 >
-> **Lo que mantiene la fase abierta es su sexto ítem, y es de RF-7, no de
-> RF-4**: enchufar la capa de ocupación (RF-7.1 a 7.7) en las pantallas de
+> **Lo que la mantuvo abierta fue su sexto ítem, que es de RF-7 y no de RF-4**:
+> enchufar la capa de ocupación (RF-7.1 a 7.7) en las pantallas de
 > entrenamiento, que la fase 2 dejó dicho que se haría cuando esas pantallas
-> existieran. Ahora existen las seis y **ninguna la usa** —comprobado sobre el
-> código el 2026-09-21: `OccupancyLayer` y `useOccupancy` solo aparecen en el
-> visor (`features/viewer/`) y en el tablero de análisis (`features/board/`)—,
-> así que la casilla sigue sin marcar y no se marca por simpatía con RF-4. Por
-> eso `0.4.5` sube el patch y no cierra fase.
+> existieran. El 2026-09-21 existían las seis y ninguna la usaba, así que la
+> casilla no se marcó por simpatía con RF-4 y `0.4.5` subió el patch sin cerrar
+> fase. Se cerró el **2026-09-22**, en las tres pantallas de entrenamiento que
+> tienen tablero: con ese ítem **cierra la fase 3, en la versión `0.5.0`**
+> (ver el [CHANGELOG](../CHANGELOG.md)), y quedan cerradas las **fases 0 a 3**.
 >
 > Eran cuatro ítems hasta el **2026-09-21**: RF-4.2 y RF-4.4 compartían uno y
 > se separaron al entregarse el primero, para no marcar como hecho lo que no lo
 > estaba — el mismo criterio con el que RF-6.5 se separó de los extras del
-> tablero en la fase 2, y el mismo por el que la capa de ocupación no se marca
-> ahora.
+> tablero en la fase 2, y el mismo por el que la capa de ocupación no se marcó
+> hasta tenerla en pantalla.
 
 - [x] Puzzles desde mis errores con repetición espaciada, aceptando como buena
       cualquier jugada equivalente y no solo la única del motor (RF-4.1 con
@@ -1073,19 +1073,62 @@ entregado. Lo que sí es alcance —RF-3.8— se dice expresamente.
         compartido nuevo, `components/ProgressBar.tsx`, más `formatPhase` subida
         a `lib/format.ts`. El inventario de RNF-11 gana las filas 104 a 106, con
         la 106 cerrada el mismo día; ver [07-coherencia-ui.md](07-coherencia-ui.md).
-- [ ] Capa de ocupación (RF-7.1 a 7.7) en la pantalla de entrenamiento, que la
-      fase 2 dejó pendiente de que esa pantalla existiera. **Es el único ítem
-      que queda de la fase 3** desde el 2026-09-21, y no es de RF-4: las seis
-      pantallas de entrenamiento ya existen —plan, puzzles, aperturas,
-      re-jugar, antesala de sparring y partida de sparring— y **ninguna usa la
-      capa**. Comprobado sobre el código ese mismo día: `OccupancyLayer` y
-      `useOccupancy` solo se importan desde `features/viewer/GameViewerPage.tsx`
-      y `features/board/BoardPage.tsx`. Las pantallas con tablero de RF-4
-      renunciaron a propósito a la barra de evaluación —decir a cada jugada
-      quién va ganando convierte el ejercicio en un análisis asistido—, así que
-      al cerrarlo habrá que decidir en cuáles de ellas entra la capa y con qué
-      sub-modo, que es lectura de la posición y no opinión del motor. Con ese
-      ítem cerrado, la fase 3 cierra y le toca `0.5.0`.
+- [x] Capa de ocupación (**RF-7.1 a 7.7**) en la pantalla de entrenamiento, que
+      la fase 2 dejó pendiente de que esa pantalla existiera. Hecho el
+      **2026-09-22**: la capa entra en las **tres** pantallas de entrenamiento
+      que tienen tablero —el puzzle (RF-4.1), el drill de apertura (RF-4.2) y
+      la partida de sparring (RF-4.3 y RF-4.4)—, con la misma tecla `O`, el
+      mismo panel y el mismo cálculo que ya tenían el visor y el tablero de
+      análisis. **Sin endpoint, sin migración y sin reglas nuevas**: es front
+      puro sobre `components/board/`, que es lo que hace que sean cinco
+      pantallas y no cinco copias. Las decisiones que el texto del RF no fijaba
+      están en la nota "Cómo se cumplieron los siete puntos P1" de
+      [02-requerimientos.md](02-requerimientos.md), ampliada con esta fecha, y
+      lo que abrió en el inventario de RNF-11, en
+      [07-coherencia-ui.md](07-coherencia-ui.md).
+
+      - **Entran las tres que tienen tablero y ninguna más.** El plan, la lista
+        de re-jugar y la antesala de sparring no lo tienen; en las otras seis
+        pantallas de la aplicación la capa no pinta nada que mirar.
+      - **La capa entra donde la barra de evaluación no entró**, y esa es la
+        línea que se decidió aquí: las pantallas de RF-4 renunciaron a la barra
+        a propósito —decir a cada jugada quién va ganando convierte el
+        ejercicio en un análisis asistido—, pero la ocupación es lectura de la
+        posición que ya está en pantalla y no opinión del motor, y la cabecera
+        de RF-7 dice desde el primer día que se activa sobre **cualquier**
+        tablero, entrenamiento incluido.
+      - **Ahí las tres marcas arrancan apagadas** (`marksOnByDefault: false`),
+        y siguen arrancando encendidas en el visor y en el tablero de análisis:
+        rodear las piezas colgadas (RF-7.4) es media solución de un puzzle y,
+        en una partida de sparring, el aviso de blunder que un rival calibrado
+        no debe dar. Se apagan las tres a la vez —colgadas, clavadas (RF-7.6) y
+        rayos X (RF-7.5)— y no solo las que delatan, porque el panel las
+        presenta como tres controles iguales. El panel dice ahí mismo que
+        arrancan apagadas y por qué: una divergencia deliberada que no se
+        cuenta en pantalla se lee como un descuido.
+      - **Las marcas gobiernan también lo que el panel dice**, no solo lo que
+        se dibuja: la inspección calla "· colgada", "· clavada" y la lista de
+        rayos X si su marca está apagada, porque si no, apagar una marca era un
+        gesto sin efecto. El conteo de atacantes y defensores va siempre: es
+        RF-7.3. Es la fila 108 del inventario de RNF-11, abierta y cerrada el
+        mismo día.
+      - **La capa se enchufa por una sola propiedad**,
+        `Chessboard.occupancyController`, en vez del trío
+        `overlay` + `onSelectSquare` + `onHoverSquare` que usaban el visor y el
+        tablero de análisis: las tres piezas siempre van juntas, y repetirlas a
+        mano en cinco pantallas era poder equivocarse en una. `overlay` queda
+        para la rejilla del editor de posición. La frase que anuncia el atajo
+        `O` pasa a ser una constante compartida
+        (`OCCUPANCY_TOGGLE_KEY_HINT`, al lado de la tecla que nombra).
+      - Sin tests nuevos: no hay lógica nueva que probar —el cálculo de
+        `occupancy.ts` y sus pruebas no se tocan—, y los del front siguen
+        pasando. El inventario de RNF-11 gana la fila **107** (el tablero se
+        dibuja de dos tamaños, que venía de antes y solo se ve al poner las
+        cinco columnas juntas), abre y cierra la **108** y precisa la 91.
+      - **Con este ítem cierra la fase 3**, en la versión **`0.5.0`** del
+        2026-09-22 — sube el minor, que es lo que le toca a una fase cerrada;
+        ver el [CHANGELOG](../CHANGELOG.md). Con ella quedan cerradas las
+        fases 0 a 3 y para `1.0.0` queda la fase 4 entera.
 
 ## Fase 4 · Pulido y distribución
 

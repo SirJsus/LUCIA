@@ -50,14 +50,15 @@ export const FIELD_CLASSES =
   "rounded border border-slate-300 bg-white px-2 py-1.5 dark:border-slate-700 dark:bg-slate-950";
 
 /** Alto máximo de las listas navegables (jugadas, variantes) y ancho del panel
- * lateral de las dos pantallas de tablero. Eran cuatro valores distintos para
+ * lateral de las pantallas con tablero. Eran cuatro valores distintos para
  * el mismo layout: 22rem y 24rem de panel, 28rem y 26rem de lista. */
 export const MOVE_LIST_HEIGHT_CLASS = "max-h-[26rem]";
 export const BOARD_SIDEBAR_GRID_CLASS = "grid gap-4 lg:grid-cols-[minmax(0,1fr)_24rem]";
 
 /** La frase de ayuda bajo el tablero, donde se anuncian los atajos: misma
- * forma y mismo sitio en las dos pantallas que tienen tablero (criterio C-1:
- * el teclado se anuncia, no se descubre probando). */
+ * forma y mismo sitio en las cinco pantallas que tienen tablero —el visor, el
+ * tablero de análisis y las tres de entrenamiento— (criterio C-1: el teclado
+ * se anuncia, no se descubre probando). */
 export const BOARD_HINT_CLASSES = "text-center text-xs opacity-60";
 
 /** El enlace de navegación que no está marcado. El activo se ve como el botón

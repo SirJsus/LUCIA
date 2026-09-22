@@ -7,9 +7,11 @@
  * enseña es `OccupancyLayer` y quien la explica en palabras, `OccupancyPanel`.
  *
  * **De dónde sale la posición y a dónde va el resultado**: entra un FEN —el de
- * la jugada que se está viendo en el visor (RF-5) o el del nodo actual del
- * tablero de análisis (RF-6)— y sale un `OccupancyMap` que las dos pantallas
- * pintan igual. No se guarda nada: se recalcula al cambiar de posición.
+ * la jugada que se está viendo en el visor (RF-5), el del nodo actual del
+ * tablero de análisis (RF-6) o el de la posición que hay en juego en las tres
+ * pantallas de entrenamiento con tablero (RF-4)— y sale un `OccupancyMap` que
+ * las cinco pintan igual. No se guarda nada: se recalcula al cambiar de
+ * posición.
  *
  * **Los alcances se generan a mano y no con `attackers()` de chess.js**, que
  * devuelve solo las casillas de origen. Aquí hacen falta tres cosas más que

@@ -18,10 +18,9 @@ import { EngineLineList } from "../../components/board/EngineLineList";
 import { arrowsFromEngineLines, arrowsFromPreviewLine } from "../../components/board/boardConfig";
 import { MoveButton } from "../../components/board/MoveButton";
 import { MoveNavigator } from "../../components/board/MoveNavigator";
-import { OccupancyLayer } from "../../components/board/OccupancyLayer";
 import { OccupancyPanel } from "../../components/board/OccupancyPanel";
 import { useMoveNavigationKeys } from "../../components/board/useMoveNavigationKeys";
-import { useOccupancy } from "../../components/board/useOccupancy";
+import { OCCUPANCY_TOGGLE_KEY_HINT, useOccupancy } from "../../components/board/useOccupancy";
 import { EmptyState, ErrorBox, ProgressBox, Spinner } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
 import {
@@ -420,9 +419,7 @@ export function GameViewerPage() {
             lastMoveUci={lastMoveUci}
             engineArrows={engineArrows}
             whiteWinPercent={whiteWinPercent}
-            overlay={<OccupancyLayer controller={occupancyController} orientation={orientation} />}
-            onSelectSquare={occupancyController.selectSquare}
-            onHoverSquare={occupancyController.hoverSquare}
+            occupancyController={occupancyController}
           />
 
           <MoveNavigator
@@ -438,7 +435,7 @@ export function GameViewerPage() {
           <p className={BOARD_HINT_CLASSES}>
             ← → recorren la partida, Inicio y Fin van a sus extremos. Pulsa una jugada de la lista
             o del gráfico para saltar a esa posición. Señala una jugada de las alternativas para
-            verla sobre el tablero. Con O se enciende y se apaga la capa de ocupación.
+            verla sobre el tablero. {OCCUPANCY_TOGGLE_KEY_HINT}
           </p>
 
           <OccupancyPanel controller={occupancyController} />

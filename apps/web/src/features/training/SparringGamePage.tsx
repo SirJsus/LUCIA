@@ -19,7 +19,11 @@
  *
  * **Sin barra de evaluación**, como en los puzzles: un rival calibrado se
  * entrena jugando contra él, y una barra diciendo a cada jugada quién va
- * ganando convierte la partida en un análisis asistido.
+ * ganando convierte la partida en un análisis asistido. **Con capa de
+ * ocupación**, en cambio (RF-7, y lo mismo en las otras dos pantallas de
+ * entrenamiento con tablero): esa no es la opinión del motor sobre la
+ * posición, es leer la posición que ya está en pantalla — el matiz que decide
+ * qué ayuda entra aquí y cuál no.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
@@ -31,6 +35,8 @@ import { EmptyState, ErrorBox, Spinner, SuccessBox, WarningBox } from "../../com
 import { Panel } from "../../components/Panel";
 import { Chessboard } from "../../components/board/Chessboard";
 import { legalMovesByOrigin } from "../../components/board/legalMoves";
+import { OccupancyPanel } from "../../components/board/OccupancyPanel";
+import { OCCUPANCY_TOGGLE_KEY_HINT, useOccupancy } from "../../components/board/useOccupancy";
 import {
   BOARD_HINT_CLASSES,
   BOARD_SIDEBAR_GRID_CLASS,
@@ -98,6 +104,12 @@ export function SparringGamePage() {
     () => (game && canMove ? legalMovesByOrigin(game.fen) : undefined),
     [game, canMove],
   );
+  /** La capa de ocupación (RF-7) sobre la posición en juego. Va antes de los
+   * retornos tempranos porque es un hook, y mientras la partida se carga
+   * recibe un FEN vacío del que `computeOccupancy` ya devuelve `null`. Las
+   * marcas arrancan apagadas: las colgadas de RF-7.4 durante una partida en
+   * marcha son el aviso de blunder que un rival calibrado no debe dar. */
+  const occupancyController = useOccupancy(game?.fen ?? "", { marksOnByDefault: false });
 
   function tryMove(from: string, to: string) {
     if (!game || !canMove) return;
@@ -129,7 +141,7 @@ export function SparringGamePage() {
       </TrainingHeader>
 
       <div className={BOARD_SIDEBAR_GRID_CLASS}>
-        <div className="space-y-2">
+        <div className="space-y-3">
           <Chessboard
             fen={game.fen}
             orientation={playerColor}
@@ -137,6 +149,7 @@ export function SparringGamePage() {
             legalMoves={legalMoves}
             onMove={tryMove}
             lastMoveUci={game.last_move_uci}
+            occupancyController={occupancyController}
           />
           {/* Lo que hay que saber del tablero, en la misma frase y en el mismo
               sitio que en el visor, el tablero de análisis y los puzzles
@@ -144,8 +157,11 @@ export function SparringGamePage() {
           <p className={BOARD_HINT_CLASSES}>
             {outcome !== null
               ? "La partida terminó: el tablero ya no se mueve."
-              : "Arrastra una pieza para jugar. Las promociones se coronan en dama."}
+              : "Arrastra una pieza para jugar. Las promociones se coronan en dama."}{" "}
+            {OCCUPANCY_TOGGLE_KEY_HINT}
           </p>
+
+          <OccupancyPanel controller={occupancyController} />
         </div>
 
         <aside className="space-y-3">

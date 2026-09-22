@@ -13,15 +13,17 @@
  * el tablero es manipulable, y el visor de partidas lo tiene en modo lectura;
  * además no hay evento alguno para "el ratón pasa por encima", que es lo que
  * necesita el sub-modo de cobertura de RF-7.2. Midiendo sobre el rectángulo
- * del tablero las dos pantallas responden igual, y como los manejadores van en
- * el contenedor —que recibe los eventos que suben desde el tablero— chessground
- * sigue recibiendo el ratón intacto para arrastrar piezas.
+ * del tablero responden igual las cinco pantallas con tablero, y como los
+ * manejadores van en el contenedor —que recibe los eventos que suben desde el
+ * tablero— chessground sigue recibiendo el ratón intacto para arrastrar piezas.
  */
 import { Chessground } from "chessground";
 import type { Api } from "chessground/api";
 import { useEffect, useRef, type ReactNode } from "react";
 import { buildBoardConfig, type EngineArrow } from "./boardConfig";
+import { OccupancyLayer } from "./OccupancyLayer";
 import { squaresInReadingOrder } from "./squares";
+import type { OccupancyController } from "./useOccupancy";
 
 export type { Api as ChessboardApi };
 
@@ -50,18 +52,27 @@ export interface ChessboardProps {
    * el tablero entero con `getFen()` de la API, que es más simple que
    * reconstruirlo a partir de tres eventos distintos. */
   onPositionChange?: () => void;
+  /** El controlador de la capa de ocupación de la pantalla (RF-7), si la
+   * tiene —no el `OccupancyMap`, que es lo que ese controlador calcula—. Se
+   * pasa entero y no sus piezas sueltas porque siempre van juntas —lo que se
+   * dibuja encima, la casilla que se fija y la que se señala— y la capa se
+   * orienta como el tablero: enchufarlas a mano era repetir tres líneas en
+   * cada una de las cinco pantallas con tablero y poder equivocarse en una. */
+  occupancyController?: OccupancyController;
   /** Al pulsar una casilla: así se coloca una pieza sin arrastrarla en el
-   * editor (RF-6.1) y así se elige la casilla que se inspecciona en la capa de
-   * ocupación (RF-7.3). Un arrastre no cuenta como pulsación —se suelta en
-   * otra casilla—, que es lo que distingue colocar de mover. */
+   * editor (RF-6.1). Un arrastre no cuenta como pulsación —se suelta en otra
+   * casilla—, que es lo que distingue colocar de mover. Sin esto manda
+   * `occupancyController`, que usa la pulsación para elegir qué casilla
+   * inspecciona (RF-7.3); un tablero no es editor y capa de ocupación a la
+   * vez. */
   onSelectSquare?: (square: string) => void;
-  /** Casilla sobre la que está el ratón, o `null` al salir del tablero. La
-   * cobertura de una pieza se filtra al señalarla (RF-7.2). */
+  /** Casilla sobre la que está el ratón, o `null` al salir del tablero. Como
+   * `onSelectSquare`, sin esto manda `occupancyController`: la cobertura de
+   * una pieza se filtra al señalarla (RF-7.2). */
   onHoverSquare?: (square: string | null) => void;
   /** Lo que se dibuja **encima** del tablero, ocupándolo entero: la rejilla de
-   * casillas enfocables del editor y la capa de ocupación. Va aquí y no en
-   * quien llama para que todas las capas se coloquen igual sobre el mismo
-   * cuadrado. */
+   * casillas enfocables del editor. Va aquí y no en quien llama para que todas
+   * las capas se coloquen igual sobre el mismo cuadrado. */
   overlay?: ReactNode;
   /** Recibe la API imperativa de chessground al montarse. Hace falta para lo
    * que no cabe en propiedades: soltar una pieza arrastrada desde la bandeja
@@ -79,8 +90,9 @@ export function Chessboard({
   onMove,
   editable = false,
   onPositionChange,
-  onSelectSquare,
-  onHoverSquare,
+  occupancyController,
+  onSelectSquare = occupancyController?.selectSquare,
+  onHoverSquare = occupancyController?.hoverSquare,
   overlay,
   onReady,
 }: ChessboardProps) {
@@ -160,6 +172,9 @@ export function Chessboard({
       onPointerLeave={() => reportHoveredSquare(null)}
     >
       <div ref={boardRef} className="size-full" />
+      {occupancyController && (
+        <OccupancyLayer controller={occupancyController} orientation={orientation} />
+      )}
       {overlay}
     </div>
   );

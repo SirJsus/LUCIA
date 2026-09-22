@@ -3,7 +3,8 @@
  *
  * Hace falta porque chessground no es accesible por teclado: no pone
  * `tabindex` en ninguna casilla ni escucha teclas. Esta capa no lo sustituye,
- * se le superpone, y se le pasa a `Chessboard` por su hueco `overlay`.
+ * se le superpone: el editor de posición se la pasa a `Chessboard` por su
+ * hueco `overlay` y la de ocupación la lleva dentro (`OccupancyLayer`).
  *
  * **No le quita el ratón a chessground**: la capa entera va con
  * `pointer-events-none`, así que los clics y los arrastres la atraviesan y

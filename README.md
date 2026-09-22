@@ -2,14 +2,13 @@
 
 Plataforma personal de entrenamiento de ajedrez. Usa **Stockfish** y **Lc0 (Leela Chess Zero)** como "cerebro", importa tu perfil e historial de **chess.com**, y construye encima análisis, estadísticas y entrenamiento que en las plataformas comerciales están detrás de un muro de pago.
 
-> Estado: fases 0 a 2 del roadmap cerradas (importación, análisis con motor,
-> estadísticas, tablero de análisis y ocupación del tablero) y **RF-4 entero
-> entregado**: puzzles desde los errores propios con repetición espaciada
-> (RF-4.1), drill de aperturas (RF-4.2), sparring contra el motor con fuerza
-> calibrada (RF-4.3), re-jugar desde el error (RF-4.4) y el plan de
-> entrenamiento semanal (RF-4.5). Queda el empaquetado (fase 4) para la
-> v1.0.0. Ver [docs/05-roadmap.md](docs/05-roadmap.md) y
-> [CHANGELOG.md](CHANGELOG.md).
+> Estado: fases 0 a 3 del roadmap cerradas — importación, análisis con motor,
+> estadísticas, tablero de análisis, ocupación del tablero y **RF-4 entero**:
+> puzzles desde los errores propios con repetición espaciada (RF-4.1), drill de
+> aperturas (RF-4.2), sparring contra el motor con fuerza calibrada (RF-4.3),
+> re-jugar desde el error (RF-4.4) y el plan de entrenamiento semanal (RF-4.5).
+> Queda el empaquetado (fase 4) para la v1.0.0. Ver
+> [docs/05-roadmap.md](docs/05-roadmap.md) y [CHANGELOG.md](CHANGELOG.md).
 
 ## Estructura del monorepo
 
@@ -97,10 +96,13 @@ donde la empieces, no cuenta en tus estadísticas —sería medirte contra un
 motor al que le has bajado la fuerza—, pero se abre como tablero para
 analizarla) y **Motores** (profundidad, MultiPV, hilos y hash, editables).
 
-Sobre cualquier tablero —el del visor y el de análisis— se enciende con la
-tecla `O` la **capa de ocupación** (RF-7): quién controla cada casilla, qué
+Sobre cualquier tablero —el del visor, el de análisis y los tres de
+entrenamiento: puzzle, drill de apertura y partida de sparring— se enciende con
+la tecla `O` la **capa de ocupación** (RF-7): quién controla cada casilla, qué
 piezas están colgadas o clavadas y qué rayos X hay detrás. Se calcula en el
-navegador, sin motor y sin red.
+navegador, sin motor y sin red. Entrenando, las tres marcas —colgadas, clavadas
+y rayos X— arrancan apagadas: rodear una pieza colgada es media solución del
+puzzle. Se encienden desde el panel cuando quieras la ayuda.
 
 Todo funciona sin conexión salvo dos cosas, y las dos las pides tú: importar
 partidas de chess.com y traer teoría de aperturas nueva del Opening Explorer de

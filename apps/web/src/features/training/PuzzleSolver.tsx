@@ -1,5 +1,6 @@
-/** Un puzzle en pantalla: el tablero donde se intenta la jugada y el panel
- * que dice cómo fue (RF-4.1).
+/** Un puzzle en pantalla: el tablero donde se intenta la jugada, la capa de
+ * ocupación que se enciende sobre él (RF-7) y el panel que dice cómo fue
+ * (RF-4.1).
  *
  * **La comprobación la hace el servidor.** Aquí no se sabe cuál es la
  * solución mientras el puzzle está abierto, y es deliberado: cualquier cosa
@@ -23,6 +24,8 @@ import { ClassificationBadge } from "../../components/ClassificationBadge";
 import { Chessboard } from "../../components/board/Chessboard";
 import type { EngineArrow } from "../../components/board/boardConfig";
 import { legalMovesByOrigin } from "../../components/board/legalMoves";
+import { OccupancyPanel } from "../../components/board/OccupancyPanel";
+import { OCCUPANCY_TOGGLE_KEY_HINT, useOccupancy } from "../../components/board/useOccupancy";
 import { arrowsFromPuzzleAnswer } from "./arrows";
 import { ErrorBox, SuccessBox, WarningBox } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
@@ -68,6 +71,11 @@ export function PuzzleSolver({ puzzle, onNext }: { puzzle: Puzzle; onNext: () =>
     () => (shownFen === puzzle.fen ? legalMovesByOrigin(puzzle.fen) : undefined),
     [puzzle.fen, shownFen],
   );
+  /** La capa de ocupación (RF-7) sobre la posición que se ve, que tras fallar
+   * es la del intento y no la del puzzle: lo que se lee es lo que hay en
+   * pantalla. Las marcas arrancan apagadas porque las colgadas de RF-7.4 son
+   * media solución de un puzzle táctico. */
+  const occupancyController = useOccupancy(shownFen, { marksOnByDefault: false });
   const arrows = useMemo(
     () =>
       reviewedAnswer
@@ -110,7 +118,7 @@ export function PuzzleSolver({ puzzle, onNext }: { puzzle: Puzzle; onNext: () =>
 
   return (
     <div className={BOARD_SIDEBAR_GRID_CLASS}>
-      <div className="space-y-2">
+      <div className="space-y-3">
         {/* Sin barra de evaluación, al contrario que el visor y el tablero de
             análisis: aquí la evaluación de la posición es media respuesta.
             Aparece al cerrar el puzzle, en números, dentro del panel. */}
@@ -122,6 +130,7 @@ export function PuzzleSolver({ puzzle, onNext }: { puzzle: Puzzle; onNext: () =>
           onMove={tryMove}
           lastMoveUci={attemptedUci}
           engineArrows={arrows}
+          occupancyController={occupancyController}
         />
         {/* Lo que hay que saber del tablero, en la misma frase y con la misma
             forma que en el visor y en el tablero de análisis (criterio C-1).
@@ -132,8 +141,11 @@ export function PuzzleSolver({ puzzle, onNext }: { puzzle: Puzzle; onNext: () =>
         <p className={BOARD_HINT_CLASSES}>
           {isReviewed
             ? arrowLegend(arrows)
-            : "Arrastra una pieza para responder. Las promociones se coronan en dama."}
+            : "Arrastra una pieza para responder. Las promociones se coronan en dama."}{" "}
+          {OCCUPANCY_TOGGLE_KEY_HINT}
         </p>
+
+        <OccupancyPanel controller={occupancyController} />
       </div>
 
       <aside className="space-y-3">

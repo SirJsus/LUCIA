@@ -937,8 +937,12 @@ tiene que ver, no dónde ni con qué cálculo; esta es la lectura que se le dio.
 Vive entero en `apps/web/src/components/board/` —`occupancy.ts` (el cálculo,
 con pruebas propias), `useOccupancy` (el estado y la tecla `O`),
 `OccupancyLayer` (lo que se pinta sobre el tablero) y `OccupancyPanel` (el
-control, la inspección y la leyenda)—, así que se comporta igual en el visor y
-en el tablero de análisis; el entrenamiento (RF-4) lo enchufará cuando exista.
+control, la inspección y la leyenda)—, así que se comporta igual en las
+**cinco pantallas con tablero**: el visor (RF-5), el tablero de análisis (RF-6)
+y, desde el **2026-09-22**, las tres de entrenamiento (RF-4) que tienen tablero
+—el puzzle (RF-4.1), el drill de apertura (RF-4.2) y la partida de sparring
+(RF-4.3 y RF-4.4)—. El plan (RF-4.5), la lista de re-jugar y la antesala de
+sparring no tienen tablero y quedan fuera.
 
 - **Los alcances se generan aquí y no con `attackers()` de chess.js**, que solo
   devuelve casillas de origen: hacen falta además la pieza que ataca (para
@@ -955,6 +959,28 @@ en el tablero de análisis; el entrenamiento (RF-4) lo enchufará cuando exista.
   la posición que ya está en pantalla, sin endpoint, sin esquema y sin motor,
   como dice la entrada de esta sección. Recordar el sub-modo entre sesiones es
   RF-7.8 y sigue pendiente.
+- **La capa entra en el entrenamiento y la barra de evaluación no**
+  (**2026-09-22**). Las tres pantallas de RF-4 con tablero renunciaron a la
+  barra a propósito —decir a cada jugada quién va ganando convierte el
+  ejercicio en un análisis asistido—, pero esto es otra cosa: es leer la
+  posición que ya está en pantalla, no la opinión del motor sobre ella, y la
+  cabecera de esta sección dice desde el primer día que la capa se activa sobre
+  **cualquier** tablero, entrenamiento incluido.
+- **Ahí las tres marcas arrancan apagadas**, y encendidas en el visor y en el
+  tablero de análisis (**2026-09-22**). Rodear las piezas colgadas (RF-7.4) es
+  media solución de un puzzle táctico y, en una partida de sparring, el aviso
+  de blunder que un rival calibrado no debe dar; las clavadas (RF-7.6) y los
+  rayos X (RF-7.5) se apagan con ellas, y no solo las que delatan, porque el
+  panel presenta las tres como controles iguales y arrancar con una sí y otra
+  no obligaría a explicar ahí por qué esa. Apagadas siguen estando en el panel,
+  con su ayuda: quien las quiera las enciende a sabiendas, que es el matiz
+  entre leer la posición y que te la lean.
+- **Las marcas gobiernan también lo que el panel dice**, no solo lo que se
+  dibuja (**2026-09-22**): con su marca apagada, la inspección de RF-7.3 calla
+  "· colgada", "· clavada" y la lista de rayos X. Sin eso, apagar una marca era
+  un gesto sin efecto —pulsar una casilla entregaba en palabras justo lo que se
+  había pedido no ver—. El conteo de atacantes y defensores va siempre: es el
+  propio RF-7.3 y no una marca.
 
 ### RF-10 · Alternativas por jugada en el análisis guardado
 
