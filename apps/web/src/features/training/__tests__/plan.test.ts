@@ -11,40 +11,58 @@ import { describe, expect, it } from "vitest";
 import { formatWeaknessSentence, taskDisplay, taskProgressPercent } from "../plan";
 
 function weakness(overrides: Partial<Weakness>): Weakness {
-  return { kind: "phase", subject: "middlegame", magnitude: 10, color: "", ...overrides };
+  return {
+    kind: "phase",
+    subject: "middlegame",
+    magnitude: 10,
+    color: "",
+    ...overrides,
+  };
 }
 
 describe("formatWeaknessSentence", () => {
   it("cuenta la fase en puntos de probabilidad de victoria", () => {
-    expect(formatWeaknessSentence(weakness({ kind: "phase", subject: "endgame", magnitude: 8 }))).toBe(
-      "Pierdes 8 pts de prob. de victoria por jugada en final.",
-    );
+    expect(
+      formatWeaknessSentence(weakness({ kind: "phase", subject: "endgame", magnitude: 8 })),
+    ).toBe("Pierdes 8 pts de prob. de victoria por jugada en final.");
   });
 
   it("cuenta el tipo de error como parte del total", () => {
     expect(
-      formatWeaknessSentence(weakness({ kind: "mistake_type", subject: "tactical", magnitude: 55 })),
+      formatWeaknessSentence(
+        weakness({ kind: "mistake_type", subject: "tactical", magnitude: 55 }),
+      ),
     ).toBe("El 55 % de tus errores están clasificados como «Táctico».");
   });
 
   it("nombra la apertura con el bando, que es lo que la distingue", () => {
     expect(
       formatWeaknessSentence(
-        weakness({ kind: "opening", subject: "Caro-Kann Defense", magnitude: 2.5, color: "black" }),
+        weakness({
+          kind: "opening",
+          subject: "Caro-Kann Defense",
+          magnitude: 2.5,
+          color: "black",
+        }),
       ),
-    ).toBe("Con Caro-Kann Defense de negras pierdes 2.5 puntos.");
+      // "de marcador" y "frente a empatarlas todas": la misma lista enseña
+      // seguidos puntos de probabilidad, de marcador y de precisión, así que
+      // cada frase dice de cuáles son los suyos y respecto a qué (fila 104).
+    ).toBe(
+      "Con Caro-Kann Defense de negras pierdes 2.5 puntos de marcador frente a empatarlas todas.",
+    );
   });
 
   it("cuenta los apuros de reloj como parte de las partidas", () => {
-    expect(formatWeaknessSentence(weakness({ kind: "time_trouble", subject: "", magnitude: 40 }))).toBe(
-      "Juegas con el reloj encima en el 40 % de tus partidas.",
-    );
+    expect(
+      formatWeaknessSentence(weakness({ kind: "time_trouble", subject: "", magnitude: 40 })),
+    ).toBe("Juegas con el reloj encima en el 40 % de tus partidas.");
   });
 
   it("cuenta la tendencia como puntos de precisión perdidos", () => {
-    expect(formatWeaknessSentence(weakness({ kind: "accuracy_trend", subject: "", magnitude: 3.2 }))).toBe(
-      "Tu precisión ha bajado 3.2 puntos respecto a los meses anteriores.",
-    );
+    expect(
+      formatWeaknessSentence(weakness({ kind: "accuracy_trend", subject: "", magnitude: 3.2 })),
+    ).toBe("Has perdido 3.2 puntos de precisión respecto a los meses anteriores.");
   });
 });
 
@@ -65,7 +83,12 @@ describe("las etiquetas y el destino de cada deber", () => {
 describe("taskProgressPercent", () => {
   it("es la parte hecha del objetivo", () => {
     const task = (done_this_week: number, weekly_target: number) =>
-      ({ kind: "puzzles", done_this_week, weekly_target, reasons: [] }) as PlanTask;
+      ({
+        kind: "puzzles",
+        done_this_week,
+        weekly_target,
+        reasons: [],
+      }) as PlanTask;
     expect(taskProgressPercent(task(0, 10))).toBe(0);
     expect(taskProgressPercent(task(5, 10))).toBe(50);
     expect(taskProgressPercent(task(10, 10))).toBe(100);

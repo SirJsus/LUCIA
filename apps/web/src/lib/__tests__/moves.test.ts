@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moveNumberLabel, moveNumberOf, plyFromFen } from "../moves";
+import { formatMoveSequence, moveNumberLabel, moveNumberOf, plyFromFen } from "../moves";
 
 const STANDARD = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
@@ -30,5 +30,27 @@ describe("moveNumberOf / moveNumberLabel", () => {
     expect(moveNumberLabel(0)).toBe("1.");
     expect(moveNumberLabel(1)).toBe("1...");
     expect(moveNumberLabel(22)).toBe("12.");
+  });
+});
+
+describe("formatMoveSequence", () => {
+  it("numera cada turno y deja la jugada de negras pegada a la de blancas", () => {
+    expect(formatMoveSequence(["e4", "e5", "Cf3", "Cc6"])).toBe("1. e4 e5 2. Cf3 Cc6");
+  });
+
+  it("no numera una lista vacía", () => {
+    expect(formatMoveSequence([])).toBe("");
+  });
+
+  it("escribe el turno con puntos suspensivos cuando empieza por negras", () => {
+    expect(formatMoveSequence(["e5"], 1)).toBe("1... e5");
+  });
+
+  it("numera desde la jugada real cuando la secuencia no arranca en la salida", () => {
+    expect(formatMoveSequence(["Dxd4", "exd4"], 45)).toBe("23... Dxd4 24. exd4");
+  });
+
+  it("cierra el turno impar sin repetir el número", () => {
+    expect(formatMoveSequence(["e4", "e5", "Cf3"])).toBe("1. e4 e5 2. Cf3");
   });
 });

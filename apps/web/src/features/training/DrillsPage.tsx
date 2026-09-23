@@ -13,8 +13,10 @@
  *
  * **Depende de la teoría que se haya consultado** (RF-3.6): las líneas salen
  * del repertorio comparado, y esa comparación se llena despacio y a propósito
- * (ADR-0010). Cuando generar dice que faltan posiciones, la pantalla lo avisa
- * y manda a refrescarlas, en vez de dejar creer que no hay material.
+ * (ADR-0010). Cuando falta teoría, la pantalla lo avisa y manda a refrescarla,
+ * en vez de dejar creer que no hay material. El aviso sale de la cola y no de
+ * haber pulsado «Generar líneas»: es una condición de la pantalla, porque una
+ * cola corta puede serlo porque falta teoría y no porque se juegue bien.
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
@@ -30,7 +32,10 @@ const DRILL_QUEUE_QUERY_KEY = ["training", "drills"] as const;
 
 export function DrillsPage() {
   const queryClient = useQueryClient();
-  const queueQuery = useQuery({ queryKey: DRILL_QUEUE_QUERY_KEY, queryFn: api.getDrillQueue });
+  const queueQuery = useQuery({
+    queryKey: DRILL_QUEUE_QUERY_KEY,
+    queryFn: api.getDrillQueue,
+  });
   /** En qué línea de la tanda se está. Se reinicia al traer una tanda nueva. */
   const [queueIndex, setQueueIndex] = useState(0);
 
@@ -92,14 +97,16 @@ export function DrillsPage() {
             : `${generateMutation.data.created} líneas nuevas.`}
         </SuccessBox>
       )}
-      {/* Cuántas posiciones de teoría faltan solo se sabe al generar: la cola
-          no trae `positions_missing`, así que el aviso no acompaña a la
-          pantalla el resto del tiempo (fila 99 del inventario, criterio
-          C-3). */}
-      {generateMutation.data && generateMutation.data.positions_missing > 0 && (
+      {/* Que la teoría esté a medias es una condición de la pantalla y no el
+          resultado de haber pulsado un botón: el repertorio se llena a trozos
+          (ADR-0010), así que una cola corta puede serlo porque falta teoría y
+          no porque se juegue bien. Por eso el aviso sale de la cola y
+          acompaña a la pantalla siempre, y no solo tras generar (fila 99 del
+          inventario, criterio C-3). */}
+      {queue !== undefined && queue.positions_missing > 0 && (
         <WarningBox>
-          Faltan {generateMutation.data.positions_missing} posiciones de teoría por consultar, así
-          que puede haber más líneas de las que se ven. Tráelas desde{" "}
+          Faltan {queue.positions_missing} posiciones de teoría por consultar, así que puede haber
+          más líneas de las que se ven. Tráelas desde{" "}
           <Link to="/stats" className="underline">
             Estadísticas
           </Link>

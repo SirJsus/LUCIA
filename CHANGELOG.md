@@ -11,14 +11,16 @@ SemVer para la serie `0.x`).
 
 ## [Sin publicar]
 
-Nada todavía. `0.5.0` cerró la **fase 3** y, con ella, **las fases 0 a 3
+Nada todavía. `0.5.0` cerró la **fase 3 entera** —sus siete ítems, el séptimo
+de ellos el barrido de cierre de RNF-11— y, con ella, **las fases 0 a 3
 enteras**: para `1.0.0` queda la fase 4 y solo la fase 4.
 
 Camino a v1.0.0 — ver progreso en [docs/05-roadmap.md](docs/05-roadmap.md) y
 alcance congelado en [docs/02-requerimientos.md](docs/02-requerimientos.md).
 Con `0.3.0` quedaron cerradas las **fases 0, 1 y 2**, con `0.4.0` su
 **apéndice**, con `0.4.1` a `0.4.5` los cinco ítems de RF-4 de la **fase 3** y
-con `0.5.0` el sexto y último, que no era de RF-4 sino de RF-7.
+con `0.5.0` los dos últimos, que no eran de RF-4: la capa de ocupación en las
+pantallas de entrenamiento (RF-7) y el barrido de RNF-11.
 
 **Qué está entregado**: RF-1, RF-2, **RF-4 entero** (4.1 a 4.5, del 2026-09-19
 al 2026-09-21), RF-5, RF-6, RF-10 entero, los siete puntos P1 de **RF-7**
@@ -45,24 +47,49 @@ después del corte), **RF-9 · Comparación de evaluaciones
 entre motores** (ampliación de RF-2.6, sin fase propia) y **RNF-11 ·
 Coherencia de interfaz**, criterio permanente cuyos incumplimientos concretos
 se arreglan dentro de 1.0: su inventario en
-[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) llegó a estar **vacío** el
-2026-09-19 y hoy tiene **quince filas abiertas** —catorce de las pantallas de
-entrenamiento de la fase 3 y la 107, que destapó la capa de ocupación al poner
-las cinco columnas construidas igual—. **La fase 3 cerró sin ese barrido**, que
-se le preveía: no bloquea el cierre, porque RNF-11 se planteó después del corte
-y no cuenta para el progreso hacia 1.0.0, pero las quince filas siguen siendo
-trabajo sobre RF ya congelados y se arreglan dentro de 1.0.
+[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) **está vacío** desde el
+barrido de cierre de la fase 3, por segunda vez en su historia —la primera fue
+el 2026-09-19, y volvió a llenarse ese mismo día con la sección de
+Entrenamiento—. **La fase 3 cerró con su barrido hecho**, que es como se le
+preveía. Que el inventario esté a cero no cierra RNF-11 ni lo mete en el
+alcance: es un criterio permanente, no cuenta para el progreso hacia 1.0.0, y
+cada cambio de `apps/web` puede volver a abrir filas — las que se abran serán,
+como las dieciséis últimas, trabajo sobre RF ya congelados y se arreglarán
+dentro de 1.0.
 
 ## [0.5.0] - 2026-09-22
 
-**Cierra la fase 3 del roadmap**, y por eso sube el minor y no el patch: la
-capa de ocupación del tablero (**RF-7.1 a RF-7.7**) entra en las tres pantallas
-de entrenamiento que tienen tablero —el puzzle (RF-4.1), el drill de apertura
-(RF-4.2) y la partida de sparring (RF-4.3 y RF-4.4)—, que era el único ítem que
-le quedaba a la fase desde que `0.4.5` cerró **RF-4 entero** sin cerrarla. Con
-esto son **cinco pantallas con la misma capa**: el visor (RF-5), el tablero de
-análisis (RF-6) y esas tres. Es lo que la fase 2 dejó dicho que se haría cuando
-las pantallas de entrenamiento existieran.
+**Cierra la fase 3 del roadmap**, y por eso sube el minor y no el patch. Trae
+**dos cosas grandes, en un solo commit y las dos de la misma fase**:
+
+1. La **capa de ocupación del tablero** (**RF-7.1 a RF-7.7**) entra en las tres
+   pantallas de entrenamiento que tienen tablero —el puzzle (RF-4.1), el drill
+   de apertura (RF-4.2) y la partida de sparring (RF-4.3 y RF-4.4)—, que era el
+   sexto ítem de la fase y el único que le quedaba desde que `0.4.5` cerró
+   **RF-4 entero** sin cerrarla. Con esto son **cinco pantallas con la misma
+   capa**: el visor (RF-5), el tablero de análisis (RF-6) y esas tres. Es lo
+   que la fase 2 dejó dicho que se haría cuando las pantallas de entrenamiento
+   existieran.
+2. El **barrido de cierre de la fase 3 para RNF-11** (coherencia de interfaz),
+   su séptimo ítem: las **dieciséis filas** que quedaban del inventario de
+   [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) cerradas de una vez
+   —las quince que la sección de Entrenamiento había ido abriendo pantalla a
+   pantalla (91, 92, 94 a 105 y 107) más la **109**, que nació al comprobar el
+   propio barrido—, y **el inventario queda vacío**. Es lo que se decidió el
+   2026-09-19 al abrir la primera de esas filas: seis de ellas pedían decidir
+   en qué se parecen las pantallas de Entrenamiento, y eso no se puede decidir
+   con la primera delante.
+
+Lo que **cierra la fase es el primero**; el segundo es lo que al cierre se le
+preveía, y va aquí y no en una versión propia porque **RNF-11 es un criterio
+permanente y no una casilla del roadmap**: la fase se cierra con una versión,
+el inventario no.
+
+**Fechas.** La versión conserva la del cierre de fase, el **2026-09-22**, que
+es la del trabajo: la capa de ocupación y el barrido son de ese día.
+Comprobarlo después —leer las cinco pantallas con tablero estado por estado—
+se llevó hasta el **2026-09-23** y dejó cinco arreglos mecánicos más y la fila
+109. El inventario está vacío **al 2026-09-23**.
 
 **Con la fase 3 cerrada quedan cerradas las fases 0 a 3**, y para `1.0.0` queda
 la **fase 4**: RF-3.8 (rivales recurrentes), RF-7.8 y RF-7.9 —que son los dos
@@ -70,10 +97,23 @@ extras de esta misma capa: recordar el sub-modo entre sesiones y las casillas
 críticas según motor—, las explicaciones en lenguaje natural, el empaquetado y
 macOS/Windows.
 
-**No hay alcance nuevo**: RF-7 es alcance congelado de v1.0 desde el corte del
-**2026-09-05**. No se ha añadido ningún RF ni RNF, nada baja a Post 1.0 y nada
-sube a 1.0. **Sin cambios de API, de esquema ni de datos**: esta versión es
-cliente entero.
+**No hay alcance nuevo, tampoco con el barrido.** RF-7 es alcance congelado de
+v1.0 desde el corte del **2026-09-05**. RNF-11 vive en Post 1.0 y **sigue
+ahí**: trabajarlo no lo mueve de sección ni lo mete en el conteo de progreso
+hacia 1.0.0, porque es una práctica de trabajo vinculante en cada commit de
+`apps/web` y no una prestación que se entregue. Sus dieciséis filas, en
+cambio, eran incumplimientos de requerimientos **ya congelados** —RF-4.1 a
+RF-4.5, RF-5, RF-6 y RF-7—, y por eso se arreglan dentro de 1.0. No se ha
+añadido ningún RF ni RNF, nada baja a Post 1.0 y nada sube a 1.0.
+
+**Esta versión sí toca el contrato de la API**, al contrario de lo que se dijo
+cuando esta entrada solo recogía la capa de ocupación: el barrido cambia tres
+endpoints y **dos de esos cambios son incompatibles** —`SparringGameOut` pierde
+`opponent_name` y `GET /training/replays` deja de devolver una lista—, porque
+la incoherencia estaba en el dato y no en cómo se pintaba. Sigue siendo
+`0.5.0`: es el mismo commit sin publicar, y en la serie `0.x` la API puede
+cambiar sin aviso entre versiones menores, como dice la cabecera de este
+archivo. **Sin migraciones y sin cambios de esquema ni de datos.**
 
 ### Añadido
 
@@ -111,9 +151,50 @@ cliente entero.
   "Cómo se cumplieron los siete puntos P1" de
   [docs/02-requerimientos.md](docs/02-requerimientos.md), ampliada con esta
   fecha, y en el ítem de cierre de la fase 3 del
-  [roadmap](docs/05-roadmap.md). **No hay ADR nuevo**, por lo mismo que no lo
-  hubo en `0.3.0` cuando nació la capa: es una capa de lectura sobre la
-  posición que ya está en pantalla, sin endpoint, sin esquema y sin motor.
+  [roadmap](docs/05-roadmap.md). **La capa no trae ADR**, por lo mismo que no
+  lo trajo en `0.3.0` cuando nació: es una capa de lectura sobre la posición
+  que ya está en pantalla, sin endpoint, sin esquema y sin motor. El ADR-0022
+  de más abajo es del barrido y no de ella.
+
+- **Mover una pieza con el teclado en los cuatro tableros donde se juega**
+  (RNF-11 fila 91, criterio C-1, sobre RF-4.1, RF-4.2, RF-4.3/RF-4.4 y RF-6):
+  el puzzle, el drill, la partida de sparring y el tablero de análisis solo se
+  dejaban usar arrastrando. Ahora **Intro elige el origen y vuelve a pulsarse
+  en el destino, y Esc suelta lo elegido**. Era la fila más vieja del
+  inventario y la única que no se podía arreglar en su pantalla, porque la
+  rejilla enfocable que ya existía activa **una** casilla y una jugada son dos.
+  La solución no fue inventar el flujo de dos pasos sino **devolvérselo a
+  chessground**: la rejilla sube de `OccupancyLayer` a `Chessboard`, que es
+  quien conoce los dos trabajos de una casilla —ser origen o destino de una
+  jugada e inspeccionarse (RF-7.3)— y puede darle a Intro uno solo sin
+  superponer dos juegos de paradas de foco. El editor de posición (RF-6.1)
+  conserva la suya por `overlay`, porque ahí activar una casilla es colocar una
+  pieza.
+- **Cuatro módulos compartidos del front**, todos nacidos de duplicación real y
+  ninguno por anticipación: `components/PanelList.tsx` (el listado de filas
+  dentro de un panel, que estaba escrito a mano en el listado de sparring y
+  copiado carácter a carácter en el de re-jugar; no sustituye a `DataTable`,
+  porque una fila de re-jugar se despliega para enseñar el formulario de
+  dificultad), `components/board/BoardFrame.tsx` (la medida del tablero, que
+  salía de dos tamaños según llevara barra de evaluación o no — fila 107; vive
+  ahí y no en `Chessboard` para que el editor de posición no la herede),
+  `components/board/hints.ts` (las frases del pie del tablero) y
+  `features/training/ExerciseStatusBadge.tsx` (la insignia del panel lateral,
+  que significaba tres cosas distintas en las tres pantallas con tablero).
+- **[ADR-0022](docs/adr/0022-la-probabilidad-de-victoria-se-cuenta-desde-quien-entrena.md)**,
+  la única excepción escrita del barrido (fila 92): la probabilidad de victoria
+  **se cuenta desde quien entrena cuando la frase nombra el bando** —"Tu
+  probabilidad de victoria pasó de 62,0 % a 31,0 %"—, y es el criterio **C-5 el
+  que cede**. Girarla a las blancas habría sido coherente con la fila 52, pero
+  quien juega con negras leería "31 puntos más" justo debajo del titular que le
+  dice que acaba de cometer un error grave. El punto de vista de las blancas
+  sigue siendo obligatorio en todo número suelto —una columna, una insignia, un
+  gráfico—, que es donde nadie puede preguntar desde dónde se cuenta. Va a ADR
+  y no al inventario porque **un criterio con excepción es una decisión y no un
+  arreglo**.
+- **Nueve tests nuevos**: cinco del front para `formatMoveSequence` y dos para
+  `turnsOf`, y dos de API —el `starting_ply` de una partida retomada y el total
+  de la cola de re-jugar—. El total queda en **352 de Python y 166 del front**.
 
 ### Cambiado
 
@@ -126,18 +207,98 @@ cliente entero.
   el atajo `O` pasa a ser una constante compartida,
   `OCCUPANCY_TOGGLE_KEY_HINT`, al lado de la tecla que nombra (criterios C-1 y
   C-2).
-- **Inventario de RNF-11**: fila **107** nueva y **abierta** —el mismo tablero
-  se dibuja de dos tamaños, porque el visor y el análisis lo encierran en
-  `BoardWithEvalBar` y las tres pantallas de entrenamiento ponen el
-  `Chessboard` pelado; venía de antes y solo se ve ahora, con las cinco
-  columnas construidas igual—, la **108** abierta y cerrada el mismo día (era
-  el reverso de arrancar con las marcas apagadas: un control que no hace lo que
-  dice) y la **91** precisada. El inventario queda con **quince filas
-  abiertas**; ver [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md).
-- **Sin tests nuevos ni contrato tocado**: no hay lógica nueva que probar —el
-  cálculo de `occupancy.ts` y sus pruebas no se tocan— y `openapi.json` y los
-  tipos de `packages/shared-types` no cambian de contenido; lo único que se
-  mueve ahí es el número de versión de la cabecera.
+- **Cuatro cambios de comportamiento visibles**, los cuatro del barrido y los
+  cuatro con decisión detrás; van aparte para que no se lean como arreglos de
+  estilo:
+  - **La partida de sparring se encabeza como pantalla de detalle** (fila 94,
+    C-2): llevaba la cabecera de la sección, así que se titulaba
+    "Entrenamiento", volvía atrás con un botón al final del lateral y la
+    pestaña "Sparring" hacía lo mismo con otro nombre. Ahora lleva "← Volver a
+    sparring" sobre un título que nombra la partida, **sin sub-navegación**,
+    como el visor y el tablero de análisis: una partida concreta no es una
+    forma de entrenar entre cinco. Con ella suben a la cabecera sus acciones
+    —"Abrir como tablero" y "Abandonar"— (fila 109).
+  - **El drill deja la jugada errónea sobre el tablero al fallar** (fila 97,
+    C-2 / C-3), como ya hacía el puzzle, que es el que tenía la razón escrita:
+    borrarla al instante da la sensación de que la pieza rebotó y no de que la
+    respuesta era otra. Hace falta pulsar "Volver a intentarlo".
+  - **El plan dice de qué son los puntos de cada magnitud** (fila 104, C-5 /
+    C-6): "puntos" nombraba tres cosas seguidas en la misma lista. Ahora son
+    "pts de prob. de victoria", "puntos de marcador" y "puntos de precisión", y
+    la de la apertura dice además frente a qué se pierden.
+  - **Cada tarjeta de deberes se llama como la pestaña a la que lleva** (fila
+    105, C-2): decían "Líneas de apertura", "Posiciones a re-jugar" y "Partidas
+    contra el motor" y se aterrizaba en "Aperturas", "Re-jugar" y "Sparring".
+    Manda el nombre del destino; lo que la tarjeta hace lo cuenta la frase de
+    debajo.
+- **Contrato de la API: tres endpoints cambiados, dos de ellos de forma
+  incompatible**, porque en esos tres la incoherencia estaba en el dato y no en
+  cómo se pintaba. `openapi.json` y los tipos de `packages/shared-types`,
+  regenerados con `make types`; ver los flujos 12, 13 y 14 de
+  [docs/03-arquitectura.md](docs/03-arquitectura.md).
+  - **`SparringGameOut` pierde `opponent_name`** (fila 96) y **gana
+    `starting_ply`** (fila 101). El nombre del rival lo componían por separado
+    el front y el servidor, y coincidían carácter a carácter sin que nada lo
+    garantizara: lo compone ya solo `lib/format.ts::formatOpponentName`, y el
+    del servidor se queda para la cabecera del PGN, que es un documento que se
+    abre en otros programas y donde `[Black "lc0"]` no diría contra quién se
+    jugó. `starting_ply` sale de `starting_fen` y no de `origin_ply` —que es
+    relativo al inicio de la partida de origen y da otro número si esa no
+    empezaba en la salida— y con él una partida retomada (RF-4.4) se numera
+    desde donde empieza.
+  - **`GET /training/replays` deja de devolver una lista y devuelve
+    `ReplayQueueOut`** (`positions` + `total`, fila 102), para poder decir "20
+    de 312" como las otras colas. El total va en el cuerpo y no en una cabecera
+    `X-Total-Count` como el listado de Partidas, porque con las tres pestañas
+    hermanas es con las que se compara al cambiar de pestaña.
+  - **`DrillQueueOut` gana `positions_missing`** (fila 99), de la misma
+    `compare_repertoire` que ya lo contaba al generar: el repertorio se llena a
+    trozos ([ADR-0010](docs/adr/0010-repertorio-con-red-y-cacheado.md)), así
+    que una cola corta puede serlo porque falte teoría y no porque se juegue
+    bien, y eso es una condición de la pantalla al llegar y no el resultado de
+    pulsar "Generar líneas".
+- **Inventario de RNF-11: de quince filas abiertas a ninguna.** La capa de
+  ocupación abrió la **107** —el mismo tablero dibujado de dos tamaños, que
+  venía de antes y solo se veía con las cinco columnas construidas igual—,
+  cerró la **108** el mismo día y precisó la **91**; el barrido cerró después
+  esas quince y la **109** que él mismo destapó. **El inventario queda vacío**,
+  por segunda vez desde que existe. Ver
+  [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md), donde está el detalle
+  fila a fila de las dieciséis.
+
+### Corregido
+
+- **Un tablero que dejaba de aceptar jugadas las seguía aceptando.** Quitarle
+  `legalMoves` no bastaba: `buildBoardConfig` omite `movable` cuando no las hay
+  —mandarlo en `undefined` le borraría a chessground ese trozo de estado— y
+  chessground **conserva entonces los destinos de la posición anterior**, así
+  que las piezas se seguían arrastrando sobre el puzzle ya fallado y el tablero
+  acababa enseñando una posición que no era la de nadie. `Chessboard` le manda
+  ya los **destinos vacíos**. Con eso el puzzle cierra su tablero al cerrarse y
+  mientras el servidor comprueba, que es la regla que el drill y el sparring ya
+  tenían (`canMove`). Salió de comprobar el barrido leyendo las cinco pantallas
+  con tablero estado por estado (criterio C-3).
+- **Con las tres marcas apagadas, el lector de pantalla las seguía diciendo**
+  (C-3). La fila 108 hizo que gobernaran la inspección del panel, pero la
+  rejilla enfocable que se mudó a `Chessboard` seguía diciendo "clavada" y
+  "colgada" en el `aria-label` de cada casilla: con teclado y lector de
+  pantalla, apagarlas volvía a ser un gesto sin efecto **justo en las tres
+  pantallas de entrenamiento, que son donde arrancan apagadas**.
+  `describeSquareOccupancy` recibe ya las marcas, como `SquareInspection`.
+- **El atajo del teclado se anunciaba donde el tablero no acepta jugadas**
+  (C-1). `KEYBOARD_MOVE_HINT` se encadenaba siempre, así que el puzzle cerrado,
+  la línea terminada y la partida acabada decían "el tablero ya no se mueve" y
+  a continuación "Intro elige origen y destino", en la misma frase. Va ahora
+  donde va la invitación a arrastrar y no más: las dos vías se prometen juntas,
+  que es lo que pide C-1. En el tablero de análisis sigue saliendo siempre,
+  porque allí el tablero siempre acepta jugadas. De paso, la frase del teclado
+  del **editor de posición** pasa a usar las mismas palabras que las otras
+  cinco pantallas, cambiando solo lo único que cambia: lo que hace Intro.
+- **Comentarios y READMEs que habían dejado de ser ciertos**: `TrainingHeader`
+  y `features/training/README.md` seguían diciendo que las **seis** pantallas
+  de la sección comparten cabecera, cuando la fila 94 sacó de ahí a la partida
+  de sparring; y los cuatro archivos que estrena este barrido no estaban en la
+  tabla de su README, que es donde se mira antes de copiar una receta a mano.
 
 ## [0.4.5] - 2026-09-21
 

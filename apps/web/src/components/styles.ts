@@ -74,3 +74,11 @@ export const NAV_LINK_CLASSES =
 export const TABLE_ROW_CLASSES =
   "border-t border-slate-200 hover:bg-slate-50 dark:border-slate-800 dark:hover:bg-slate-900";
 export const TABLE_CELL_CLASSES = "px-3 py-2";
+
+/** Fila de un listado de panel (`components/PanelList.tsx`) y la línea siempre
+ * visible que lleva dentro. Van separadas porque una fila puede desplegar algo
+ * debajo de esa línea —el formulario de dificultad de re-jugar—, y entonces el
+ * `flex` no puede estar en el `<li>`. */
+export const LIST_ROW_CLASSES =
+  "border-b border-slate-100 px-3 py-2 text-sm last:border-b-0 dark:border-slate-800";
+export const LIST_ROW_SUMMARY_CLASSES = "flex flex-wrap items-center gap-3";

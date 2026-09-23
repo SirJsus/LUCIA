@@ -427,9 +427,15 @@ que se le dio; los topes y los tiempos son constantes con nombre en
   dejaría la partida donde el motor no la reconocería. Jugada de la persona y
   respuesta del motor viajan en la misma petición, porque son un solo turno.
 - **La partida se guarda como posición de partida más jugadas en UCI**, y la
-  posición actual, el PGN y el final se derivan al servir: así no hay dos
-  versiones de la misma partida que puedan discrepar. `result` es la **única**
-  marca de que terminó (`null` mientras se juega) y `termination` dice por qué
+  posición actual, el PGN, el final y `starting_ply` —desde qué media jugada de
+  la partida real arranca, para numerar bien una retomada a mitad (RF-4.4)— se
+  derivan al servir: así no hay dos versiones de la misma partida que puedan
+  discrepar. El **nombre del rival** dejó de derivarse para la pantalla el
+  **2026-09-22**: viajan `engine` y `engine_elo` y la frase "Stockfish (1500)"
+  la compone el front, porque componerla a la vez en los dos lados eran dos
+  nombres que coincidían sin que nada lo garantizara. En el servidor se queda
+  el que va al PGN, que es un documento que se abre en otros programas.
+  `result` es la **única** marca de que terminó (`null` mientras se juega) y `termination` dice por qué
   —mate, ahogado, material insuficiente, cincuenta jugadas, repetición o
   abandono—, porque "0-1" no distingue un mate de un abandono y en un
   entrenamiento eso es justo lo que se quiere saber.
@@ -937,7 +943,11 @@ tiene que ver, no dónde ni con qué cálculo; esta es la lectura que se le dio.
 Vive entero en `apps/web/src/components/board/` —`occupancy.ts` (el cálculo,
 con pruebas propias), `useOccupancy` (el estado y la tecla `O`),
 `OccupancyLayer` (lo que se pinta sobre el tablero) y `OccupancyPanel` (el
-control, la inspección y la leyenda)—, así que se comporta igual en las
+control, la inspección y la leyenda)—, con la rejilla enfocable con la que se
+inspecciona una casilla sin ratón (RF-7.3) en `Chessboard` desde el
+**2026-09-22**: una casilla tiene dos trabajos —inspeccionarse y ser origen o
+destino de una jugada— y solo quien conoce los dos puede darle a Intro uno sin
+que salgan dos rejillas superpuestas. Así se comporta igual en las
 **cinco pantallas con tablero**: el visor (RF-5), el tablero de análisis (RF-6)
 y, desde el **2026-09-22**, las tres de entrenamiento (RF-4) que tienen tablero
 —el puzzle (RF-4.1), el drill de apertura (RF-4.2) y la partida de sparring
@@ -977,10 +987,13 @@ sparring no tienen tablero y quedan fuera.
   entre leer la posición y que te la lean.
 - **Las marcas gobiernan también lo que el panel dice**, no solo lo que se
   dibuja (**2026-09-22**): con su marca apagada, la inspección de RF-7.3 calla
-  "· colgada", "· clavada" y la lista de rayos X. Sin eso, apagar una marca era
-  un gesto sin efecto —pulsar una casilla entregaba en palabras justo lo que se
-  había pedido no ver—. El conteo de atacantes y defensores va siempre: es el
-  propio RF-7.3 y no una marca.
+  "· colgada", "· clavada" y la lista de rayos X, **y lo mismo vale para lo que
+  la casilla lee en voz alta** con un lector de pantalla
+  (`describeSquareOccupancy`, desde el 2026-09-22). Sin eso, apagar una marca
+  era un gesto sin efecto
+  —pulsar una casilla entregaba en palabras justo lo que se había pedido no
+  ver—, y quedaba sin efecto justo por la vía del teclado. El conteo de
+  atacantes y defensores va siempre: es el propio RF-7.3 y no una marca.
 
 ### RF-10 · Alternativas por jugada en el análisis guardado
 

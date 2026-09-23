@@ -6,7 +6,7 @@
  * lo que pinta va con `pointer-events-none` y la casilla bajo el puntero la
  * resuelve el propio `Chessboard` por geometría.
  *
- * Son tres capas apiladas, cada una con un trabajo:
+ * Son dos capas apiladas, cada una con un trabajo:
  *
  * 1. **Los tintes**, una casilla por celda. En mapa de calor (RF-7.1) el color
  *    dice quién domina y la intensidad, por cuánto; en cobertura (RF-7.2),
@@ -14,8 +14,14 @@
  * 2. **Las líneas**, en SVG. Los conectores pieza → casilla van continuos y los
  *    rayos X discontinuos, que es justamente lo que pide RF-7.5 para que no se
  *    confundan con un ataque directo.
- * 3. **La rejilla enfocable** (`SquareKeyboardGrid`), para inspeccionar una
- *    casilla sin ratón (RF-7.3 con el criterio C-1).
+ *
+ * La rejilla enfocable con la que se inspecciona una casilla sin ratón (RF-7.3
+ * con el criterio C-1) **no está aquí**: la dibuja `Chessboard`, que es quien
+ * puede darle a Intro los dos trabajos que tiene una casilla —elegirla para
+ * inspeccionarla y elegirla como origen o destino de una jugada— sin que salgan
+ * dos rejillas superpuestas con dos juegos de paradas de foco (fila 91 del
+ * inventario). De aquí sale solo `describeSquareOccupancy`, que es lo que esa
+ * rejilla lee en voz alta cuando la capa está encendida.
  *
  * **Ningún significado va solo en el color** (criterio C-7): cada casilla con
  * atacantes lleva su número encima, las clavadas se marcan con borde a rayas y
@@ -23,8 +29,7 @@
  * palabras.
  */
 import { coverageFrom, type OccupancyMap } from "./occupancy";
-import { colorName, pieceName, type PieceColor } from "./pieces";
-import { SquareKeyboardGrid } from "./SquareKeyboardGrid";
+import { type PieceColor } from "./pieces";
 import { squareScreenCell, squaresInReadingOrder, type BoardOrientation } from "./squares";
 import type { OccupancyController } from "./useOccupancy";
 
@@ -95,12 +100,6 @@ export function OccupancyLayer({
           );
         })}
       </svg>
-
-      <SquareKeyboardGrid
-        orientation={orientation}
-        describeSquare={(square) => describeSquareOccupancy(occupancy, square)}
-        onActivate={controller.selectSquare}
-      />
     </>
   );
 }
@@ -183,7 +182,10 @@ function OccupancySquare({
 /** El color de una casilla en el mapa de calor (RF-7.1): de quien tenga más
  * atacantes directos, gris si empatan con al menos uno, y nada si no la alcanza
  * nadie. */
-function heatmapTint(balance: number, attackerCount: number): { color: string; opacity: number } | null {
+function heatmapTint(
+  balance: number,
+  attackerCount: number,
+): { color: string; opacity: number } | null {
   if (balance !== 0) {
     return {
       color: TINT_RGB_BY_COLOR[balance > 0 ? "w" : "b"],
@@ -241,22 +243,4 @@ function buildOccupancyLines(
 function squareCenter(square: string, orientation: BoardOrientation): [x: number, y: number] {
   const { column, row } = squareScreenCell(square, orientation);
   return [column + 0.5, row + 0.5];
-}
-
-/** Lo que se lee de una casilla con un lector de pantalla: qué hay en ella y
- * quién la alcanza. Es la versión en palabras de todo lo que la capa dice con
- * color (criterio C-7). */
-function describeSquareOccupancy(occupancy: OccupancyMap, square: string): string {
-  const piece = occupancy.pieces[square];
-  const { directAttacks } = occupancy.squares[square];
-  const parts = [
-    `${square}: ${piece ? pieceName(piece.role, piece.color) : "vacía"}`,
-    ...(["w", "b"] as PieceColor[])
-      .filter((color) => directAttacks[color].length > 0)
-      .map((color) => `${directAttacks[color].length} de las ${colorName(color)}`),
-  ];
-  if (piece && occupancy.pinnedSquares.includes(square)) parts.push("clavada");
-  if (piece && occupancy.hangingSquares.includes(square)) parts.push("colgada");
-  if (directAttacks.w.length === 0 && directAttacks.b.length === 0) parts.push("sin control");
-  return parts.join(", ");
 }

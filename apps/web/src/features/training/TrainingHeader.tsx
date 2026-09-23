@@ -2,16 +2,18 @@
  * sección, lo que hace la pantalla concreta y la navegación entre las formas
  * de entrenar.
  *
- * Está en un solo sitio porque todas las pantallas de la sección —el plan
+ * Está en un solo sitio porque las cinco pestañas de la sección —el plan
  * semanal (RF-4.5), los puzzles (RF-4.1), el drill de aperturas (RF-4.2), los
- * errores que re-jugar (RF-4.4), la antesala del sparring y una partida de
- * sparring (RF-4.3)— tienen que encabezarse igual (criterio C-2 de
- * docs/07-coherencia-ui.md); lo único que cambia es la frase, que llega como
- * `children`.
+ * errores que re-jugar (RF-4.4) y la antesala del sparring (RF-4.3)— tienen que
+ * encabezarse igual (criterio C-2 de docs/07-coherencia-ui.md); lo único que
+ * cambia es la frase, que llega como `children`. Una partida de sparring
+ * concreta **no** la usa: es una pantalla de detalle y se encabeza como el
+ * visor y el tablero de análisis, con la vuelta atrás sobre su título (fila 94
+ * del inventario).
  *
- * "Entrenamiento" tiene seis pantallas, así que la elección vive dentro de la
- * sección y no en la navegación principal, que si no crecería una entrada por
- * cada forma de entrenar. Los enlaces se ven como el enlace activo de la
+ * "Entrenamiento" tiene cinco formas de entrenar, así que la elección vive
+ * dentro de la sección y no en la navegación principal, que si no crecería una
+ * entrada por cada una. Los enlaces se ven como el enlace activo de la
  * navegación principal y salen de la misma receta (`buttonClasses`), para que
  * "dónde estoy" se lea igual en los dos sitios.
  */
@@ -23,8 +25,8 @@ import { buttonClasses, NAV_LINK_CLASSES } from "../../components/styles";
  * dice por dónde empezar, y las otras cuatro son adónde te manda.
  *
  * `exact` distingue la pestaña que es también la raíz de la sección: sin él,
- * "/training" —que es prefijo de todas— se quedaría marcada en todas. Sparring
- * no lo lleva porque tiene una pantalla debajo, la de una partida concreta. */
+ * "/training" —que es prefijo de todas— se quedaría marcada en todas. Las demás
+ * no lo necesitan: cada una es la única pantalla de su ruta. */
 const TRAINING_TABS = [
   { to: "/training", label: "Plan", exact: true },
   { to: "/training/puzzles", label: "Puzzles", exact: false },

@@ -13,6 +13,7 @@ import { EngineSelect } from "../../components/EngineSelect";
 import { ClassificationBadge } from "../../components/ClassificationBadge";
 import { CustomPositionBadge } from "../../components/CustomPositionBadge";
 import { GameSourceBadge } from "../../components/GameSourceBadge";
+import { OCCUPANCY_TOGGLE_KEY_HINT } from "../../components/board/hints";
 import { BoardWithEvalBar } from "../../components/board/BoardWithEvalBar";
 import { EngineLineList } from "../../components/board/EngineLineList";
 import { arrowsFromEngineLines, arrowsFromPreviewLine } from "../../components/board/boardConfig";
@@ -20,7 +21,7 @@ import { MoveButton } from "../../components/board/MoveButton";
 import { MoveNavigator } from "../../components/board/MoveNavigator";
 import { OccupancyPanel } from "../../components/board/OccupancyPanel";
 import { useMoveNavigationKeys } from "../../components/board/useMoveNavigationKeys";
-import { OCCUPANCY_TOGGLE_KEY_HINT, useOccupancy } from "../../components/board/useOccupancy";
+import { useOccupancy } from "../../components/board/useOccupancy";
 import { EmptyState, ErrorBox, ProgressBox, Spinner } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
 import {
@@ -77,7 +78,10 @@ export function GameViewerPage() {
   const [engine, setEngine] = useState<EngineId>("stockfish");
   const [previewPvUci, setPreviewPvUci] = useState<string[] | null>(null);
 
-  const gameQuery = useQuery({ queryKey: ["game", id], queryFn: () => api.getGame(id) });
+  const gameQuery = useQuery({
+    queryKey: ["game", id],
+    queryFn: () => api.getGame(id),
+  });
 
   // Si la partida ya se analizó antes, se reutiliza en vez de volver a
   // gastar minutos de motor.
@@ -139,7 +143,11 @@ export function GameViewerPage() {
         // estadísticas, y publicar la copia la contaría dos veces.
       });
     },
-    onSuccess: (board) => navigate({ to: "/boards/$boardId", params: { boardId: String(board.id) } }),
+    onSuccess: (board) =>
+      navigate({
+        to: "/boards/$boardId",
+        params: { boardId: String(board.id) },
+      }),
   });
 
   // --- Jugar desde aquí contra el motor (RF-4.4) ---
@@ -314,11 +322,6 @@ export function GameViewerPage() {
           <Button
             onClick={() => analysis && exportPgnMutation.mutate(analysis.id)}
             disabled={analysis?.status !== "done" || exportPgnMutation.isPending}
-            title={
-              analysis?.status === "done"
-                ? "Descarga la partida con los comentarios del análisis y las variantes, para abrirla en lichess o ChessBase"
-                : "Analiza la partida para poder exportarla con los comentarios del motor"
-            }
           >
             {exportPgnMutation.isPending ? "Exportando…" : "Exportar PGN anotado"}
           </Button>
@@ -329,14 +332,6 @@ export function GameViewerPage() {
           <Button
             onClick={() => openAsBoardMutation.mutate()}
             disabled={openAsBoardMutation.isPending}
-            // Qué se lleva el tablero, con la misma forma que "Copiar PGN" y
-            // "Exportar PGN anotado", que son las otras dos que sacan la
-            // partida de donde está (criterio C-6).
-            title={
-              analysis?.status === "done"
-                ? "Crea un tablero de análisis con las jugadas de esta partida y los comentarios del análisis. Lo que pruebes allí no toca ni la partida ni su análisis."
-                : "Crea un tablero de análisis con las jugadas de esta partida. Lo que pruebes allí no toca la partida; analízala antes si quieres llevarte también los comentarios."
-            }
           >
             {openAsBoardMutation.isPending ? "Abriendo…" : "Abrir como tablero"}
           </Button>
@@ -347,7 +342,6 @@ export function GameViewerPage() {
           <Button
             onClick={() => setReplayFormOpen(!isReplayFormOpen)}
             disabled={startReplayMutation.isPending}
-            title="Abre una partida contra el motor desde la posición que estás viendo. No toca esta partida ni su análisis."
           >
             {isReplayFormOpen ? "Cancelar" : "Jugar desde aquí"}
           </Button>
@@ -364,6 +358,26 @@ export function GameViewerPage() {
           </Button>
         </div>
       </div>
+
+      {/* Qué hacen las tres acciones que sacan la partida de aquí, a la vista y
+          no en un `title`: con teclado un `title` no aparece nunca, y en un
+          botón deshabilitado —que es como está "Exportar PGN anotado" sin
+          análisis— tampoco. Es la misma forma con la que Puzzles y Aperturas
+          explican su botón de generar, y lo que cerraron las filas 56 y 57 en
+          la barra de filtros de Partidas y en la goma del editor de posición
+          (fila 103 del inventario, criterios C-6 y C-7). */}
+      <p className="text-xs opacity-60">
+        <strong className="font-medium">Exportar PGN anotado</strong> descarga la partida con los
+        comentarios del análisis y sus variantes, para abrirla en lichess o ChessBase
+        {analysis?.status === "done" ? "" : "; hay que analizarla antes"}.{" "}
+        <strong className="font-medium">Abrir como tablero</strong> crea un tablero de análisis con
+        sus jugadas
+        {analysis?.status === "done"
+          ? " y los comentarios del análisis"
+          : "; analízala antes si quieres llevarte también los comentarios"}
+        . <strong className="font-medium">Jugar desde aquí</strong> abre una partida contra el motor
+        desde la posición que estás viendo. Ninguna de las tres toca esta partida ni su análisis.
+      </p>
 
       {isReplayFormOpen && (
         <Panel title={`Jugar desde la jugada ${moveNumberLabel(currentPly + startingPly + 1)}`}>
@@ -433,9 +447,9 @@ export function GameViewerPage() {
           />
 
           <p className={BOARD_HINT_CLASSES}>
-            ← → recorren la partida, Inicio y Fin van a sus extremos. Pulsa una jugada de la lista
-            o del gráfico para saltar a esa posición. Señala una jugada de las alternativas para
-            verla sobre el tablero. {OCCUPANCY_TOGGLE_KEY_HINT}
+            ← → recorren la partida, Inicio y Fin van a sus extremos. Pulsa una jugada de la lista o
+            del gráfico para saltar a esa posición. Señala una jugada de las alternativas para verla
+            sobre el tablero. {OCCUPANCY_TOGGLE_KEY_HINT}
           </p>
 
           <OccupancyPanel controller={occupancyController} />
@@ -630,7 +644,10 @@ function countClassifications(classifications: string[]): Map<string, number> {
 /** Reconstruye la secuencia de posiciones desde el PGN, para poder navegar la
  * partida aunque todavía no se haya analizado. */
 function parsePgn(pgn: string | undefined): ParsedGame {
-  const emptyParsedGame: ParsedGame = { startingFen: DEFAULT_POSITION, positions: [] };
+  const emptyParsedGame: ParsedGame = {
+    startingFen: DEFAULT_POSITION,
+    positions: [],
+  };
   if (!pgn) return emptyParsedGame;
   try {
     const chess = new Chess();

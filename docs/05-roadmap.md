@@ -772,6 +772,11 @@ entregado. Lo que sí es alcance —RF-3.8— se dice expresamente.
 > fase. Se cerró el **2026-09-22**, en las tres pantallas de entrenamiento que
 > tienen tablero: con ese ítem **cierra la fase 3, en la versión `0.5.0`**
 > (ver el [CHANGELOG](../CHANGELOG.md)), y quedan cerradas las **fases 0 a 3**.
+> En el **mismo commit** viaja el séptimo ítem, el barrido de cierre de RNF-11:
+> las dieciséis filas que quedaban del inventario de coherencia, cerradas de
+> una vez, con lo que el inventario queda vacío. Es lo que el `versionador`
+> había señalado como pendiente al cerrar la fase — la fase se cierra con una
+> versión, el inventario no, porque RNF-11 es un criterio permanente.
 >
 > Eran cuatro ítems hasta el **2026-09-21**: RF-4.2 y RF-4.4 compartían uno y
 > se separaron al entregarse el primero, para no marcar como hecho lo que no lo
@@ -1129,6 +1134,61 @@ entregado. Lo que sí es alcance —RF-3.8— se dice expresamente.
         2026-09-22 — sube el minor, que es lo que le toca a una fase cerrada;
         ver el [CHANGELOG](../CHANGELOG.md). Con ella quedan cerradas las
         fases 0 a 3 y para `1.0.0` queda la fase 4 entera.
+
+- [x] Barrido de cierre de la fase 3 para **RNF-11** (coherencia de interfaz),
+      en el **mismo commit** que la capa de ocupación de arriba y con la misma
+      fecha, **2026-09-22**. Cierra las **dieciséis** filas que quedaban del
+      inventario de [07-coherencia-ui.md](07-coherencia-ui.md) —las quince que
+      la sección de Entrenamiento había ido abriendo pantalla a pantalla, más
+      la 109, que nació al comprobar el propio barrido— y **el inventario
+      queda vacío** por primera vez desde que existe. Era lo que el
+      `versionador` había señalado como pendiente al cerrar la fase: la fase se
+      cerró con `0.5.0` y el inventario no, porque RNF-11 es un criterio
+      permanente y no una casilla.
+
+      - **Por qué de una vez y no pantalla a pantalla.** Se decidió el
+        2026-09-19, al abrir la primera de estas filas: seis de ellas pedían
+        decidir en qué se parecen las pantallas de Entrenamiento, y eso no se
+        puede decidir con la primera delante. Con las seis hechas, el barrido
+        es una sola lectura comparada en vez de seis acuerdos sucesivos.
+      - **Lo que tocó fuera del front.** Tres endpoints cambiaron de contrato
+        porque la incoherencia estaba en el dato y no en cómo se pintaba:
+        `SparringGameOut` pierde `opponent_name` —el nombre del rival lo
+        compone ya `lib/format.ts::formatOpponentName`, y el del servidor se
+        queda solo para la cabecera del PGN— y gana `starting_ply`, con el que
+        una partida retomada (RF-4.4) se numera desde donde empieza;
+        `GET /training/replays` pasa de devolver una lista a `ReplayQueueOut`
+        (`positions` + `total`), para poder decir "20 de 312" como las otras
+        colas; y `DrillQueueOut` gana `positions_missing`, porque que falte
+        teoría es una condición de la pantalla y no el resultado de pulsar un
+        botón. Ver los flujos 12, 13 y 14 de
+        [03-arquitectura.md](03-arquitectura.md).
+      - **Cuatro módulos compartidos nuevos**, todos por duplicación real y
+        ninguno por anticipación: `components/PanelList.tsx` (el listado de
+        filas dentro de un panel, copiado carácter a carácter entre los dos
+        listados de Entrenamiento), `components/board/BoardFrame.tsx` (la
+        medida del tablero, que salía de dos tamaños según llevara barra de
+        evaluación o no), `components/board/hints.ts` (las frases del pie del
+        tablero) y `features/training/ExerciseStatusBadge.tsx` (la insignia del
+        panel lateral, que significaba tres cosas distintas en las tres
+        pantallas con tablero).
+      - **Mover una pieza con el teclado** (fila 91, la más vieja del
+        inventario) se resolvió devolviéndole el flujo de dos pasos a
+        chessground: la rejilla enfocable pasó de `OccupancyLayer` a
+        `Chessboard`, que es quien conoce los dos trabajos de una casilla
+        —ser origen o destino de una jugada e inspeccionarse— y puede darle a
+        Intro uno sin superponer dos juegos de paradas de foco. El editor de
+        posición conserva la suya por `overlay`.
+      - **Una excepción escrita a un criterio**, la única del barrido: la
+        probabilidad de victoria se cuenta desde quien entrena cuando la frase
+        nombra el bando (fila 92), y es **C-5 el que cede**. Queda como
+        [ADR-0022](adr/0022-la-probabilidad-de-victoria-se-cuenta-desde-quien-entrena.md),
+        porque un criterio con excepción es una decisión y no un arreglo.
+      - Sin migraciones y sin requerimientos nuevos: RNF-11 ya existía y nada
+        de esto amplía el alcance de v1.0. Los tests siguen en verde —352 de
+        Python y 166 del front—, con los de `replays`, `sparring`, `plan`,
+        `sparring.ts` y `moves.ts` ajustados a los contratos y formatos
+        nuevos.
 
 ## Fase 4 · Pulido y distribución
 

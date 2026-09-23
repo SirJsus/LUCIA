@@ -19,7 +19,7 @@ import { useState } from "react";
 import { Button } from "../../components/Button";
 import { FieldLabel } from "../../components/FieldLabel";
 import { FIELD_CLASSES } from "../../components/styles";
-import { formatEngineName } from "../../lib/format";
+import { formatOpponentName } from "../../lib/format";
 
 /** El Elo que trae el formulario. No es el de nadie en concreto: es el punto
  * medio del rango que acepta Stockfish redondeado a un número que se entiende,
@@ -35,10 +35,7 @@ const MAX_ENGINE_ELO = 3190;
 
 /** Lo que el formulario deja elegir, que es todo lo que hace falta para abrir
  * una partida menos de dónde se retoma (`origin`), que lo pone quien llama. */
-export type SparringSetup = Pick<
-  SparringGameCreate,
-  "player_color" | "engine" | "engine_elo"
->;
+export type SparringSetup = Pick<SparringGameCreate, "player_color" | "engine" | "engine_elo">;
 
 export function SparringSetupForm({
   defaultPlayerColor = "white",
@@ -98,8 +95,8 @@ export function SparringSetupForm({
           value={engine}
           onChange={(event) => setEngine(event.target.value as "stockfish" | "lc0")}
         >
-          <option value="stockfish">{formatEngineName("stockfish")}</option>
-          <option value="lc0">{formatEngineName("lc0")} · Maia</option>
+          <option value="stockfish">{formatOpponentName("stockfish")}</option>
+          <option value="lc0">{formatOpponentName("lc0")}</option>
         </select>
       </FieldLabel>
 

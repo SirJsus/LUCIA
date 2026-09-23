@@ -34,8 +34,8 @@ import { useState } from "react";
 import { Button } from "../../components/Button";
 import { ClassificationBadge } from "../../components/ClassificationBadge";
 import { EmptyState, ErrorBox, Spinner } from "../../components/Feedback";
-import { Panel } from "../../components/Panel";
-import { buttonClasses } from "../../components/styles";
+import { PanelList } from "../../components/PanelList";
+import { buttonClasses, LIST_ROW_CLASSES, LIST_ROW_SUMMARY_CLASSES } from "../../components/styles";
 import { api } from "../../lib/api";
 import { formatDate, formatOwnWinPercentLossSentence } from "../../lib/format";
 import { moveNumberLabel, plyFromFen } from "../../lib/moves";
@@ -67,7 +67,8 @@ export function ReplaysPage() {
       }),
   });
 
-  const positions = positionsQuery.data ?? [];
+  const queue = positionsQuery.data;
+  const positions = queue?.positions ?? [];
 
   return (
     <div className="space-y-6">
@@ -95,35 +96,48 @@ export function ReplaysPage() {
           cosa en la aplicación —los momentos críticos del visor (RF-2.8), que
           se eligen con otra regla—, y esta pantalla llama errores a lo que
           enseña en la frase de entrada y en el vacío (criterio C-2). Mismo
-          "Tus …" que el listado de Sparring. */}
+          "Tus …" que el listado de Sparring.
+
+          Al lado del título, cuántos se ven de cuántos hay: la lista viene
+          recortada a los veinte más caros, y sin decirlo se ven veinte de
+          trescientos como si fueran todos, mientras las tres pestañas hermanas
+          dicen siempre cuántas quedan de cuántas (fila 102 del inventario,
+          criterio C-3). */}
       {positions.length > 0 && (
-        <Panel title="Tus errores" bodyClassName="">
-          <ul>
-            {positions.map((position) => {
-              const key = `${position.game_id}-${position.ply}`;
-              const isChosen = key === chosenPositionKey;
-              return (
-                <ReplayRow
-                  key={key}
-                  position={position}
-                  isChosen={isChosen}
-                  isPending={startMutation.isPending}
-                  // El fallo de la anterior no se hereda al elegir otra: un
-                  // recuadro rojo sobre un formulario recién abierto se lee
-                  // como si acabara de fallar este (criterio C-3, el mismo
-                  // `reset()` que se hizo al abrir "Importar PGN").
-                  onChoose={() => {
-                    startMutation.reset();
-                    setChosenPositionKey(key);
-                  }}
-                  onCancel={() => setChosenPositionKey(null)}
-                  onStart={(setup) => startMutation.mutate({ position, setup })}
-                  startError={isChosen && startMutation.isError ? startMutation.error : null}
-                />
-              );
-            })}
-          </ul>
-        </Panel>
+        <PanelList
+          title="Tus errores"
+          aside={
+            queue !== undefined && queue.total > positions.length ? (
+              <span className="text-sm font-normal opacity-70">
+                los {positions.length} más caros de {queue.total}
+              </span>
+            ) : undefined
+          }
+        >
+          {positions.map((position) => {
+            const key = `${position.game_id}-${position.ply}`;
+            const isChosen = key === chosenPositionKey;
+            return (
+              <ReplayRow
+                key={key}
+                position={position}
+                isChosen={isChosen}
+                isPending={startMutation.isPending}
+                // El fallo de la anterior no se hereda al elegir otra: un
+                // recuadro rojo sobre un formulario recién abierto se lee
+                // como si acabara de fallar este (criterio C-3, el mismo
+                // `reset()` que se hizo al abrir "Importar PGN").
+                onChoose={() => {
+                  startMutation.reset();
+                  setChosenPositionKey(key);
+                }}
+                onCancel={() => setChosenPositionKey(null)}
+                onStart={(setup) => startMutation.mutate({ position, setup })}
+                startError={isChosen && startMutation.isError ? startMutation.error : null}
+              />
+            );
+          })}
+        </PanelList>
       )}
     </div>
   );
@@ -150,8 +164,8 @@ function ReplayRow({
   startError: unknown;
 }) {
   return (
-    <li className="border-b border-slate-100 px-3 py-2 text-sm last:border-b-0 dark:border-slate-800">
-      <div className="flex flex-wrap items-center gap-3">
+    <li className={LIST_ROW_CLASSES}>
+      <div className={LIST_ROW_SUMMARY_CLASSES}>
         {/* El número de jugada sale del FEN de la posición y no del `ply`, que
             es relativo al inicio de la partida: una partida importada que
             empieza en la jugada 12 se numera desde 12, como ya hace el puzzle
@@ -164,10 +178,7 @@ function ReplayRow({
             motor suelto no comunica nada (criterios C-5 y C-6). La frase es la
             misma que la del puzzle resuelto y sale del mismo formateador. */}
         <span className="opacity-70">
-          {formatOwnWinPercentLossSentence(
-            position.win_percent_before,
-            position.win_percent_after,
-          )}
+          {formatOwnWinPercentLossSentence(position.win_percent_before, position.win_percent_after)}
         </span>
         <span className="ml-auto text-xs opacity-60">
           contra {position.opponent}, {formatDate(position.played_at)}

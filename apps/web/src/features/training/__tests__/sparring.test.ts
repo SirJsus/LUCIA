@@ -16,7 +16,7 @@ function game(overrides: Partial<SparringGame>): SparringGame {
     engine_elo: 1500,
     origin_game_id: null,
     origin_ply: null,
-    opponent_name: "Stockfish (1500)",
+    starting_ply: 0,
     fen: "",
     moves_san: [],
     last_move_uci: null,
@@ -67,6 +67,19 @@ describe("turnsOf", () => {
     expect(turnsOf(["e4", "e5", "Cf3"])).toEqual([
       { number: 1, white: "e4", black: "e5" },
       { number: 2, white: "Cf3", black: null },
+    ]);
+  });
+
+  it("numera desde la jugada real cuando la partida se retomó a mitad", () => {
+    // Ply 44: turno 23, mueven las blancas (fila 101 del inventario).
+    expect(turnsOf(["Txd4", "exd4"], 44)).toEqual([{ number: 23, white: "Txd4", black: "exd4" }]);
+  });
+
+  it("deja el primer turno sin jugada de blancas si se retomó con negras", () => {
+    // Ply 45: turno 23, mueven las negras, así que ese turno ya está a medias.
+    expect(turnsOf(["Dxd4", "exd4"], 45)).toEqual([
+      { number: 23, white: null, black: "Dxd4" },
+      { number: 24, white: "exd4", black: null },
     ]);
   });
 });

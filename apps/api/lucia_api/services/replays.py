@@ -27,13 +27,46 @@ incluido por qué esto no invade RF-11.1.
 
 from __future__ import annotations
 
-from sqlalchemy import Row, select
+from sqlalchemy import Row, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.sql import Select
 
 from lucia_api.db.models import Analysis, AnalyzedMove, Game
 from lucia_api.services.games import player_color, player_side
 from lucia_api.services.insights import latest_analysis_ids
 from lucia_api.services.training import PUZZLE_CLASSIFICATIONS
+
+
+def _own_serious_mistake_ids(username: str) -> Select[tuple[int]]:
+    """Los `AnalyzedMove.id` que definen la lista: errores propios graves de los
+    análisis terminados más recientes. Sale aparte porque lo comparten las dos
+    consultas —la de las posiciones y la de cuántas hay—, y dos filtros escritos
+    dos veces son dos filtros que divergen."""
+    return (
+        select(AnalyzedMove.id)
+        .join(Analysis, AnalyzedMove.analysis_id == Analysis.id)
+        .where(
+            Analysis.id.in_(latest_analysis_ids()),
+            AnalyzedMove.classification.in_(PUZZLE_CLASSIFICATIONS),
+            # Las del rival no entran: dicen cómo juega el otro, no qué hay
+            # que rehacer.
+            AnalyzedMove.color == player_color(username),
+        )
+    )
+
+
+async def count_replay_positions(session: AsyncSession, username: str) -> int:
+    """Cuántos errores propios hay en total, sin el recorte de `limit`.
+
+    Viaja con la lista porque sin él la pantalla enseña veinte de trescientos y
+    nada dice que haya más, mientras sus tres pestañas hermanas dicen siempre
+    cuántas quedan de cuántas (fila 102 del inventario de
+    docs/07-coherencia-ui.md, criterio C-3).
+    """
+    total = await session.scalar(
+        select(func.count()).select_from(_own_serious_mistake_ids(username).subquery())
+    )
+    return total or 0
 
 
 async def replay_positions(
@@ -54,13 +87,7 @@ async def replay_positions(
         )
         .join(Analysis, AnalyzedMove.analysis_id == Analysis.id)
         .join(Game, Analysis.game_id == Game.id)
-        .where(
-            Analysis.id.in_(latest_analysis_ids()),
-            AnalyzedMove.classification.in_(PUZZLE_CLASSIFICATIONS),
-            # Las del rival no entran: dicen cómo juega el otro, no qué hay
-            # que rehacer.
-            AnalyzedMove.color == player_color(username),
-        )
+        .where(AnalyzedMove.id.in_(_own_serious_mistake_ids(username)))
         # Lo que costó el error, en probabilidad de victoria de quien lo
         # cometió: es lo que dice por cuál empezar.
         .order_by((AnalyzedMove.win_percent_before - AnalyzedMove.win_percent_after).desc())

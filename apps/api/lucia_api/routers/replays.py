@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db import get_session
 from lucia_api.dependencies import resolved_username
-from lucia_api.services.replays import replay_positions
+from lucia_api.services.replays import count_replay_positions, replay_positions
 
 router = APIRouter(prefix="/training", tags=["training"])
 
@@ -54,16 +54,32 @@ class ReplayPositionOut(BaseModel):
     played_at: dt.datetime
 
 
-@router.get("/replays", response_model=list[ReplayPositionOut])
+class ReplayQueueOut(BaseModel):
+    """La lista y cuántos errores hay, como la cola de puzzles y la de drills.
+
+    El total no es `len(positions)`: la lista viene recortada a `limit`, así que
+    sin él la pantalla enseñaba veinte de trescientos sin decir que había más
+    (fila 102 del inventario de docs/07-coherencia-ui.md). Va en el cuerpo y no
+    en una cabecera `X-Total-Count` como el listado de Partidas porque las tres
+    pestañas hermanas de esta —puzzles, aperturas y sparring— lo traen así, y es
+    con ellas con las que se compara al cambiar de pestaña.
+    """
+
+    positions: list[ReplayPositionOut]
+    total: int
+
+
+@router.get("/replays", response_model=ReplayQueueOut)
 async def player_replay_positions(
     session: Annotated[AsyncSession, Depends(get_session)],
     limit: Annotated[int, Query(ge=1, le=MAX_POSITIONS_LIMIT)] = DEFAULT_POSITIONS_LIMIT,
     username: str | None = None,
-) -> list[ReplayPositionOut]:
+) -> ReplayQueueOut:
     """Los errores propios desde los que se puede retomar, del más caro al más
-    barato."""
-    rows = await replay_positions(session, resolved_username(username), limit)
-    return [
+    barato, y cuántos hay en total."""
+    player = resolved_username(username)
+    rows = await replay_positions(session, player, limit)
+    positions = [
         ReplayPositionOut(
             game_id=game.id,
             ply=move.ply,
@@ -78,3 +94,4 @@ async def player_replay_positions(
         )
         for move, game, opponent in rows
     ]
+    return ReplayQueueOut(positions=positions, total=await count_replay_positions(session, player))

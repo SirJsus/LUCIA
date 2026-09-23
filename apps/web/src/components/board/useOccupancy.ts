@@ -36,14 +36,10 @@ function allMarksSetTo(on: boolean): Record<OccupancyMark, boolean> {
 }
 
 /** La tecla que enciende y apaga la capa. Es un acelerador: el control visible
- * está en el panel, y la frase bajo el tablero la anuncia (criterio C-1). */
+ * está en el panel, y la frase que lo anuncia bajo el tablero es
+ * `OCCUPANCY_TOGGLE_KEY_HINT`, en `hints.ts`, junto a la del teclado del
+ * tablero: las dos componen el mismo párrafo de pie. */
 const OCCUPANCY_TOGGLE_KEY = "o";
-
-/** Cómo se anuncia ese atajo bajo el tablero. La frase se escribe una sola vez
- * porque las cinco pantallas con tablero la enseñan igual (criterio C-2) y
- * porque vive al lado de la tecla que nombra: cambiar una sin la otra dejaría
- * la ayuda mintiendo. */
-export const OCCUPANCY_TOGGLE_KEY_HINT = "Con O se enciende y se apaga la capa de ocupación.";
 
 export interface OccupancyController {
   /** Si la capa está encendida. Apagada, ni se pinta ni se calcula. */

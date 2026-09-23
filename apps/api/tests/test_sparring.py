@@ -211,12 +211,19 @@ async def test_the_endpoint_serves_the_whole_game(
         app.dependency_overrides.clear()
 
     assert created.status_code == 201
-    assert created.json()["opponent_name"] == "Stockfish (1500)"
+    # Una partida desde cero arranca en el ply 0, que es lo que numera su lista
+    # de jugadas (fila 101 del inventario de docs/07-coherencia-ui.md); el caso
+    # de la retomada a mitad está en `test_replays.py`, que es donde vive la
+    # partida de origen.
+    assert created.json()["starting_ply"] == 0
     body = played.json()
     assert body["moves_san"] == ["e4", "e5"]
     assert body["last_move_uci"] == "e7e5"
     assert body["is_player_turn"] is True
     assert '[White "ana"]' in body["pgn"]
+    # El nombre del rival ya no viaja compuesto en la respuesta: en pantalla lo
+    # arma el front con `engine` y `engine_elo` (fila 96). Aquí se comprueba
+    # donde sigue viviendo, que es la cabecera del PGN.
     assert '[Black "Stockfish (1500)"]' in body["pgn"]
 
 
@@ -251,3 +258,4 @@ async def test_a_calibrated_stockfish_answers_with_a_legal_move(db_session: Asyn
     board = chess.Board()
     for uci in game.moves_uci_json:
         board.push(chess.Move.from_uci(uci))  # lanza si alguna no era legal
+

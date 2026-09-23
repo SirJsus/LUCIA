@@ -22,6 +22,9 @@ import type { Api } from "chessground/api";
 import { useEffect, useRef, type ReactNode } from "react";
 import { buildBoardConfig, type EngineArrow } from "./boardConfig";
 import { OccupancyLayer } from "./OccupancyLayer";
+import { describeSquareOccupancy, readPiecesFromFen } from "./occupancy";
+import { pieceName } from "./pieces";
+import { SquareKeyboardGrid } from "./SquareKeyboardGrid";
 import { squaresInReadingOrder } from "./squares";
 import type { OccupancyController } from "./useOccupancy";
 
@@ -146,7 +149,17 @@ export function Chessboard({
     apiRef.current?.set(
       buildBoardConfig({ fen, orientation, engineArrows, lastMoveUci, legalMoves, turnColor }),
     );
-  }, [fen, orientation, engineArrows, lastMoveUci, legalMoves, turnColor]);
+    // Sin `legalMoves` el tablero deja de aceptar jugadas, y eso hay que
+    // decírselo aparte: `buildBoardConfig` omite `movable` cuando no las hay
+    // —mandarlo en `undefined` le borraría a chessground ese trozo de estado,
+    // ver su docstring— y chessground conserva entonces los destinos de la
+    // posición anterior. Sin esto, las piezas se seguían arrastrando sobre el
+    // puzzle ya cerrado o sobre la jugada errónea que espera «Volver a
+    // intentarlo», y el tablero quedaba enseñando una posición que no era la
+    // de nadie (criterio C-3). El editor de posición no entra: mueve con
+    // `movable.free` y no con destinos.
+    if (!editable && !legalMoves) apiRef.current?.set({ movable: { dests: new Map() } });
+  }, [fen, orientation, engineArrows, lastMoveUci, legalMoves, turnColor, editable]);
 
   function squareUnderPointer(event: { clientX: number; clientY: number }): string | null {
     const bounds = boardRef.current?.getBoundingClientRect();
@@ -159,11 +172,23 @@ export function Chessboard({
     onHoverSquare?.(square);
   }
 
+  /** Pulsar una casilla, venga del ratón o del teclado: es una sola cosa y hace
+   * lo mismo por las dos vías. Para chessground es elegir —la primera pulsación
+   * toma el origen y la segunda mueve, que es su propio `selectSquare`— y para
+   * quien escucha, la casilla elegida (la capa de ocupación la inspecciona). */
+  function activateSquare(square: string) {
+    apiRef.current?.selectSquare(square as never);
+    onSelectSquare?.(square);
+  }
+
   return (
     <div
       className="relative aspect-square w-full"
       onPointerDown={(event) => (pressedSquare.current = squareUnderPointer(event))}
       onPointerUp={(event) => {
+        // El ratón no pasa por `activateSquare`: chessground recibe el puntero
+        // intacto y ya elige por su cuenta. Repetírselo desharía la selección
+        // que él acaba de hacer.
         const releasedSquare = squareUnderPointer(event);
         if (releasedSquare && releasedSquare === pressedSquare.current)
           onSelectSquare?.(releasedSquare);
@@ -175,9 +200,46 @@ export function Chessboard({
       {occupancyController && (
         <OccupancyLayer controller={occupancyController} orientation={orientation} />
       )}
+      {/* La rejilla enfocable, una sola y para los dos trabajos que tiene una
+          casilla: elegirla como origen o destino de una jugada y elegirla para
+          inspeccionarla. Sin ella, los tableros donde se mueve una pieza solo
+          se podían usar con el ratón —la única vía era arrastrar—, y la capa de
+          ocupación traía la suya aparte (fila 91 del inventario de
+          docs/07-coherencia-ui.md, criterio C-1). El editor de posición
+          (RF-6.1) trae la suya por `overlay` y no es movible ni lleva capa, así
+          que no salen dos. */}
+      {(legalMoves !== undefined || occupancyController?.isActive) && (
+        <SquareKeyboardGrid
+          orientation={orientation}
+          describeSquare={(square) => describeBoardSquare(fen, square, occupancyController)}
+          onActivate={activateSquare}
+          onCancel={() => apiRef.current?.selectSquare(null)}
+        />
+      )}
       {overlay}
     </div>
   );
+}
+
+/** Lo que la rejilla lee en voz alta de una casilla. Con la capa de ocupación
+ * encendida lo dice ella, que sabe además quién la ataca y quién la defiende
+ * —y calla lo que sus marcas tengan apagado, como el panel—; con la capa
+ * apagada basta con qué pieza hay, que es lo que hace falta para elegir origen
+ * y destino sin ver el tablero. */
+function describeBoardSquare(
+  fen: string,
+  square: string,
+  occupancyController: OccupancyController | undefined,
+): string {
+  if (occupancyController?.occupancy) {
+    return describeSquareOccupancy(
+      occupancyController.occupancy,
+      square,
+      occupancyController.marks,
+    );
+  }
+  const piece = readPiecesFromFen(fen)?.[square];
+  return `${square}: ${piece ? pieceName(piece.role, piece.color) : "vacía"}`;
 }
 
 /** Qué casilla cae bajo un punto de la pantalla, o `null` si cae fuera del

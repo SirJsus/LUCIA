@@ -17,18 +17,24 @@ import type { Drill, DrillMove } from "@lucia/shared-types";
 import { useMutation } from "@tanstack/react-query";
 import { Chess } from "chess.js";
 import { useMemo, useState } from "react";
-import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
+import { BoardFrame } from "../../components/board/BoardFrame";
+import {
+  KEYBOARD_MOVE_HINT,
+  OCCUPANCY_TOGGLE_KEY_HINT,
+  RETRY_AFTER_WRONG_MOVE_HINT,
+} from "../../components/board/hints";
 import { Chessboard } from "../../components/board/Chessboard";
 import { legalMovesByOrigin } from "../../components/board/legalMoves";
 import { OccupancyPanel } from "../../components/board/OccupancyPanel";
-import { OCCUPANCY_TOGGLE_KEY_HINT, useOccupancy } from "../../components/board/useOccupancy";
+import { useOccupancy } from "../../components/board/useOccupancy";
 import { ErrorBox, SuccessBox, WarningBox } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
 import { BOARD_HINT_CLASSES, BOARD_SIDEBAR_GRID_CLASS } from "../../components/styles";
 import { api } from "../../lib/api";
-import { moveNumberOf } from "../../lib/moves";
+import { formatMoveSequence, moveNumberOf } from "../../lib/moves";
 import { playerMoveCount, reasonLabel, reasonSentence } from "./drills";
+import { ExerciseStatusBadge } from "./ExerciseStatusBadge";
 
 export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => void }) {
   /** La posición que se ve y en qué jugada de la línea va. Arrancan donde la
@@ -38,8 +44,17 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
   /** Cuántas veces se ha fallado en esta pasada. Es lo que distingue después
    * recorrer la línea limpia de recorrerla tropezando. */
   const [wrongMoves, setWrongMoves] = useState(0);
-  const [wasWrong, setWasWrong] = useState(false);
   const [lastMoveUci, setLastMoveUci] = useState<string | null>(null);
+  /** La jugada que se acaba de soltar, puesta sobre el tablero mientras el
+   * servidor contesta. Si era la de la línea se borra en cuanto llega la
+   * respuesta del rival; si no lo era **se queda ahí** y hay que pulsar
+   * «Volver a intentarlo», como en los puzzles: borrarla al instante da la
+   * sensación de que la pieza rebotó y no de que la respuesta era otra
+   * (fila 97 del inventario de docs/07-coherencia-ui.md). */
+  const [attemptedMove, setAttemptedMove] = useState<{
+    fen: string;
+    uci: string;
+  } | null>(null);
 
   const color = drill.player_color === "black" ? "black" : "white";
 
@@ -53,35 +68,54 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
    * trae la línea entera y el próximo repaso, y cerrado ya no se manda nada
    * más (igual que `PuzzleSolver` con su respuesta). */
   const finished = moveMutation.data?.finished ? moveMutation.data : null;
+  /** Si la última respuesta dijo que la jugada no era la de la línea. Se lee de
+   * la respuesta y no se guarda aparte —como `finished`, y como el fallo de
+   * `PuzzleSolver`—: el estado propio de aquí es la jugada que quedó encima del
+   * tablero, y haber fallado es lo que el servidor contestó de ella. */
+  const wasWrong = moveMutation.data?.finished === false && !moveMutation.data.correct;
 
   function applyResult(result: DrillMove, uci: string | null) {
+    // Fallar es lo único que deja el tablero como estaba: la jugada errónea
+    // sigue encima hasta que se pulse «Volver a intentarlo».
+    if (!result.finished && !result.correct) {
+      setWrongMoves(wrongMoves + 1);
+      return;
+    }
+    setAttemptedMove(null);
     setFen(result.fen);
     if (result.finished) {
       setLastMoveUci(null);
       return;
     }
-    if (!result.correct) {
-      setWrongMoves(wrongMoves + 1);
-      setWasWrong(true);
-      return;
-    }
-    setWasWrong(false);
     setLastMoveUci(result.reply_uci ?? uci);
     setPly(result.next_ply ?? ply);
+  }
+
+  /** Quitar del tablero la jugada errónea y volver a la posición de la línea,
+   * igual que en `PuzzleSolver`: `reset()` olvida la respuesta que dijo que
+   * estaba mal. `wrongMoves` no se toca: los fallos de la pasada se siguen
+   * contando. */
+  function retry() {
+    setAttemptedMove(null);
+    moveMutation.reset();
   }
 
   /** El tablero deja mover mientras el drill esté abierto y no haya una
    * petición en vuelo: acertar trae la respuesta del rival, así que mover dos
    * veces seguidas sería mover sobre una posición que ya no es la de la
    * pantalla (criterio C-3). */
-  const canMove = finished === null && !moveMutation.isPending;
+  const canMove = finished === null && !moveMutation.isPending && attemptedMove === null;
   const legalMoves = useMemo(() => (canMove ? legalMovesByOrigin(fen) : undefined), [canMove, fen]);
+  /** Lo que se ve: la posición de la línea, o la jugada intentada encima. */
+  const shownFen = attemptedMove?.fen ?? fen;
   /** La capa de ocupación (RF-7) sobre la posición de la línea. Las marcas
    * arrancan apagadas como en las otras dos pantallas de entrenamiento: aquí
    * no delatan la jugada —lo que se entrena es recordar la línea—, pero que la
    * capa se comporte igual en las tres es lo que evita explicar en cada una
    * con qué arranca (criterio C-2). */
-  const occupancyController = useOccupancy(fen, { marksOnByDefault: false });
+  const occupancyController = useOccupancy(shownFen, {
+    marksOnByDefault: false,
+  });
 
   function tryMove(from: string, to: string) {
     if (!canMove) return;
@@ -89,6 +123,7 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
     try {
       // La promoción siempre a dama, como en el resto de tableros.
       const move = chess.move({ from, to, promotion: "q" });
+      setAttemptedMove({ fen: chess.fen(), uci: move.lan });
       moveMutation.mutate(move.lan);
     } catch {
       // jugada ilegal; chessground ya filtra casi todas
@@ -101,43 +136,72 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
       <div className="space-y-3">
         {/* Sin barra de evaluación, como en los puzzles: lo que se entrena es
             recordar la línea, y una evaluación en pantalla la delata. */}
-        <Chessboard
-          fen={fen}
-          orientation={color}
-          turnColor={color}
-          legalMoves={legalMoves}
-          onMove={tryMove}
-          lastMoveUci={lastMoveUci}
-          occupancyController={occupancyController}
-        />
+        <BoardFrame>
+          <Chessboard
+            fen={shownFen}
+            orientation={color}
+            turnColor={color}
+            legalMoves={legalMoves}
+            onMove={tryMove}
+            lastMoveUci={attemptedMove?.uci ?? lastMoveUci}
+            occupancyController={occupancyController}
+          />
+        </BoardFrame>
         {/* Lo que hay que saber del tablero, en la misma frase y en el mismo
             sitio que en las otras cuatro pantallas con tablero, y el atajo
             anunciado ahí y no solo en el panel (criterio C-1). */}
         <p className={BOARD_HINT_CLASSES}>
           {finished
             ? "La línea terminó: el tablero ya no se mueve."
-            : "Arrastra una pieza para seguir la línea. Las promociones se coronan en dama."}{" "}
+            : wasWrong
+              ? RETRY_AFTER_WRONG_MOVE_HINT
+              : "Arrastra una pieza para seguir la línea. Las promociones se coronan en dama."}{" "}
           {OCCUPANCY_TOGGLE_KEY_HINT}
+          {/* El teclado se anuncia donde se anuncia el arrastre y no más, igual
+              que en el puzzle: con la línea terminada o con la jugada errónea
+              encima el tablero no acepta jugadas por ninguna de las dos vías
+              (criterio C-1). */}
+          {finished === null && !wasWrong ? ` ${KEYBOARD_MOVE_HINT}` : ""}
         </p>
 
         <OccupancyPanel controller={occupancyController} />
       </div>
 
       <aside className="space-y-3">
+        {/* El mismo título y la misma insignia que el puzzle y el sparring:
+            qué bando llevas arriba y qué está pasando al lado, y lo que
+            identifica al ejercicio —la apertura, en qué repaso va— en el
+            cuerpo (fila 98 del inventario, criterios C-2 y C-3). */}
         <Panel
-          title={drill.opening_name ?? "Línea de apertura"}
-          aside={<Badge tone={drill.reason === "departure" ? "warning" : "info"}>
-            {reasonLabel(drill.reason)}
-          </Badge>}
+          title={`Juegas con ${color === "white" ? "blancas" : "negras"}`}
+          aside={
+            <ExerciseStatusBadge
+              isPlayerTurn={finished === null}
+              isWaitingForServer={moveMutation.isPending}
+              finishedLabel="línea terminada"
+            />
+          }
         >
           <p className="text-sm">
-            Juegas con {color === "white" ? "blancas" : "negras"}
+            {drill.opening_name ?? "Línea de apertura"}
             {drill.opening_eco ? ` · ${drill.opening_eco}` : ""}
           </p>
-          <p className="mt-1 text-xs opacity-70">{reasonSentence(drill)}</p>
+          <p className="mt-1 text-xs opacity-70">
+            {reasonLabel(drill.reason)}: {reasonSentence(drill)}
+          </p>
+          {/* En qué repaso va, como el puzzle: la API lo manda (`repetitions`)
+              y era el único de los tres ejercicios que no lo enseñaba. */}
+          <p className="mt-1 text-xs opacity-70">
+            {drill.repetitions > 0
+              ? `Ya la has recorrido entera ${drill.repetitions} ${
+                  drill.repetitions === 1 ? "vez" : "veces"
+                }; vuelves para afianzarla.`
+              : "Es la primera vez que la recorres."}
+          </p>
           {drill.preceding_moves_san.length > 0 && (
             <p className="mt-2 text-xs opacity-70">
-              La línea empieza con {drill.preceding_moves_san.join(" ")}.
+              La línea empieza con{" "}
+              <span className="font-mono">{formatMoveSequence(drill.preceding_moves_san)}</span>.
             </p>
           )}
           <p className="mt-2 text-sm">
@@ -151,15 +215,25 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
           </p>
         </Panel>
 
-        {moveMutation.isError && <ErrorBox error={moveMutation.error} />}
+        {/* `onRetry` recupera la posición de la línea, que es lo que desbloquea
+            la pantalla: si la petición falla por red, la jugada intentada se
+            queda encima y el tablero no deja mover, porque el botón de volver
+            a intentarlo cuelga de que el servidor haya contestado "mal"
+            (criterio C-3: de un error se tiene que poder salir). Es el mismo
+            arreglo y en el mismo sitio que en `PuzzleSolver`. */}
+        {moveMutation.isError && <ErrorBox error={moveMutation.error} onRetry={retry} />}
 
-        {wasWrong && !finished && (
+        {wasWrong && (
           <WarningBox>
             <p>
               Esa no es la jugada de la línea.{" "}
-              {wrongMoves === 1 ? "Es tu primer fallo." : `Llevas ${wrongMoves} fallos.`} Prueba
-              otra.
+              {wrongMoves === 1 ? "Es tu primer fallo." : `Llevas ${wrongMoves} fallos.`}
             </p>
+            <div className="mt-2">
+              <Button size="sm" variant="primary" onClick={retry}>
+                Volver a intentarlo
+              </Button>
+            </div>
           </WarningBox>
         )}
 
@@ -195,7 +269,7 @@ function DrillResult({
       )}
 
       <Panel title="La línea">
-        <p className="text-sm">{result.line_san.join(" ")}</p>
+        <p className="font-mono text-sm">{formatMoveSequence(result.line_san)}</p>
         <p className="mt-1 text-xs opacity-70">
           {drill.reason === "departure"
             ? "La última jugada es la que los maestros hacen aquí, en lugar de la que tú haces."

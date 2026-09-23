@@ -38,6 +38,7 @@ from lucia_api.services.drills import (
     get_drill_queue,
     record_review,
 )
+from lucia_api.services.repertoire import compare_repertoire
 
 router = APIRouter(prefix="/training", tags=["training"])
 
@@ -83,6 +84,13 @@ class DrillQueueOut(BaseModel):
     due: int
     total: int
     next_due_at: dt.datetime | None
+    positions_missing: int
+    """Cuánta teoría le falta al repertorio (RF-3.6). Viaja también aquí y no
+    solo en `DrillGenerationOut` porque es una condición de la pantalla y no el
+    resultado de haber pulsado un botón: el repertorio se llena a trozos
+    (ADR-0010), así que una cola corta puede serlo porque falta teoría y no
+    porque se juegue bien, y eso hay que poder saberlo al llegar (fila 99 del
+    inventario de docs/07-coherencia-ui.md)."""
 
 
 class DrillGenerationOut(BaseModel):
@@ -151,14 +159,22 @@ async def generate_opening_drills(
 async def player_drill_queue(
     session: Annotated[AsyncSession, Depends(get_session)],
     limit: Annotated[int, Query(ge=1, le=MAX_QUEUE_LIMIT)] = DEFAULT_QUEUE_LIMIT,
+    username: str | None = None,
 ) -> DrillQueueOut:
-    """Los drills que toca repetir ahora, del más atrasado al más reciente."""
+    """Los drills que toca repetir ahora, del más atrasado al más reciente, y
+    cuánta teoría le falta al repertorio del que salen."""
     queue = await get_drill_queue(session, _now(), limit)
+    # La misma comparación que cuenta «Generar líneas», que es de donde sale
+    # este número: pedirla entera sale igual de caro —lo que cuesta es cargar
+    # las partidas y la teoría, que se hace en las dos— y así hay un solo sitio
+    # donde se decide qué posición falta.
+    comparison = await compare_repertoire(session, resolved_username(username))
     return DrillQueueOut(
         drills=[_to_drill_out(drill) for drill in queue.drills],
         due=queue.due,
         total=queue.total,
         next_due_at=queue.next_due_at,
+        positions_missing=comparison.positions_missing,
     )
 
 

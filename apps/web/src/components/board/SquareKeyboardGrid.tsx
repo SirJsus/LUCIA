@@ -3,8 +3,9 @@
  *
  * Hace falta porque chessground no es accesible por teclado: no pone
  * `tabindex` en ninguna casilla ni escucha teclas. Esta capa no lo sustituye,
- * se le superpone: el editor de posición se la pasa a `Chessboard` por su
- * hueco `overlay` y la de ocupación la lleva dentro (`OccupancyLayer`).
+ * se le superpone y le devuelve el trabajo: activar una casilla llama al
+ * `selectSquare` del propio chessground, que es quien sabe encadenar origen y
+ * destino.
  *
  * **No le quita el ratón a chessground**: la capa entera va con
  * `pointer-events-none`, así que los clics y los arrastres la atraviesan y
@@ -15,10 +16,12 @@
  * patrón de cualquier rejilla accesible: 64 paradas de tabulador harían
  * inservible el resto de la pantalla.
  *
- * La usan las dos capas que se dibujan sobre un tablero: el editor de posición
- * (RF-6.1), donde Intro coloca la pieza elegida, y la de ocupación (RF-7.3),
- * donde Intro inspecciona la casilla. Cada una dice con `describeSquare` qué se
- * lee en voz alta, que es lo único que cambia entre las dos.
+ * La usan el editor de posición (RF-6.1), que se la pasa a `Chessboard` por su
+ * hueco `overlay` y donde Intro coloca la pieza elegida, y el propio
+ * `Chessboard` en todo tablero donde haya algo que elegir: mover una pieza
+ * —Intro toma el origen y el segundo Intro, el destino— e inspeccionar la
+ * casilla con la capa de ocupación encendida (RF-7.3). Cada uno dice con
+ * `describeSquare` qué se lee en voz alta, que es lo único que cambia.
  */
 import { useState } from "react";
 import { squaresInReadingOrder, type BoardOrientation } from "./squares";
@@ -27,6 +30,7 @@ export function SquareKeyboardGrid({
   orientation,
   describeSquare,
   onActivate,
+  onCancel,
 }: {
   /** Desde qué lado se mira el tablero: la rejilla tiene que recorrerse en el
    * mismo orden en que se ven las casillas, o las flechas irían al revés. */
@@ -35,6 +39,10 @@ export function SquareKeyboardGrid({
    * capa que la usa. */
   describeSquare: (square: string) => string;
   onActivate: (square: string) => void;
+  /** Escape: soltar lo que estuviera elegido. Con teclado, elegir un origen y
+   * no encontrar destino dejaría la pieza marcada sin forma de deshacerlo
+   * (criterio C-1). */
+  onCancel?: () => void;
 }) {
   const [focusedSquare, setFocusedSquare] = useState("e4");
   const squares = squaresInReadingOrder(orientation);
@@ -43,6 +51,12 @@ export function SquareKeyboardGrid({
    * en la lista en orden de lectura, los lados están a un paso y las filas a
    * ocho, mire quien mire el tablero. */
   function moveFocus(event: React.KeyboardEvent, square: string) {
+    if (event.key === "Escape" && onCancel) {
+      event.preventDefault();
+      event.stopPropagation();
+      onCancel();
+      return;
+    }
     const steps: Record<string, [column: number, row: number]> = {
       ArrowLeft: [-1, 0],
       ArrowRight: [1, 0],

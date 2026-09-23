@@ -22,13 +22,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/Button";
 import { EngineSelect } from "../../components/EngineSelect";
 import { FieldLabel } from "../../components/FieldLabel";
+import { KEYBOARD_MOVE_HINT, OCCUPANCY_TOGGLE_KEY_HINT } from "../../components/board/hints";
 import { BoardWithEvalBar } from "../../components/board/BoardWithEvalBar";
 import { MoveNavigator } from "../../components/board/MoveNavigator";
 import { useMoveNavigationKeys } from "../../components/board/useMoveNavigationKeys";
 import { arrowsFromEngineLines, arrowsFromPreviewLine } from "../../components/board/boardConfig";
 import { legalMovesByOrigin } from "../../components/board/legalMoves";
 import { OccupancyPanel } from "../../components/board/OccupancyPanel";
-import { OCCUPANCY_TOGGLE_KEY_HINT, useOccupancy } from "../../components/board/useOccupancy";
+import { useOccupancy } from "../../components/board/useOccupancy";
 import { ErrorBox, ProgressBox, Spinner, SuccessBox, WarningBox } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
 import {
@@ -75,7 +76,10 @@ export function BoardPage() {
   const id = Number(boardId);
 
   const queryClient = useQueryClient();
-  const boardQuery = useQuery({ queryKey: ["board", id], queryFn: () => api.getBoard(id) });
+  const boardQuery = useQuery({
+    queryKey: ["board", id],
+    queryFn: () => api.getBoard(id),
+  });
 
   /** Lo que devuelve cada escritura es el tablero entero —con `can_undo` y
    * `can_redo` al día—, así que se guarda en la caché en vez de pedirlo otra
@@ -291,10 +295,7 @@ export function BoardPage() {
 
   const analyzedLine = useMemo(
     () =>
-      matchAnalyzedLine(
-        mainLineMoves,
-        boardAnalysis?.status === "done" ? boardAnalysis.moves : [],
-      ),
+      matchAnalyzedLine(mainLineMoves, boardAnalysis?.status === "done" ? boardAnalysis.moves : []),
     [mainLineMoves, boardAnalysis],
   );
 
@@ -356,10 +357,7 @@ export function BoardPage() {
   // queda delante. Los dos caminos van en `useMemo` porque de ellos cuelgan
   // los saltos de abajo y, a través de ellos, el listener de teclado:
   // recalcularlos en cada render volvería a registrarlo continuamente.
-  const pathToCurrent = useMemo(
-    () => (tree ? pathToNode(tree, currentId) : []),
-    [tree, currentId],
-  );
+  const pathToCurrent = useMemo(() => (tree ? pathToNode(tree, currentId) : []), [tree, currentId]);
   const lineAhead = useMemo(() => (currentNode ? mainLine(currentNode) : []), [currentNode]);
   const movesBehind = Math.max(0, pathToCurrent.length - 1);
 
@@ -657,9 +655,7 @@ export function BoardPage() {
             onMove={handleBoardMove}
             occupancyController={occupancyController}
             whiteWinPercent={
-              engineOn && bestLine && !isEvaluationStale
-                ? whiteWinPercentFromScore(bestLine)
-                : null
+              engineOn && bestLine && !isEvaluationStale ? whiteWinPercentFromScore(bestLine) : null
             }
           />
 
@@ -679,9 +675,9 @@ export function BoardPage() {
               docs/07-coherencia-ui.md, la misma razón que cerró la fila 56
               del inventario). */}
           <p className={BOARD_HINT_CLASSES}>
-            Arrastra una pieza para añadir la jugada. ← → recorren la línea, Inicio y Fin van a
-            sus extremos. Ctrl+Z deshace y Ctrl+Y (o Ctrl+Mayús+Z) rehace. Señala una jugada del
-            panel del motor para verla sobre el tablero. {OCCUPANCY_TOGGLE_KEY_HINT}
+            Arrastra una pieza para añadir la jugada. ← → recorren la línea, Inicio y Fin van a sus
+            extremos. Ctrl+Z deshace y Ctrl+Y (o Ctrl+Mayús+Z) rehace. Señala una jugada del panel
+            del motor para verla sobre el tablero. {OCCUPANCY_TOGGLE_KEY_HINT} {KEYBOARD_MOVE_HINT}
           </p>
 
           <OccupancyPanel controller={occupancyController} />
@@ -696,15 +692,11 @@ export function BoardPage() {
             <Panel title="Precisión" bodyClassName="p-3 text-sm">
               <div className="flex justify-between">
                 <span>Blancas</span>
-                <span className="tabular-nums">
-                  {formatAccuracy(boardAnalysis.white_accuracy)}
-                </span>
+                <span className="tabular-nums">{formatAccuracy(boardAnalysis.white_accuracy)}</span>
               </div>
               <div className="flex justify-between">
                 <span>Negras</span>
-                <span className="tabular-nums">
-                  {formatAccuracy(boardAnalysis.black_accuracy)}
-                </span>
+                <span className="tabular-nums">{formatAccuracy(boardAnalysis.black_accuracy)}</span>
               </div>
               <p className="mt-2 text-xs opacity-60">
                 {formatEngineName(boardAnalysis.engine)} · profundidad {boardAnalysis.depth} ·{" "}

@@ -76,9 +76,8 @@ export function OccupancyPanel({ controller }: { controller: OccupancyController
     >
       {!isActive ? (
         <p className="opacity-70">
-          Colorea cada casilla según quién la controla, marca las piezas colgadas y las
-          clavadas, y dice quién ataca y quién defiende la casilla que pulses. Se enciende aquí
-          o con la tecla{" "}
+          Colorea cada casilla según quién la controla, marca las piezas colgadas y las clavadas, y
+          dice quién ataca y quién defiende la casilla que pulses. Se enciende aquí o con la tecla{" "}
           <kbd className="rounded border border-slate-300 px-1 font-mono text-xs dark:border-slate-700">
             O
           </kbd>
@@ -140,8 +139,8 @@ export function OccupancyPanel({ controller }: { controller: OccupancyController
                 explicación (criterio C-2). */}
             {!marksOnByDefault && (
               <p className="mt-1 text-xs opacity-60">
-                Aquí arrancan apagadas: señalan sobre el tablero justo lo que esta pantalla te
-                está entrenando a ver. Enciende las que quieras cuando prefieras la ayuda.
+                Aquí arrancan apagadas: señalan sobre el tablero justo lo que esta pantalla te está
+                entrenando a ver. Enciende las que quieras cuando prefieras la ayuda.
               </p>
             )}
             <div className="mt-1 space-y-2">
@@ -175,11 +174,7 @@ export function OccupancyPanel({ controller }: { controller: OccupancyController
             </EmptyState>
           )}
 
-          <OccupancyLegend
-            mode={mode}
-            coverageColor={coverageColor}
-            marks={marks}
-          />
+          <OccupancyLegend mode={mode} coverageColor={coverageColor} marks={marks} />
         </>
       )}
     </Panel>
@@ -364,8 +359,7 @@ function OccupancyLegend({
             className="mt-1.5 h-0 w-3 shrink-0 border-t-2 border-dashed border-slate-500"
             aria-hidden="true"
           />
-          Línea discontinua: rayo X, el alcance a través de otra pieza. Nunca cuenta en el
-          balance.
+          Línea discontinua: rayo X, el alcance a través de otra pieza. Nunca cuenta en el balance.
         </li>
       )}
     </ul>

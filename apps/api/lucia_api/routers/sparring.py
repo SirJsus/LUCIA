@@ -73,10 +73,17 @@ class SparringGameOut(BaseModel):
     salió y llevar de vuelta al visor. `origin_game_id` queda a `null` si esa
     partida se borró del historial: lo jugado aquí sigue valiendo, pero ya no
     hay adónde volver."""
-    opponent_name: str
-    """Cómo se llama el rival en pantalla y en el PGN: "Stockfish (1500)" o
-    "Lc0 · Maia". Se compone aquí para que no haya dos versiones del nombre,
-    una en la pantalla y otra en la partida exportada (criterio C-5)."""
+    starting_ply: int
+    """Desde qué media jugada de la partida real arranca esta, contando la
+    primera de todas como 0. Es 0 en una partida que empieza desde la salida y
+    el ply de la posición retomada en una que empieza a mitad (RF-4.4).
+
+    Viaja porque sin él la lista de jugadas numera desde 1 una partida que
+    empieza en la jugada 23, dos centímetros debajo del panel que dice de dónde
+    se retomó (fila 101 del inventario de docs/07-coherencia-ui.md). Sale de
+    `starting_fen`, que es la posición de verdad, y no de `origin_ply`, que es
+    relativo al inicio de la partida de origen y da otro número si esa no
+    empezaba en la salida."""
 
     fen: str
     """La posición que hay ahora. Es lo que dibuja el tablero."""
@@ -251,7 +258,16 @@ async def _get_game(session: AsyncSession, game_id: int) -> SparringGame:
 
 
 def _opponent_name(game: SparringGame) -> str:
-    """Cómo se llama el rival: el motor y, si la tiene, su fuerza pedida."""
+    """Cómo se llama el rival **en el PGN**: el motor y, si la tiene, su fuerza
+    pedida.
+
+    En pantalla no se usa: lo compone el front con `engine` y `engine_elo`, que
+    es lo que ya viaja en esta misma respuesta, para que el nombre no se arme
+    en dos sitios y desde dos lados (fila 96 del inventario de
+    docs/07-coherencia-ui.md). Aquí se queda porque el PGN es un documento que
+    se abre en otros programas, y una cabecera `[Black "lc0"]` no dice contra
+    quién se jugó.
+    """
     if game.engine == "stockfish":
         return f"Stockfish ({game.engine_elo})"
     return "Lc0 · Maia"
@@ -275,7 +291,9 @@ def _to_out(game: SparringGame, player_name: str) -> SparringGameOut:
         engine_elo=game.engine_elo,
         origin_game_id=game.origin_game_id,
         origin_ply=game.origin_ply,
-        opponent_name=opponent,
+        # `Board.ply()` es justamente eso: las medias jugadas que han pasado
+        # desde la salida hasta esa posición.
+        starting_ply=chess.Board(game.starting_fen).ply(),
         fen=board.fen(),
         moves_san=moves_san(game.starting_fen, game.moves_uci_json),
         last_move_uci=game.moves_uci_json[-1] if game.moves_uci_json else None,

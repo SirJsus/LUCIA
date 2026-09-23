@@ -9,17 +9,17 @@ autoguardado, se importa y exporta PGN (RF-6.7), se deshace y rehace
 marca el tablero como "partida propia" para que cuente en el historial y en
 las estadísticas (RF-6.5).
 
-| Archivo | Qué es |
-| --- | --- |
-| `BoardsPage.tsx` | Lista y creación de tableros (posición inicial, FEN, PGN pegado o el editor de posición). Se entra por el enlace "Ver tablero" del final de la fila, como en el listado de partidas |
-| `PositionEditor.tsx` | El editor de posición pieza a pieza (RF-6.1): tablero editable, paleta, turno, enroques y captura al paso. No crea el tablero, escribe el FEN montado en el campo "FEN o PGN" de `BoardsPage` |
-| `position.ts` | La posición que se está montando y su FEN (`toFen`/`fromFen`, `positionError`). Lógica pura, probada aparte |
-| `BoardPage.tsx` | El tablero: jugadas, motor en vivo, teclado, autoguardado, importar PGN, deshacer / rehacer, análisis completo y la marca de partida propia |
-| `tree.ts` | El árbol de variantes (añadir, promover, borrar, PGN en los dos sentidos con `toPgn`/`fromPgn`) y la validación de jugadas con chess.js; `matchAnalyzedLine` empareja un análisis con la línea principal de ahora |
-| `OwnGamePanel.tsx` | Marcar el tablero como "partida propia" (RF-6.5): `OwnGameStatus` es la línea de la cabecera que dice si cuenta y abre el panel, y `OwnGamePanel` el formulario que publica o retira. Lo que se escribe aquí viaja a `PUT /boards/{id}/own-game` con el PGN del árbol y se convierte en una fila del historial |
-| `VariationTree.tsx` | Navegación visual de ese árbol (RF-6.3), con la clasificación de cada jugada cuando hay análisis |
-| `useUndoRedoKeys.ts` | Ctrl+Z / Ctrl+Y / Ctrl+Mayús+Z (RF-6.8). Aparte de `useMoveNavigationKeys` porque son teclas que solo existen en esta pantalla |
-| `EngineLines.tsx` | Panel de líneas del motor (RF-6.2). Lo propio de aquí son los **estados** del motor —apagado, buscando, con error, sin líneas, con líneas—; las líneas las pinta `components/board/EngineLineList`, compartido con el visor: previsualiza la continuación al señalar una jugada y, al pulsarla, el tablero avanza hasta ahí |
+| Archivo              | Qué es                                                                                                                                                                                                                                                                                                                      |
+| -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `BoardsPage.tsx`     | Lista y creación de tableros (posición inicial, FEN, PGN pegado o el editor de posición). Se entra por el enlace "Ver tablero" del final de la fila, como en el listado de partidas                                                                                                                                         |
+| `PositionEditor.tsx` | El editor de posición pieza a pieza (RF-6.1): tablero editable, paleta, turno, enroques y captura al paso. No crea el tablero, escribe el FEN montado en el campo "FEN o PGN" de `BoardsPage`                                                                                                                               |
+| `position.ts`        | La posición que se está montando y su FEN (`toFen`/`fromFen`, `positionError`). Lógica pura, probada aparte                                                                                                                                                                                                                 |
+| `BoardPage.tsx`      | El tablero: jugadas, motor en vivo, teclado, autoguardado, importar PGN, deshacer / rehacer, análisis completo y la marca de partida propia                                                                                                                                                                                 |
+| `tree.ts`            | El árbol de variantes (añadir, promover, borrar, PGN en los dos sentidos con `toPgn`/`fromPgn`) y la validación de jugadas con chess.js; `matchAnalyzedLine` empareja un análisis con la línea principal de ahora                                                                                                           |
+| `OwnGamePanel.tsx`   | Marcar el tablero como "partida propia" (RF-6.5): `OwnGameStatus` es la línea de la cabecera que dice si cuenta y abre el panel, y `OwnGamePanel` el formulario que publica o retira. Lo que se escribe aquí viaja a `PUT /boards/{id}/own-game` con el PGN del árbol y se convierte en una fila del historial              |
+| `VariationTree.tsx`  | Navegación visual de ese árbol (RF-6.3), con la clasificación de cada jugada cuando hay análisis                                                                                                                                                                                                                            |
+| `useUndoRedoKeys.ts` | Ctrl+Z / Ctrl+Y / Ctrl+Mayús+Z (RF-6.8). Aparte de `useMoveNavigationKeys` porque son teclas que solo existen en esta pantalla                                                                                                                                                                                              |
+| `EngineLines.tsx`    | Panel de líneas del motor (RF-6.2). Lo propio de aquí son los **estados** del motor —apagado, buscando, con error, sin líneas, con líneas—; las líneas las pinta `components/board/EngineLineList`, compartido con el visor: previsualiza la continuación al señalar una jugada y, al pulsarla, el tablero avanza hasta ahí |
 
 Al motor se le pide la posición con 400 ms de retardo, para no lanzar una
 petición por cada jugada de una secuencia rápida. Durante esa espera lo que hay
@@ -96,8 +96,14 @@ la tecla `O` o desde su panel, igual que en el visor: `BoardPage` solo le pasa
 el FEN del nodo actual a `useOccupancy` y le pasa ese controlador a
 `Chessboard` por su propiedad `occupancyController`, que es quien dibuja
 `OccupancyLayer` encima —el hueco `overlay` queda para la rejilla enfocable del
-editor de posición, que es lo otro que se pinta sobre este tablero—. Todo lo
-demás —el cálculo, los sub-modos y la leyenda— es de `components/board/`, para
+editor de posición, que es lo otro que se pinta sobre este tablero—. La rejilla
+enfocable de **este** tablero ya no es de la capa: la monta `Chessboard` siempre
+que haya algo que elegir, porque una casilla tiene aquí dos trabajos —ser origen
+o destino de una jugada e inspeccionarse con la capa encendida— y solo quien
+conoce los dos puede darle a Intro uno sin superponer dos rejillas. Por eso este
+tablero se juega también **con el teclado** (`KEYBOARD_MOVE_HINT`, en la frase
+de atajos de abajo) y no solo arrastrando. Todo lo demás —el cálculo, los
+sub-modos y la leyenda— es de `components/board/`, para
 que las cinco pantallas con tablero la lean igual. Aquí las tres marcas
 arrancan encendidas, como en el visor; en las tres pantallas de entrenamiento
 arrancan apagadas (ver `features/training/README.md`).

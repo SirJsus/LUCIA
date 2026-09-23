@@ -4,26 +4,30 @@ RF-4 entero: el **plan de entrenamiento semanal** (RF-4.5), que es la portada
 de la sección, y las cuatro formas de entrenar a las que manda — puzzles
 sacados de los errores propios (RF-4.1, con RF-10.3), el drill de aperturas
 (RF-4.2), sparring contra el motor con la fuerza calibrada (RF-4.3) y re-jugar
-desde el error (RF-4.4). Las seis pantallas —las cinco pestañas más la de una
-partida de sparring— cuelgan de la misma sección y comparten cabecera; la
-elección entre ellas vive dentro, no en la navegación principal.
+desde el error (RF-4.4). Las cinco pestañas cuelgan de la misma sección y
+comparten cabecera (`TrainingHeader`); la elección entre ellas vive dentro, no
+en la navegación principal. La sexta pantalla, la de una partida de sparring
+concreta, se encabeza como pantalla de detalle —vuelta atrás sobre el título de
+lo que se tiene delante, como el visor y el tablero de análisis— y no lleva la
+sub-navegación (fila 94 del inventario de docs/07-coherencia-ui.md).
 
-| Archivo | Qué es |
-| --- | --- |
-| `TrainingHeader.tsx` | La cabecera común: el título de la sección, la frase de cada pantalla (`children`) y la sub-navegación Plan \| Puzzles \| Aperturas \| Re-jugar \| Sparring. El plan va primero porque es la portada. |
-| `PlanPage.tsx` | El plan de la semana (RF-4.5) y **la portada de la sección** (`/training`): arriba qué te está costando puntos, debajo los deberes que salen de ahí, cada uno con su avance y con las debilidades que lo piden. No se hace nada aquí: cada tarjeta lleva a la pestaña donde se entrena. |
-| `plan.ts` | Cómo se lee el plan: cada debilidad en una frase con su número en **su** unidad (`formatWeaknessSentence`) y cómo se llama cada deber, en qué se cuenta y adónde lleva (`TASK_DISPLAYS`). Pura, probada en `__tests__/plan.test.ts`. |
-| `PuzzlesPage.tsx` | Puzzles: el botón de generar, la cola del día y los estados por los que pasa (sin puzzles, por hoy terminado, resolviendo). |
-| `PuzzleSolver.tsx` | Un puzzle: el tablero donde se responde, la capa de ocupación bajo él (RF-7, ver abajo) y el panel que dice cómo fue. Se monta con `key={puzzle.id}`, así que cambiar de puzzle reinicia su estado. La capa lee la posición **que se está viendo**, que tras fallar es la del intento y no la del puzzle. |
-| `arrows.ts` | Las flechas del puzzle cerrado: solución en verde, equivalentes atenuadas, la jugada de la partida en rojo. Pura, probada en `__tests__/arrows.test.ts`. |
-| `DrillsPage.tsx` | Drill de aperturas: el botón de generar líneas —con el aviso de cuánta teoría falta por consultar—, la cola del día y los estados por los que pasa (sin líneas, por hoy terminado, recorriendo una). |
-| `DrillRunner.tsx` | Una línea: el tablero donde se repite jugando el propio bando, la capa de ocupación bajo él (RF-7, ver abajo) y el panel que dice qué se entrena y por qué. Se monta con `key={drill.id}`, así que cambiar de línea reinicia su estado. |
-| `drills.ts` | Cómo se lee un drill: el motivo en palabras ("Abandonas la teoría aquí en 8 partidas y sacas un 25,0 %") y cuántas jugadas propias tiene la línea. Pura, probada en `__tests__/drills.test.ts`. |
-| `ReplaysPage.tsx` | Re-jugar desde el error (RF-4.4): la lista curada de tus errores más caros y, bajo el que elijas, el formulario para retomar la partida desde ahí. La lista **no se guarda en ninguna parte**: sale de los análisis cada vez que se pide. |
+| Archivo                 | Qué es                                                                                                                                                                                                                                                                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TrainingHeader.tsx`    | La cabecera común: el título de la sección, la frase de cada pantalla (`children`) y la sub-navegación Plan \| Puzzles \| Aperturas \| Re-jugar \| Sparring. El plan va primero porque es la portada.                                                                                                                       |
+| `PlanPage.tsx`          | El plan de la semana (RF-4.5) y **la portada de la sección** (`/training`): arriba qué te está costando puntos, debajo los deberes que salen de ahí, cada uno con su avance y con las debilidades que lo piden. No se hace nada aquí: cada tarjeta lleva a la pestaña donde se entrena.                                     |
+| `plan.ts`               | Cómo se lee el plan: cada debilidad en una frase con su número en **su** unidad (`formatWeaknessSentence`) y cómo se llama cada deber, en qué se cuenta y adónde lleva (`TASK_DISPLAYS`). Pura, probada en `__tests__/plan.test.ts`.                                                                                        |
+| `PuzzlesPage.tsx`       | Puzzles: el botón de generar, la cola del día y los estados por los que pasa (sin puzzles, por hoy terminado, resolviendo).                                                                                                                                                                                                 |
+| `PuzzleSolver.tsx`      | Un puzzle: el tablero donde se responde, la capa de ocupación bajo él (RF-7, ver abajo) y el panel que dice cómo fue. Se monta con `key={puzzle.id}`, así que cambiar de puzzle reinicia su estado. La capa lee la posición **que se está viendo**, que tras fallar es la del intento y no la del puzzle.                   |
+| `arrows.ts`             | Las flechas del puzzle cerrado: solución en verde, equivalentes atenuadas, la jugada de la partida en rojo. Pura, probada en `__tests__/arrows.test.ts`.                                                                                                                                                                    |
+| `DrillsPage.tsx`        | Drill de aperturas: el botón de generar líneas —con el aviso de cuánta teoría falta por consultar—, la cola del día y los estados por los que pasa (sin líneas, por hoy terminado, recorriendo una).                                                                                                                        |
+| `DrillRunner.tsx`       | Una línea: el tablero donde se repite jugando el propio bando, la capa de ocupación bajo él (RF-7, ver abajo) y el panel que dice qué se entrena y por qué. Se monta con `key={drill.id}`, así que cambiar de línea reinicia su estado.                                                                                     |
+| `drills.ts`             | Cómo se lee un drill: el motivo en palabras ("Abandonas la teoría aquí en 8 partidas y sacas un 25,0 %") y cuántas jugadas propias tiene la línea. Pura, probada en `__tests__/drills.test.ts`.                                                                                                                             |
+| `ReplaysPage.tsx`       | Re-jugar desde el error (RF-4.4): la lista curada de tus errores más caros y, bajo el que elijas, el formulario para retomar la partida desde ahí. La lista **no se guarda en ninguna parte**: sale de los análisis cada vez que se pide.                                                                                   |
 | `SparringSetupForm.tsx` | Elegir rival, bando y fuerza. Extraído de `SparringPage` al necesitarlo también `ReplaysPage` y el visor: las tres pantallas desde las que se abre una partida contra el motor eligen la dificultad con los mismos controles, el mismo orden y las mismas explicaciones (criterio C-2). Solo cambia cómo se llama el botón. |
-| `SparringPage.tsx` | Sparring, la antesala: elegir rival, color y fuerza para empezar, y el listado para retomar lo que quedó a medias — con las partidas re-jugadas (RF-4.4) marcadas con una insignia, porque son de la misma tabla. |
-| `SparringGamePage.tsx` | Una partida de sparring en marcha: el tablero donde se juega, la capa de ocupación bajo él (RF-7, ver abajo) y el panel con el rival, las jugadas y cómo acabó. También las retomadas (RF-4.4), que añaden de dónde salieron con enlace de vuelta al visor. |
-| `sparring.ts` | Cómo se lee una partida en pantalla: el resultado desde quien juega ("Ganaste por jaque mate") y las jugadas emparejadas por turno. Pura, probada en `__tests__/sparring.test.ts`. |
+| `SparringPage.tsx`      | Sparring, la antesala: elegir rival, color y fuerza para empezar, y el listado para retomar lo que quedó a medias — con las partidas re-jugadas (RF-4.4) marcadas con una insignia, porque son de la misma tabla.                                                                                                           |
+| `SparringGamePage.tsx`  | Una partida de sparring en marcha: el tablero donde se juega, la capa de ocupación bajo él (RF-7, ver abajo) y el panel con el rival, las jugadas y cómo acabó. También las retomadas (RF-4.4), que añaden de dónde salieron con enlace de vuelta al visor.                                                                 |
+| `ExerciseStatusBadge.tsx` | La insignia del panel lateral de las tres pantallas con tablero: si el sistema está esperando, si te toca o si el ejercicio se acabó. Dice lo mismo en las tres, que antes significaba el repaso en el puzzle, la baraja en el drill y el turno en el sparring (fila 98 del inventario de docs/07-coherencia-ui.md).        |
+| `sparring.ts`           | Cómo se lee una partida en pantalla: el resultado desde quien juega ("Ganaste por jaque mate") y las jugadas emparejadas por turno. Pura, probada en `__tests__/sparring.test.ts`.                                                                                                                                          |
 
 **Lo que la pantalla de puzzles no sabe.** Ni la solución ni la jugada que se
 hizo en la partida llegan al navegador mientras el puzzle está abierto: las dos
@@ -99,7 +103,7 @@ delante a `useOccupancy` y le dan el controlador a `Chessboard` por su
 propiedad `occupancyController`; todo lo demás vive en `components/board/`,
 compartido con el visor y el tablero de análisis, y la frase que anuncia el
 atajo `O` es la misma constante en las cinco
-(`useOccupancy.ts::OCCUPANCY_TOGGLE_KEY_HINT`).
+(`components/board/hints.ts::OCCUPANCY_TOGGLE_KEY_HINT`).
 
 **Aquí las tres marcas arrancan apagadas** (`marksOnByDefault: false`), y es lo
 único que distingue esta capa de la del visor y la del tablero de análisis,

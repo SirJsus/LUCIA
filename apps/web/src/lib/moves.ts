@@ -33,3 +33,28 @@ export function moveNumberOf(absolutePly: number): number {
 export function moveNumberLabel(absolutePly: number): string {
   return `${moveNumberOf(absolutePly)}${absolutePly % 2 === 0 ? "." : "..."}`;
 }
+
+/** Una secuencia de jugadas escrita como se lee en un tablero: "1. e4 e5 2.
+ * Cf3 Cc6".
+ *
+ * Existe porque la línea del drill de aperturas era la única secuencia de
+ * jugadas de la aplicación que se pintaba como prosa —"e4 e5 Nf3 Nc6", sin
+ * número y sin monoespaciada—, mientras el visor, el sparring y el árbol de
+ * variantes numeran y usan `font-mono` (fila 100 del inventario de
+ * docs/07-coherencia-ui.md, criterio C-5).
+ *
+ * `startingPly` es el ply absoluto de la primera jugada de la lista, para que
+ * una secuencia que no arranca en la posición estándar se numere desde su
+ * jugada real. Una línea de apertura arranca en 0, así que no hace falta
+ * pasarlo. Si la primera es de negras se escribe "23… Dxd4", que es lo que
+ * distingue una jugada de negras de la de blancas del mismo turno.
+ */
+export function formatMoveSequence(movesSan: string[], startingPly = 0): string {
+  return movesSan
+    .map((san, index) => {
+      const absolutePly = startingPly + index;
+      if (absolutePly % 2 === 1 && index > 0) return san;
+      return `${moveNumberLabel(absolutePly)} ${san}`;
+    })
+    .join(" ");
+}

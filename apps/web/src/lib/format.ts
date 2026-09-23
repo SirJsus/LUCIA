@@ -60,16 +60,19 @@ export function formatAccuracyPoints(points: number): string {
   return Math.abs(points).toFixed(1);
 }
 
-/** Puntos de partida perdidos frente a empatarlas todas: "2.5 puntos"
- * (`lucia_core.drills.points_lost`, RF-4.2 y RF-4.5).
+/** Puntos de partida perdidos frente a empatarlas todas: "2.5 puntos de
+ * marcador" (`lucia_core.drills.points_lost`, RF-4.2 y RF-4.5).
  *
  * No son los puntos de probabilidad de victoria de `formatWinPercentPoints` ni
  * los de precisión de `formatAccuracyPoints`: son victorias y tablas, la
- * moneda del marcador. Que las tres magnitudes se llamen "puntos" en la misma
- * lista es la fila 104 del inventario; tenerlas en un solo sitio es lo que
- * hará que decidirlo sea un solo cambio. */
+ * moneda del marcador. Los tres decían "puntos" a secas y los tres salían
+ * seguidos en la misma lista del plan semanal, así que la palabra nombraba tres
+ * magnitudes distintas (fila 104 del inventario de docs/07-coherencia-ui.md).
+ * Cada uno dice ya de qué son los suyos, que es lo que hizo
+ * `formatWinPercentPoints` cuando "pts" a secas se leía como puntos de
+ * material. */
 export function formatScorePoints(points: number): string {
-  return `${points.toFixed(1)} puntos`;
+  return `${points.toFixed(1)} puntos de marcador`;
 }
 
 /** Lo que costó un error propio, en una frase: "Tu probabilidad de victoria
@@ -81,9 +84,15 @@ export function formatScorePoints(points: number): string {
  * la forma de que dos sitios acaben diciendo lo mismo de dos maneras (criterio
  * C-5).
  *
- * Va **desde quien jugó** y no desde las blancas, que es lo que discute la
- * fila 92 del inventario: mientras se decide, al menos el punto de vista es
- * uno solo y cambiarlo será un solo cambio.
+ * **Cuenta desde quien jugó y no desde las blancas**, que es la excepción
+ * escrita de C-5 (fila 92 del inventario, decidida el 2026-09-22): la misma
+ * jugada de las negras sale aquí como 31 % y como 69 % en el visor al que
+ * lleva "Ver partida", y se acepta porque la frase nombra el bando —"Tu
+ * probabilidad"— y porque girarla rompería el "menos" que hace legible la
+ * pérdida. Lo que C-5 sigue prohibiendo es el número suelto, sin frase que
+ * diga desde dónde se cuenta. Razonado, con lo que se descartó y dónde queda
+ * la frontera, en
+ * [ADR-0022](../../../../docs/adr/0022-la-probabilidad-de-victoria-se-cuenta-desde-quien-entrena.md).
  */
 export function formatOwnWinPercentLossSentence(before: number, after: number): string {
   return `Tu probabilidad de victoria pasó de ${formatPercent(before, 1)} a ${formatPercent(
@@ -114,6 +123,26 @@ const ENGINE_DISPLAY_NAMES: Record<EngineId, string> = {
 
 export function formatEngineName(engine: string): string {
   return ENGINE_DISPLAY_NAMES[engine as EngineId] ?? capitalize(engine);
+}
+
+/** Cómo se llama el rival de una partida de sparring (RF-4.3): "Stockfish
+ * (1500)", "Lc0 · Maia".
+ *
+ * El nombre se componía en dos sitios y desde dos lados —el desplegable de
+ * "Nueva partida" lo armaba en el front y la partida lo recibía ya armado del
+ * servidor—, así que coincidían carácter a carácter sin que nada lo
+ * garantizara (fila 96 del inventario de docs/07-coherencia-ui.md, criterio
+ * C-5). Se compone aquí, que es donde vive el formateo, a partir de `engine` y
+ * `engine_elo`, que es todo lo que hace falta y lo que la API ya manda.
+ *
+ * Sin `engineElo` da el nombre a secas, que es lo que necesita el desplegable:
+ * ahí la fuerza se elige en su propio campo.
+ */
+export function formatOpponentName(engine: string, engineElo: number | null = null): string {
+  // Lc0 juega con una red Maia y no con un Elo pedido, así que lo que lo
+  // identifica es la red; Stockfish, la fuerza a la que se le pidió jugar.
+  const name = engine === "lc0" ? `${formatEngineName(engine)} · Maia` : formatEngineName(engine);
+  return engineElo === null ? name : `${name} (${engineElo})`;
 }
 
 /** Fase de la partida tal como se enseña: "Apertura", "Medio juego", "Final"

@@ -34,24 +34,36 @@ export function formatWeaknessSentence(weakness: Weakness): string {
       // cuatro, y además se leen igual que la insignia del dashboard (C-5).
       return `El ${formatPercent(weakness.magnitude, 0)} de tus errores están clasificados como «${mistakeTypeStyle(weakness.subject).label}».`;
     case "opening":
-      return `Con ${weakness.subject} de ${weakness.color === "black" ? "negras" : "blancas"} pierdes ${formatScorePoints(weakness.magnitude)}.`;
+      // "frente a empatarlas todas" es la referencia de `points_lost`, y sin
+      // ella "pierdes 2.5" no dice pocos o muchos respecto a qué (fila 104 del
+      // inventario, criterio C-6).
+      return `Con ${weakness.subject} de ${weakness.color === "black" ? "negras" : "blancas"} pierdes ${formatScorePoints(weakness.magnitude)} frente a empatarlas todas.`;
     case "time_trouble":
       return `Juegas con el reloj encima en el ${formatPercent(weakness.magnitude, 0)} de tus partidas.`;
     case "accuracy_trend":
-      return `Tu precisión ha bajado ${formatAccuracyPoints(weakness.magnitude)} puntos respecto a los meses anteriores.`;
+      return `Has perdido ${formatAccuracyPoints(weakness.magnitude)} puntos de precisión respecto a los meses anteriores.`;
   }
 }
 
 /** Cómo se llama cada deber, en qué se cuenta y a qué pestaña lleva. Las tres
  * cosas en la misma tabla y no en tres para que el nombre, la unidad y el
- * destino de un deber no puedan separarse. */
+ * destino de un deber no puedan separarse.
+ *
+ * **El nombre es el de la pestaña a la que lleva**, no uno descriptivo: las
+ * tarjetas decían "Líneas de apertura", "Posiciones a re-jugar" y "Partidas
+ * contra el motor" y se aterrizaba en «Aperturas», «Re-jugar» y «Sparring»,
+ * así que el único control que anticipaba el destino —el botón dice "Entrenar"
+ * en las cuatro— lo nombraba de otra manera (fila 105 del inventario de
+ * docs/07-coherencia-ui.md, criterio C-2). Lo que la tarjeta hace lo cuenta la
+ * frase de debajo, que es donde ya estaba. La unidad sí es descriptiva: es lo
+ * que se cuenta, no adónde se va. */
 type TaskDisplay = { label: string; unit: string; to: string };
 
 const TASK_DISPLAYS: Record<TrainingTaskKind, TaskDisplay> = {
   puzzles: { label: "Puzzles", unit: "puzzles", to: "/training/puzzles" },
-  drills: { label: "Líneas de apertura", unit: "líneas", to: "/training/drills" },
-  replays: { label: "Posiciones a re-jugar", unit: "posiciones", to: "/training/replays" },
-  sparring: { label: "Partidas contra el motor", unit: "partidas", to: "/training/sparring" },
+  drills: { label: "Aperturas", unit: "líneas", to: "/training/drills" },
+  replays: { label: "Re-jugar", unit: "posiciones", to: "/training/replays" },
+  sparring: { label: "Sparring", unit: "partidas", to: "/training/sparring" },
 };
 
 /** El `kind` llega como texto desde la API, así que uno desconocido se deja

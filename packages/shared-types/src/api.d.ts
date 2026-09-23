@@ -522,7 +522,8 @@ export interface paths {
         };
         /**
          * Player Drill Queue
-         * @description Los drills que toca repetir ahora, del más atrasado al más reciente.
+         * @description Los drills que toca repetir ahora, del más atrasado al más reciente, y
+         *     cuánta teoría le falta al repertorio del que salen.
          */
         get: operations["player_drill_queue_training_drills_get"];
         put?: never;
@@ -575,7 +576,7 @@ export interface paths {
         /**
          * Player Replay Positions
          * @description Los errores propios desde los que se puede retomar, del más caro al más
-         *     barato.
+         *     barato, y cuántos hay en total.
          */
         get: operations["player_replay_positions_training_replays_get"];
         put?: never;
@@ -1071,6 +1072,8 @@ export interface components {
             total: number;
             /** Next Due At */
             next_due_at: string | null;
+            /** Positions Missing */
+            positions_missing: number;
         };
         /** EngineConfigOut */
         EngineConfigOut: {
@@ -1601,6 +1604,23 @@ export interface components {
              */
             played_at: string;
         };
+        /**
+         * ReplayQueueOut
+         * @description La lista y cuántos errores hay, como la cola de puzzles y la de drills.
+         *
+         *     El total no es `len(positions)`: la lista viene recortada a `limit`, así que
+         *     sin él la pantalla enseñaba veinte de trescientos sin decir que había más
+         *     (fila 102 del inventario de docs/07-coherencia-ui.md). Va en el cuerpo y no
+         *     en una cabecera `X-Total-Count` como el listado de Partidas porque las tres
+         *     pestañas hermanas de esta —puzzles, aperturas y sparring— lo traen así, y es
+         *     con ellas con las que se compara al cambiar de pestaña.
+         */
+        ReplayQueueOut: {
+            /** Positions */
+            positions: components["schemas"]["ReplayPositionOut"][];
+            /** Total */
+            total: number;
+        };
         /** SparringGameCreate */
         SparringGameCreate: {
             /** Player Color */
@@ -1631,8 +1651,8 @@ export interface components {
             origin_game_id: number | null;
             /** Origin Ply */
             origin_ply: number | null;
-            /** Opponent Name */
-            opponent_name: string;
+            /** Starting Ply */
+            starting_ply: number;
             /** Fen */
             fen: string;
             /** Moves San */
@@ -2732,6 +2752,7 @@ export interface operations {
         parameters: {
             query?: {
                 limit?: number;
+                username?: string | null;
             };
             header?: never;
             path?: never;
@@ -2843,7 +2864,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ReplayPositionOut"][];
+                    "application/json": components["schemas"]["ReplayQueueOut"];
                 };
             };
             /** @description Validation Error */

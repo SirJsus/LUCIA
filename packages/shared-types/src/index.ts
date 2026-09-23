@@ -57,6 +57,7 @@ export type DrillGeneration = Schemas["DrillGenerationOut"];
 export type DrillMove = Schemas["DrillMoveOut"];
 export type SparringGame = Schemas["SparringGameOut"];
 export type ReplayPosition = Schemas["ReplayPositionOut"];
+export type ReplayQueue = Schemas["ReplayQueueOut"];
 export type WeeklyPlan = Schemas["WeeklyPlanOut"];
 export type PlanTask = Schemas["PlanTaskOut"];
 export type Weakness = Schemas["WeaknessOut"];

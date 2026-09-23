@@ -1591,7 +1591,7 @@
           "training"
         ],
         "summary": "Player Drill Queue",
-        "description": "Los drills que toca repetir ahora, del más atrasado al más reciente.",
+        "description": "Los drills que toca repetir ahora, del más atrasado al más reciente, y\ncuánta teoría le falta al repertorio del que salen.",
         "operationId": "player_drill_queue_training_drills_get",
         "parameters": [
           {
@@ -1604,6 +1604,22 @@
               "minimum": 1,
               "default": 20,
               "title": "Limit"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
             }
           }
         ],
@@ -1690,7 +1706,7 @@
           "training"
         ],
         "summary": "Player Replay Positions",
-        "description": "Los errores propios desde los que se puede retomar, del más caro al más\nbarato.",
+        "description": "Los errores propios desde los que se puede retomar, del más caro al más\nbarato, y cuántos hay en total.",
         "operationId": "player_replay_positions_training_replays_get",
         "parameters": [
           {
@@ -1728,11 +1744,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/ReplayPositionOut"
-                  },
-                  "title": "Response Player Replay Positions Training Replays Get"
+                  "$ref": "#/components/schemas/ReplayQueueOut"
                 }
               }
             }
@@ -3197,6 +3209,10 @@
               }
             ],
             "title": "Next Due At"
+          },
+          "positions_missing": {
+            "type": "integer",
+            "title": "Positions Missing"
           }
         },
         "type": "object",
@@ -3204,7 +3220,8 @@
           "drills",
           "due",
           "total",
-          "next_due_at"
+          "next_due_at",
+          "positions_missing"
         ],
         "title": "DrillQueueOut"
       },
@@ -4661,6 +4678,28 @@
         "title": "ReplayPositionOut",
         "description": "Un error propio desde el que se puede retomar la partida."
       },
+      "ReplayQueueOut": {
+        "properties": {
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayPositionOut"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "positions",
+          "total"
+        ],
+        "title": "ReplayQueueOut",
+        "description": "La lista y cuántos errores hay, como la cola de puzzles y la de drills.\n\nEl total no es `len(positions)`: la lista viene recortada a `limit`, así que\nsin él la pantalla enseñaba veinte de trescientos sin decir que había más\n(fila 102 del inventario de docs/07-coherencia-ui.md). Va en el cuerpo y no\nen una cabecera `X-Total-Count` como el listado de Partidas porque las tres\npestañas hermanas de esta —puzzles, aperturas y sparring— lo traen así, y es\ncon ellas con las que se compara al cambiar de pestaña."
+      },
       "SparringGameCreate": {
         "properties": {
           "player_color": {
@@ -4748,9 +4787,9 @@
             ],
             "title": "Origin Ply"
           },
-          "opponent_name": {
-            "type": "string",
-            "title": "Opponent Name"
+          "starting_ply": {
+            "type": "integer",
+            "title": "Starting Ply"
           },
           "fen": {
             "type": "string",
@@ -4823,7 +4862,7 @@
           "engine_elo",
           "origin_game_id",
           "origin_ply",
-          "opponent_name",
+          "starting_ply",
           "fen",
           "moves_san",
           "last_move_uci",

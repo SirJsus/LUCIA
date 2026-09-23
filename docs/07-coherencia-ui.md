@@ -75,7 +75,15 @@ filas **107 y 108** —la 108, cerrada el mismo día— y lo que precisó la 91;
 divergencia deliberada —las tres
 marcas arrancan apagadas en entrenamiento y encendidas en el visor y en el
 tablero de análisis— se resolvió dentro del mismo commit, diciéndolo en el
-panel donde se ven apagadas.
+panel donde se ven apagadas. Y el **barrido de cierre de la fase 3**, del mismo
+2026-09-22, recorre las quince que quedaban abiertas y las cierra todas: es lo
+que se decidió el 2026-09-19 al abrir la primera de ellas, esperar a tener las
+seis pantallas delante para decidir de una vez en qué se parecen. Comprobar ese
+barrido —leer las cinco pantallas con tablero estado por estado— dejó cinco
+arreglos más y destapó la **109**, que se cerró en el mismo commit: dar a la
+partida de sparring cabecera de pantalla de detalle (fila 94) es lo que la puso
+a compararse con el visor también por dónde tiene sus acciones. El inventario
+queda vacío.
 
 **Qué es cada mitad de este documento.** Los criterios C-1 a C-7 son
 **RNF-11**, que vive en la sección Post 1.0 de
@@ -102,86 +110,46 @@ antes de comitear cambios de front — ver [Cómo se verifica](#cómo-se-verific
 | C-2 | **Misma acción, mismo nombre, mismo sitio.** Una acción que existe en dos pantallas se llama igual, se ve igual y ocupa la misma posición relativa. |
 | C-3 | **La interfaz refleja lo que el sistema está haciendo.** Toda pantalla que dependa del motor o de la red distingue visualmente: inactiva, en cola, trabajando (con progreso si se conoce), terminada, vacía y con error. No basta un "analizando…" en letra pequeña. |
 | C-4 | **Estados compartidos, no artesanales.** Carga, error y vacío se resuelven con `Spinner`, `ErrorBox` y `EmptyState` de `apps/web/src/components/Feedback.tsx`. Nada de frases sueltas en texto plano para lo mismo. |
-| C-5 | **Un dato, una forma.** La evaluación, la clasificación de jugada y el nombre del motor se presentan igual en todas partes: mismo signo, misma unidad, mismo punto de vista (blancas) y mismo formateador (`lib/score.ts`). |
+| C-5 | **Un dato, una forma.** La evaluación, la clasificación de jugada y el nombre del motor se presentan igual en todas partes: mismo signo, misma unidad, mismo punto de vista (blancas) y mismo formateador (`lib/score.ts`). **Excepción, decidida el 2026-09-22 al cerrar la fila 92**: una frase puede contarlo desde el bando de quien entrena si lo nombra explícitamente («Tu probabilidad de victoria pasó de…»). Es lo que hacen el puzzle resuelto (RF-4.1) y la lista de re-jugar (RF-4.4), donde lo que se cuenta es el error propio: desde las blancas, quien juega con negras leería «31 puntos más» delante de su propia equivocación. El punto de vista de las blancas sigue siendo obligatorio en todo número suelto —una columna, una insignia, un gráfico—, que es donde nadie puede preguntar desde dónde se cuenta. |
 | C-6 | **Legible sin saber de ajedrez.** Todo número del motor va acompañado de etiqueta, leyenda o representación visual. `+0.35` solo, sin más, no comunica nada a quien no lee evaluaciones. |
 | C-7 | **Accesibilidad mínima.** Foco visible, `aria-label` en los botones que son solo icono, y ningún significado transmitido únicamente por color. |
 
-## Inventario de incoherencias abiertas (al 2026-09-22)
+## Inventario de incoherencias abiertas (al 2026-09-23)
 
-**Quince**: las dos de la pantalla de puzzles (91 y 92), las tres que abrió
-el sparring (94 a 96), las cuatro del drill de aperturas (97 a 100), las tres
-de re-jugar desde el error (101 a 103), las dos del plan semanal (104 y 105) y
-la que destapó llevar la capa de ocupación a las tres pantallas de
-entrenamiento (107). La
-106, que era la única de las tres del plan que se leía como un defecto y no
-como un matiz —«el 55 % de tus errores son de tipo de final»—, se cerró el
-mismo día en el commit que la trajo, y lo mismo la 108, que era el reverso de
-la decisión de arrancar las marcas apagadas en entrenamiento: dejarla abierta
-habría sido publicar un control que no hace lo que dice.
-Llegó a
-estar vacío el 2026-09-19 —las cuatro últimas
-heredadas, la 65 y la 67 de la pantalla de Partidas y la 68 y la 70 del control
-de exportar del visor, se cerraron al recorrer el apéndice de la fase 2—, y
-volvió a llenarse ese mismo día con la pantalla de Entrenamiento. Los números
-no se renumeran al cerrar una fila, que es la referencia con la que se habla de
-ella en un commit: la 93 está cerrada y su número no se reutiliza.
+**Ninguna.** El barrido de cierre de la fase 3 recorrió las quince que quedaban
+—las dos de la pantalla de puzzles (91 y 92), las tres que abrió el sparring
+(94 a 96), las cuatro del drill de aperturas (97 a 100), las tres de re-jugar
+desde el error (101 a 103), las dos del plan semanal (104 y 105) y la que
+destapó llevar la capa de ocupación a las tres pantallas de entrenamiento
+(107)— y las cerró todas. Comprobarlo a continuación dejó cinco arreglos más y
+destapó una fila nueva, la **109**, consecuencia directa de cerrar la 94: dar
+a la partida de sparring cabecera de pantalla de detalle la puso a compararse
+con el visor y con el tablero de análisis también por dónde tiene sus acciones.
+Se cerró en el mismo commit subiéndolas a la cabecera. El detalle de las
+dieciséis está abajo, en la entrada del 2026-09-22.
 
-Las dos de los puzzles vienen del 2026-09-19 y no caben en un commit: una es
-media jornada de trabajo en un componente compartido y la otra pide decidir
-antes si se matiza el criterio C-5. La 91 es además la misma que tiene el
-tablero del sparring, y por eso se amplía en vez de duplicarse: el problema es
-uno —una jugada son dos casillas y la rejilla enfocable activa una— y se
-arreglará una sola vez para los dos tableros. Las tres del sparring (RF-4.3),
-del 2026-09-21, son decisiones de presentación, no descuidos: dónde se encabeza
-una pantalla de detalle que vive dentro de una sección con sub-navegación, qué
-forma tiene el tercer listado de la aplicación y de qué lado se compone el
-nombre del rival. Las cuatro del drill (RF-4.2) son de la misma raíz: la
-pantalla es gemela de la de puzzles y el parecido se rompe en el panel lateral
-—lo que pasa al fallar, lo que dice el encabezado del panel y cómo se leen las
-jugadas de la línea—, más el aviso de teoría incompleta, que pide un campo
-nuevo en la cola. Se dejan para el final de la fase 3, cuando estén todas las
-pantallas de Entrenamiento y se pueda decidir de una vez cómo se parecen. Las
-tres de re-jugar (RF-4.4), del 2026-09-21, son las tres de la misma clase: dos
-piden un campo más en la API —el ply desde el que arranca una partida retomada
-y cuántos errores hay en total— y la tercera es la ayuda de la cabecera del
-visor, que lleva ahí desde RF-5.5 y que este cambio agranda con un botón más.
-Las tres del plan semanal (RF-4.5), del 2026-09-21, son las tres de palabras y
-no de forma: el plan es la primera pantalla que enseña **cinco magnitudes
-distintas seguidas**, y decidir cómo se llama cada una es una decisión de
-redacción que conviene tomar de una vez —y junto a las doce anteriores— en el
-barrido de cierre de la fase 3. La de la capa de ocupación en
-entrenamiento (RF-7 sobre RF-4), del 2026-09-22, sale de comparar por
-primera vez las cinco pantallas con tablero: es la medida del tablero, que
-diverge desde antes de esta capa y solo se ve al poner las cinco columnas una
-al lado de otra. La otra que abrió esa comparación, el alcance de las tres
-casillas de "Qué se marca", se cerró el mismo día y está abajo.
+Es la segunda vez que queda vacío. La primera fue
+el 2026-09-19, al cerrar las cuatro heredadas de la fase 2 —la 65 y la 67 de la pantalla de Partidas y la 68
+y la 70 del control de exportar del visor—, y volvió a llenarse ese mismo día
+con la pantalla de Entrenamiento: era la primera sección que se construía
+entera de una vez, y compararla consigo misma y con lo que ya había daba más de
+lo que cabía en un commit. Por eso se decidió entonces dejarlas para el final
+de la fase, cuando estuvieran las seis pantallas y se pudiera decidir de una
+vez cómo se parecen; esto es ese momento.
 
-| # | Incoherencia | Dónde | Criterio |
-| --- | --- | --- | --- |
-| 91 | Los tres tableros donde se mueve una pieza —el puzzle, la partida de sparring y la línea del drill de aperturas— solo se pueden usar con el ratón: la única vía es arrastrar. Las otras dos capas que se dibujan sobre un tablero —el editor de posición y la ocupación— tienen su rejilla enfocable (`SquareKeyboardGrid`), pero esa rejilla activa **una** casilla y una jugada son dos (origen y destino), así que no sirve tal cual. Desde que los tres tableros llevan la capa de ocupación (2026-09-22) tienen ya esa rejilla encima —la trae `OccupancyLayer`—, pero solo mientras la capa está encendida y solo para inspeccionar la casilla: mover sigue siendo únicamente arrastrar. | `apps/web/src/features/training/PuzzleSolver.tsx`, `apps/web/src/features/training/SparringGamePage.tsx` y `apps/web/src/features/training/DrillRunner.tsx` (los tres `Chessboard` van sin `overlay` propio) | C-1 |
-| 92 | La probabilidad de victoria del puzzle se da desde quien resolvió ("Tu probabilidad de victoria pasó de…") y no desde las blancas. La misma jugada de las negras sale como 31 % aquí y como 69 % en el visor al que lleva "Ver partida", que es justo lo que corrigió la fila 52 en los momentos críticos. Desde RF-4.4 lo dice también la lista de errores para re-jugar, con la misma frase y desde el mismo lado —la frase está ya en un solo sitio (`formatOwnWinPercentLossSentence`), así que girarla es un solo cambio—, y ahí el choque es más corto: la propia fila lleva al lado el enlace "Ver partida" que enseña el otro número. | `apps/web/src/lib/format.ts::formatOwnWinPercentLossSentence`, que usan `features/training/PuzzleSolver.tsx::PuzzleResult` y `features/training/ReplaysPage.tsx` | C-5 |
-| 94 | La pantalla de una partida de sparring no se encabeza como las otras dos pantallas de detalle: su título es "Entrenamiento" —el de la sección— en vez del de la partida, y la vuelta atrás es un botón al final del lateral ("Volver a Sparring") en lugar del enlace de texto sobre el título que usan el visor y el tablero de análisis ("← Volver a partidas", "← Volver a tableros"). Encima la pestaña "Sparring" de la sub-navegación lleva al mismo sitio con otro nombre: dos controles para lo mismo. | `apps/web/src/features/training/SparringGamePage.tsx` (la `TrainingHeader` y el `Link` del final del lateral) | C-2 |
-| 95 | El listado de partidas de sparring es la tercera forma de pintar un listado: Partidas usa `DataTable`, Tableros una `<ul>` de tarjetas con `PANEL_CLASSES`, y este una `<ul>` de filas separadas por línea dentro de un `Panel`. Los datos son tabulares —fecha, color, rival, resultado— y la fila acaba igual que las otras dos, con un enlace con aspecto de botón. El listado de re-jugar (RF-4.4) es ya el cuarto y copia carácter a carácter la receta de fila de este —el mismo `className` del `<li>`, el mismo `ml-auto` para la fecha, el mismo `Panel` con `bodyClassName=""`—: dos listas iguales sostenidas a mano, que es la familia de las filas 39 a 41. | `apps/web/src/features/training/SparringPage.tsx::SparringGameRow` y `apps/web/src/features/training/ReplaysPage.tsx::ReplayRow` | C-2 |
-| 96 | El nombre del rival se compone dos veces y de dos lados: el formulario de "Nueva partida" lo arma en el front con `formatEngineName` ("Lc0 · Maia") y la partida lo recibe ya armado del servidor (`opponent_name`, "Stockfish (1500)"). Hoy coinciden carácter a carácter y nada lo garantiza; el front ya recibe `engine` y `engine_elo`, que es todo lo que hace falta para componerlo una sola vez. Desde RF-4.4 el formulario es compartido, así que la versión del front es una sola y sale de tres pantallas. | `apps/api/lucia_api/routers/sparring.py::_opponent_name` y `apps/web/src/features/training/SparringSetupForm.tsx` | C-5 |
-| 97 | Fallar deja el tablero de dos maneras distintas en las dos pantallas gemelas. En el puzzle la jugada errónea se queda puesta a propósito —"borrarla al instante da la sensación de que la pieza rebotó y no de que la respuesta era otra"— y hace falta pulsar «Volver a intentarlo» para recuperar la posición; en el drill el servidor devuelve la posición de antes, la pieza rebota y se puede volver a arrastrar sin pulsar nada. Una de las dos está mal, y la razón escrita está del lado del puzzle. | `apps/web/src/features/training/DrillRunner.tsx::applyResult` y `apps/web/src/features/training/PuzzleSolver.tsx` | C-2 / C-3 |
-| 98 | El encabezado del panel lateral dice una cosa distinta en cada una de las tres pantallas con tablero de Entrenamiento. El título: "Juegan blancas" en el puzzle, "Juegas con blancas" en el sparring y el nombre de la apertura en el drill, que baja el color a la primera línea del cuerpo. La insignia de al lado: en el puzzle es en qué repaso va ("nuevo", "repaso 3"), en el sparring es lo que está haciendo el sistema ("el motor piensa…", "te toca") y en el drill es de qué baraja salió la línea. Como consecuencia, el drill no enseña su `repetitions` —que la API manda— y es el único de los tres que no dice que está esperando al servidor mientras el rival contesta. | `apps/web/src/features/training/DrillRunner.tsx` (el `Panel` del lateral), comparado con `PuzzleSolver.tsx` y `SparringGamePage.tsx` | C-2 / C-3 |
-| 99 | Que la teoría esté a medias solo se dice **después** de pulsar «Generar líneas», y es una condición de la pantalla entera: las líneas salen del repertorio comparado, que se llena a trozos (ADR-0010), así que una cola corta puede serlo porque falta teoría y no porque se juegue bien. `positions_missing` solo viaja en `DrillGenerationOut`; la cola (`DrillQueueOut`) no lo trae. | `apps/api/lucia_api/routers/drills.py::DrillQueueOut` y `apps/web/src/features/training/DrillsPage.tsx` | C-3 |
-| 100 | Las jugadas de la línea se pintan como una cadena suelta —"e4 e5 Nf3 Nc6"—, sin número de jugada y sin la tipografía monoespaciada con la que la aplicación enseña notación en todas partes (`MoveButton`, la tabla de salidas del repertorio, la lista de jugadas del sparring, que numera desde `lib/moves.ts`). Es la única secuencia de jugadas de la aplicación que se lee como prosa. | `apps/web/src/features/training/DrillRunner.tsx` (`line_san.join(" ")` en `DrillResult` y `preceding_moves_san.join(" ")` en el panel) | C-5 |
-| 101 | Una partida retomada se numera desde 1. La lista de jugadas de una partida de sparring que empieza en la jugada 23 (RF-4.4) dice "1. 2. 3.", dos centímetros debajo del panel que dice "Retomada desde la jugada 23.". Y ese número del origen sale de `origin_ply`, que es relativo al inicio de la partida de origen: si esa empezaba en una posición dada, el visor la numera desde su jugada real y aquí sale otra. El front no puede arreglarlo solo: `SparringGameOut` manda la posición de ahora y las jugadas, pero no desde qué ply arranca la partida. | `apps/web/src/features/training/sparring.ts::turnsOf` y `features/training/SparringGamePage.tsx`, con `apps/api/lucia_api/routers/sparring.py::SparringGameOut` | C-5 |
-| 102 | El listado de re-jugar no dice cuántos errores hay ni que está recortado. La API devuelve los veinte más caros (`DEFAULT_POSITIONS_LIMIT`) y la pantalla los enseña sin más, mientras sus tres pestañas hermanas dicen siempre cuántas quedan de cuántas ("N por repasar de M", "N sin terminar"), y el listado de Partidas trae su total en `X-Total-Count` desde la fila 59. Con trescientos errores se ven veinte y nada dice que haya más. | `apps/web/src/features/training/ReplaysPage.tsx` y `apps/api/lucia_api/routers/replays.py` | C-3 |
-| 103 | Tres de las acciones de la cabecera del visor explican qué hacen solo en un `title` —"Exportar PGN anotado", "Abrir como tablero" y, desde RF-4.4, "Jugar desde aquí"—, que con teclado no aparece nunca y en un botón deshabilitado tampoco. Es lo mismo que corrigieron las filas 56 y 57 en la barra de filtros de Partidas y el editor de posición con su "Goma": la ayuda va a la vista bajo el control, como ya la ponen Puzzles y Aperturas bajo su botón de generar. | `apps/web/src/features/viewer/GameViewerPage.tsx` (la fila de acciones de la cabecera) | C-6 / C-7 |
-| 104 | La palabra "puntos" nombra tres magnitudes distintas en la misma lista del plan, y dos de las tres se dicen exactamente igual. Seguidas se leen: «Pierdes 8 pts de prob. de victoria por jugada en final.», «Con Caro-Kann Defense de negras pierdes 2.5 puntos.» (puntos de marcador: victorias y tablas frente a empatarlas todas) y «Tu precisión ha bajado 3.2 puntos respecto a los meses anteriores.» (puntos de precisión, que son porcentaje). Las tres frases están una debajo de otra en el mismo panel, y la de la apertura además no dice frente a qué se pierden esos 2.5. Es lo mismo que resolvió `formatWinPercentPoints` cuando "pts" a secas se leía como puntos de material. Cada magnitud tiene ya su formateador, así que ponerle nombre a cada una es un cambio en un solo sitio. | `apps/web/src/lib/format.ts::formatScorePoints` y `formatAccuracyPoints`, que usa `features/training/plan.ts::formatWeaknessSentence` | C-5 / C-6 |
-| 105 | Las cuatro tarjetas de deberes llaman a las pantallas de entrenamiento con nombres que no son los de sus pestañas: "Líneas de apertura" lleva a «Aperturas», "Posiciones a re-jugar" a «Re-jugar» y "Partidas contra el motor" a «Sparring»; solo "Puzzles" coincide. Es la misma clase de choque que la fila 94 —la pestaña y el botón que llevan al mismo sitio con dos nombres—, y aquí el botón de la tarjeta dice además "Entrenar" en las cuatro, así que el nombre de la tarjeta es lo único que anticipa adónde se va. | `apps/web/src/features/training/plan.ts::TASK_DISPLAYS` frente a `features/training/TrainingHeader.tsx::TRAINING_TABS` | C-2 |
-| 107 | El mismo tablero se dibuja de dos tamaños. El visor y el tablero de análisis lo montan con `BoardWithEvalBar`, que lo encierra en `mx-auto max-w-[36rem]`; las tres pantallas de entrenamiento ponen el `Chessboard` pelado, así que ocupa la columna entera —en una ventana ancha, bastante más de 36rem— y las piezas salen de otro tamaño al cambiar de pestaña. Venía de antes de la capa de ocupación, pero solo se ve ahora, con las cinco columnas construidas igual (tablero, frase de atajos, panel de ocupación). Arreglarlo es elegir dónde vive esa medida: subirla a `Chessboard` la impondría también al editor de posición, que hoy no la tiene. | `apps/web/src/components/board/BoardWithEvalBar.tsx` frente a `features/training/PuzzleSolver.tsx`, `DrillRunner.tsx` y `SparringGamePage.tsx` | C-2 |
+Los números no se renumeran al cerrar una fila, que es la referencia con la que
+se habla de ella en un commit: la 93 y la 106 están cerradas y sus números no
+se reutilizan. La siguiente fila que se abra será la **110**.
 
 ## Lo que se cerró
 
-Las 90 primeras filas de este inventario, todas cerradas, se cerraron en doce
-pasadas, y aquí queda el rastro de qué se hizo, para que un
-`git blame` no sea la única forma de averiguarlo. Las seis últimas pasadas
-—la de Entrenamiento, la del sparring, la del drill de aperturas, la de
-re-jugar desde el error, la del plan semanal y la de la capa de ocupación en
-entrenamiento— están al final: no cerraron filas, las abrieron.
+Las 109 filas de este inventario, todas cerradas, se cerraron en trece pasadas,
+y aquí queda el rastro de qué se hizo, para que un `git blame` no sea la única
+forma de averiguarlo. Las seis pasadas que construyeron Entrenamiento —la de la
+pantalla de puzzles, la del sparring, la del drill de aperturas, la de re-jugar
+desde el error, la del plan semanal y la de la capa de ocupación— están al
+final: esas no cerraron filas, las abrieron. La decimotercera, el barrido de
+cierre de la fase 3, es la que las cerró todas, y va la última de todas.
 
 **2026-09-06 · legibilidad del análisis.** Apareció la barra de evaluación, el
 tablero de análisis empezó a dibujar las flechas del motor, los vacíos del
@@ -1243,6 +1211,158 @@ el mismo commit:
   cambio entra por su propiedad `occupancyController` y la rejilla enfocable
   viaja dentro
   de la capa.
+
+**2026-09-22 · el barrido de cierre de la fase 3.** Las quince filas que la
+sección de Entrenamiento había ido abriendo, cerradas de una vez, que es como
+se decidió el 2026-09-19 que se harían: solo con las seis pantallas delante se
+puede decidir en qué se parecen. Seis de las quince pedían una decisión que no
+era de código; van marcadas como tales.
+
+- **91 · mover una pieza con el teclado** (C-1). Era la más vieja y la única
+  que no se podía arreglar en su pantalla: los tableros donde se mueve —el
+  puzzle, el drill, el sparring y el de análisis— solo se dejaban usar
+  arrastrando, y la rejilla enfocable que ya existía (`SquareKeyboardGrid`)
+  activa **una** casilla mientras que una jugada son dos. La solución no fue
+  inventar el flujo de dos pasos sino devolvérselo a chessground: la rejilla
+  vive ahora en `Chessboard` y activar una casilla llama a su `selectSquare`,
+  que ya sabe tomar el origen con la primera pulsación y mover con la segunda.
+  Esc suelta lo elegido. Como es una sola rejilla para los dos trabajos que
+  tiene una casilla —mover e inspeccionar (RF-7.3)—, la de `OccupancyLayer`
+  desapareció: dos rejillas superpuestas eran dos juegos de paradas de foco. El
+  editor de posición conserva la suya por `overlay`, porque ahí activar una
+  casilla es colocar una pieza.
+- **92 · desde qué bando se cuenta la probabilidad de victoria** (C-5,
+  *decisión*). La frase del error propio se queda contando desde quien jugó
+  («Tu probabilidad de victoria pasó de…») y **el criterio C-5 es el que cede**:
+  gana una excepción escrita para las frases que nombran el bando. Girarla a
+  las blancas habría sido coherente con la fila 52, pero quien juega con negras
+  leería «31 puntos más» delante de su propia equivocación, y lo que la fila 52
+  arregló era un número suelto en una lista, que sigue prohibido.
+- **94 · la partida de sparring se encabeza como pantalla de detalle** (C-2,
+  *decisión*). Llevaba la cabecera de la sección, así que se titulaba
+  «Entrenamiento», volvía atrás con un botón al final del lateral y la pestaña
+  «Sparring» hacía lo mismo con otro nombre. Ahora lleva «← Volver a sparring»
+  sobre un título que nombra la partida, como el visor y el tablero de
+  análisis, y sin pestañas: una partida concreta no es una forma de entrenar
+  entre cinco.
+- **95 · un solo listado de panel** (C-2). La receta —panel sin relleno, `<ul>`
+  dentro, filas separadas por una línea— estaba escrita a mano en el listado de
+  sparring y copiada carácter a carácter en el de re-jugar. Es
+  `components/PanelList.tsx` con `LIST_ROW_CLASSES` y `LIST_ROW_SUMMARY_CLASSES`
+  en `styles.ts`, por lo mismo y con la misma forma que `DataTable`. No
+  sustituye a `DataTable`: una fila de re-jugar se despliega para enseñar el
+  formulario de dificultad.
+- **96 · el nombre del rival se compone una vez** (C-5). Lo armaban el front
+  (el desplegable de «Nueva partida») y el servidor (`opponent_name`), y
+  coincidían carácter a carácter sin que nada lo garantizara. Es
+  `formatOpponentName(engine, engineElo)` en `lib/format.ts`, y
+  `opponent_name` sale de `SparringGameOut`: el `_opponent_name` del servidor
+  se queda solo para la cabecera del PGN, que es un documento que se abre en
+  otros programas y donde `[Black "lc0"]` no diría contra quién se jugó.
+- **97 · fallar deja el tablero igual en las dos gemelas** (C-2 / C-3,
+  *decisión*). Gana el puzzle, que es el que tenía la razón escrita: la jugada
+  errónea se queda puesta y hace falta pulsar «Volver a intentarlo», porque
+  borrarla al instante da la sensación de que la pieza rebotó y no de que la
+  respuesta era otra. El drill dejó de aceptar la posición de vuelta del
+  servidor como lo que se ve.
+- **98 · el panel lateral se encabeza igual en las tres** (C-2 / C-3). El
+  título es «Juegas con blancas/negras» en las tres, y la insignia dice siempre
+  lo mismo —si el sistema está esperando, si te toca o si se acabó— en vez de
+  significar el repaso en el puzzle, la baraja en el drill y el turno en el
+  sparring. Es `features/training/ExerciseStatusBadge.tsx`. Lo que identifica al
+  ejercicio bajó al cuerpo del panel, y de paso el drill enseña ya sus
+  `repetitions`, que la API mandaba y nadie leía.
+- **99 · que falte teoría es condición de la pantalla, no del botón** (C-3).
+  `positions_missing` viaja ya en `DrillQueueOut` y no solo en
+  `DrillGenerationOut`, de la misma `compare_repertoire` que lo cuenta al
+  generar: el repertorio se llena a trozos (ADR-0010), así que
+  una cola corta puede serlo porque falta teoría y no porque se juegue bien, y
+  eso hay que poder saberlo al llegar y no después de pulsar «Generar líneas».
+- **100 · la línea del drill se lee como notación** (C-5). Era la única
+  secuencia de jugadas de la aplicación pintada como prosa. Es
+  `formatMoveSequence` en `lib/moves.ts`, numerada y monoespaciada, con
+  `startingPly` para las que no arrancan en la salida.
+- **101 · una partida retomada se numera desde donde empieza** (C-5).
+  `SparringGameOut` manda `starting_ply`, sacado de `starting_fen` y no de
+  `origin_ply` —que es relativo al inicio de la partida de origen y da otro
+  número si esa no empezaba en la salida—, y con él numeran tanto la lista de
+  jugadas como la frase «Retomada desde la jugada 23».
+- **102 · re-jugar dice cuántos errores hay** (C-3). La respuesta es ya
+  `ReplayQueueOut` —`positions` y `total`—, con el total en el cuerpo y no en
+  una cabecera `X-Total-Count` como el listado de Partidas, porque las tres
+  pestañas hermanas lo traen así y es con ellas con las que se compara al
+  cambiar de pestaña.
+- **103 · las ayudas salen de los `title`** (C-6 / C-7). Las tres acciones que
+  sacan la partida del visor —«Exportar PGN anotado», «Abrir como tablero» y
+  «Jugar desde aquí»— explicaban qué hacen en un `title`, que con teclado no
+  aparece nunca y en un botón deshabilitado tampoco. Están a la vista bajo la
+  fila de acciones, como ya lo hacían Puzzles y Aperturas bajo su botón de
+  generar, y de paso el «Abrir como tablero» del sparring, que tenía el mismo
+  defecto en la misma acción.
+- **104 · cada magnitud dice de qué son sus puntos** (C-5 / C-6, *decisión*).
+  «Puntos» nombraba tres cosas seguidas en la misma lista del plan. Ahora son
+  «pts de prob. de victoria», «puntos de marcador» y «puntos de precisión», y
+  la de la apertura dice además frente a qué se pierden: «frente a empatarlas
+  todas», que es la referencia de `points_lost` y la mitad que faltaba.
+- **105 · la tarjeta se llama como el sitio al que lleva** (C-2, *decisión*).
+  Las tarjetas de deberes decían «Líneas de apertura», «Posiciones a re-jugar»
+  y «Partidas contra el motor» y se aterrizaba en «Aperturas», «Re-jugar» y
+  «Sparring». Manda el nombre de la pestaña; lo que la tarjeta hace lo cuenta
+  la frase de debajo, que es donde ya estaba.
+- **107 · el tablero se dibuja de un solo tamaño** (C-2, *decisión*). La medida
+  vive en `components/board/BoardFrame.tsx`, que usan las cinco pantallas con
+  tablero, y no en `Chessboard`: el editor de posición no tiene por qué
+  heredarla.
+- **109 · la acción de la partida de sparring sube a la cabecera** (C-2).
+  Abierta y cerrada aquí, y nacida de la 94: en cuanto la pantalla se encabeza
+  como pantalla de detalle, se compara con el visor y con el tablero de
+  análisis también por dónde tiene sus acciones, y «Abrir como tablero» —el
+  mismo nombre en las tres— estaba al final del lateral, bajo la lista de
+  jugadas. Sube a la derecha del título, con su línea de ayuda debajo y con el
+  recuadro de error al lado del botón que lo provoca, que estaba a dos columnas
+  (criterio C-3). Con ella sube «Abandonar», que es la que ocupa ese sitio
+  mientras se juega.
+
+Y cinco arreglos mecánicos, de comprobar el barrido leyendo las cinco pantallas
+con tablero estado por estado, sin nada que decidir:
+
+- **C-1 · el teclado se anuncia solo donde el tablero acepta jugadas.**
+  `KEYBOARD_MOVE_HINT` se encadenaba siempre, así que el puzzle cerrado, la
+  línea terminada y la partida acabada decían «el tablero ya no se mueve» y a
+  continuación «Intro elige origen y destino», en la misma frase; y con la
+  jugada errónea encima, esperando a «Volver a intentarlo», lo mismo. Va ahora
+  donde va la invitación a arrastrar y no más: las dos vías se prometen juntas,
+  que es lo que pide C-1. En el tablero de análisis sigue saliendo siempre,
+  porque allí el tablero siempre acepta jugadas.
+- **C-3 · un tablero que deja de aceptar jugadas deja de aceptarlas.** Quitarle
+  `legalMoves` no bastaba: `buildBoardConfig` omite `movable` cuando no las hay
+  —mandarlo en `undefined` le borraría a chessground ese trozo de estado— y
+  chessground conserva entonces los destinos de la posición anterior, así que
+  las piezas se seguían arrastrando sobre el puzzle fallado y el tablero
+  quedaba enseñando una posición que no era la de nadie. `Chessboard` le manda
+  ya los destinos vacíos. Con eso, el puzzle cierra su tablero al cerrarse y
+  mientras el servidor comprueba, que es la misma regla que ya tenían el drill
+  y el sparring (`canMove`).
+- **C-3 · las tres marcas mandan también en lo que se lee en voz alta.** La
+  fila 108 las hizo gobernar la inspección del panel, pero la rejilla enfocable
+  que se mudó a `Chessboard` seguía diciendo «clavada» y «colgada» en el
+  `aria-label` de cada casilla con esas marcas apagadas: con teclado y lector
+  de pantalla, apagarlas volvía a ser un gesto sin efecto justo en las tres
+  pantallas donde arrancan apagadas. `describeSquareOccupancy` recibe las
+  marcas, como `SquareInspection`.
+- **C-2 · la frase del teclado del editor de posición, con las mismas
+  palabras.** Decía «Con teclado: tabula hasta el tablero, muévete con las
+  flechas y pon la pieza elegida con Intro» para la misma rejilla que las otras
+  cinco pantallas anuncian como «Con el teclado: Tab lleva al tablero, las
+  flechas recorren las casillas…». Lo que cambia es lo que hace Intro, que es
+  lo único que cambia ahora en la frase.
+- **Comentarios y READMEs que dejaron de ser ciertos.** `TrainingHeader` y
+  `features/training/README.md` seguían diciendo que las **seis** pantallas de
+  la sección comparten cabecera, cuando la fila 94 sacó de ahí a la partida de
+  sparring; y los cuatro archivos que estrenó el barrido —`PanelList`,
+  `BoardFrame`, `board/hints.ts` y `ExerciseStatusBadge`— no estaban en la tabla de su
+  README, que es donde se mira antes de copiar una receta a mano.
+
 
 **Y un nombre que se revisó y se deja como está.** Que la acción se llame
 "Exportar PGN anotado" y no "Exportar PGN", teniendo Partidas un "Importar

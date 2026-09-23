@@ -62,20 +62,28 @@ export interface SparringTurn {
   black: string | null;
 }
 
-export function turnsOf(movesSan: string[]): SparringTurn[] {
+export function turnsOf(movesSan: string[], startingPly = 0): SparringTurn[] {
+  // Una partida retomada (RF-4.4) empieza a mitad, así que el índice dentro de
+  // `movesSan` no es el ply: hay que sumarle desde dónde arrancó. Sin esto, la
+  // lista numeraba desde 1 una partida que empieza en la jugada 23, dos
+  // centímetros debajo del panel que decía justo eso (fila 101 del inventario
+  // de docs/07-coherencia-ui.md, criterio C-5).
+  //
+  // Con negras la partida arranca en un ply impar, así que el primer turno
+  // tiene solo jugada de negras: se emparejan por número de jugada y no de dos
+  // en dos desde el principio.
   const turns: SparringTurn[] = [];
-  for (let index = 0; index < movesSan.length; index += 2) {
+  for (let index = 0; index < movesSan.length;) {
+    const absolutePly = startingPly + index;
+    const isWhiteMove = absolutePly % 2 === 0;
     turns.push({
       // El número de jugada sale de `lib/moves.ts`, que es de donde sale en las
-      // otras cinco pantallas que numeran (criterio C-5). El índice se toma
-      // como ply absoluto, que solo es cierto cuando la partida arranca en la
-      // posición estándar: desde RF-4.4 una partida retomada empieza a mitad y
-      // su lista se numera igualmente desde 1. Es la fila 101 del inventario;
-      // el ply de salida no viaja todavía en `SparringGameOut`.
-      number: moveNumberOf(index),
-      white: movesSan[index] ?? null,
-      black: movesSan[index + 1] ?? null,
+      // otras cinco pantallas que numeran (criterio C-5).
+      number: moveNumberOf(absolutePly),
+      white: isWhiteMove ? (movesSan[index] ?? null) : null,
+      black: isWhiteMove ? (movesSan[index + 1] ?? null) : (movesSan[index] ?? null),
     });
+    index += isWhiteMove ? 2 : 1;
   }
   return turns;
 }

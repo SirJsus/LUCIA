@@ -169,8 +169,8 @@ export function PositionEditor({
           />
           <p className={BOARD_HINT_CLASSES}>
             Elige una pieza y pulsa las casillas, o arrástrala desde la paleta. Arrastra fuera del
-            tablero para quitar una pieza. Con teclado: tabula hasta el tablero, muévete con las
-            flechas y pon la pieza elegida con Intro.
+            tablero para quitar una pieza. Con el teclado: Tab lleva al tablero, las flechas
+            recorren las casillas e Intro coloca la pieza elegida.
           </p>
         </div>
 
@@ -213,9 +213,7 @@ export function PositionEditor({
               {/* Qué hace la goma, a la vista y no en un `title`: con teclado
                   un `title` no aparece nunca (criterio C-6, la misma razón por
                   la que las ayudas de los filtros bajaron bajo su campo). */}
-              <p className="text-xs opacity-60">
-                La goma deja vacía la casilla que pulses.
-              </p>
+              <p className="text-xs opacity-60">La goma deja vacía la casilla que pulses.</p>
             </div>
           </fieldset>
 

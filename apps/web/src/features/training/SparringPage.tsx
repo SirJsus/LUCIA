@@ -20,9 +20,10 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { Badge } from "../../components/Badge";
 import { EmptyState, ErrorBox, Spinner } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
-import { buttonClasses } from "../../components/styles";
+import { PanelList } from "../../components/PanelList";
+import { buttonClasses, LIST_ROW_CLASSES, LIST_ROW_SUMMARY_CLASSES } from "../../components/styles";
 import { api } from "../../lib/api";
-import { formatDate } from "../../lib/format";
+import { formatDate, formatOpponentName } from "../../lib/format";
 import { outcomeFor, outcomeSentence } from "./sparring";
 import { SparringSetupForm, type SparringSetup } from "./SparringSetupForm";
 import { TrainingHeader } from "./TrainingHeader";
@@ -79,21 +80,18 @@ export function SparringPage() {
       )}
 
       {games.length > 0 && (
-        <Panel
+        <PanelList
           title="Tus partidas"
           aside={
             unfinishedGames.length > 0 ? (
               <Badge tone="info">{unfinishedGames.length} sin terminar</Badge>
             ) : undefined
           }
-          bodyClassName=""
         >
-          <ul>
-            {games.map((game) => (
-              <SparringGameRow key={game.id} game={game} />
-            ))}
-          </ul>
-        </Panel>
+          {games.map((game) => (
+            <SparringGameRow key={game.id} game={game} />
+          ))}
+        </PanelList>
       )}
     </div>
   );
@@ -102,28 +100,31 @@ export function SparringPage() {
 function SparringGameRow({ game }: { game: SparringGame }) {
   const outcome = outcomeFor(game);
   return (
-    <li className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-3 py-2 text-sm last:border-b-0 dark:border-slate-800">
-      <span className="font-medium">
-        {game.player_color === "white" ? "Blancas" : "Negras"} contra {game.opponent_name}
-      </span>
-      {/* Una partida retomada empieza a mitad, y sin decirlo el listado no
-          distingue una cosa de la otra (RF-4.4). */}
-      {game.origin_game_id !== null && <Badge tone="neutral">re-jugada</Badge>}
-      {/* El resultado dicho en palabras y no solo como marcador: "0-1" no
-          comunica nada a quien no lo lee (criterio C-6). */}
-      {outcome === null ? (
-        <Badge tone="info">en curso</Badge>
-      ) : (
-        <span className="opacity-70">{outcomeSentence(game)}</span>
-      )}
-      <span className="ml-auto text-xs opacity-60">{formatDate(game.created_at)}</span>
-      <Link
-        to="/training/sparring/$sparringGameId"
-        params={{ sparringGameId: String(game.id) }}
-        className={buttonClasses("secondary", "sm")}
-      >
-        {outcome === null ? "Seguir jugando" : "Ver partida"}
-      </Link>
+    <li className={LIST_ROW_CLASSES}>
+      <div className={LIST_ROW_SUMMARY_CLASSES}>
+        <span className="font-medium">
+          {game.player_color === "white" ? "Blancas" : "Negras"} contra{" "}
+          {formatOpponentName(game.engine, game.engine_elo)}
+        </span>
+        {/* Una partida retomada empieza a mitad, y sin decirlo el listado no
+            distingue una cosa de la otra (RF-4.4). */}
+        {game.origin_game_id !== null && <Badge tone="neutral">re-jugada</Badge>}
+        {/* El resultado dicho en palabras y no solo como marcador: "0-1" no
+            comunica nada a quien no lo lee (criterio C-6). */}
+        {outcome === null ? (
+          <Badge tone="info">en curso</Badge>
+        ) : (
+          <span className="opacity-70">{outcomeSentence(game)}</span>
+        )}
+        <span className="ml-auto text-xs opacity-60">{formatDate(game.created_at)}</span>
+        <Link
+          to="/training/sparring/$sparringGameId"
+          params={{ sparringGameId: String(game.id) }}
+          className={buttonClasses("secondary", "sm")}
+        >
+          {outcome === null ? "Seguir jugando" : "Ver partida"}
+        </Link>
+      </div>
     </li>
   );
 }

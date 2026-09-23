@@ -29,30 +29,32 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { Chess } from "chess.js";
 import { useMemo } from "react";
-import { Badge } from "../../components/Badge";
 import { Button } from "../../components/Button";
 import { EmptyState, ErrorBox, Spinner, SuccessBox, WarningBox } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
+import { BoardFrame } from "../../components/board/BoardFrame";
+import { KEYBOARD_MOVE_HINT, OCCUPANCY_TOGGLE_KEY_HINT } from "../../components/board/hints";
 import { Chessboard } from "../../components/board/Chessboard";
 import { legalMovesByOrigin } from "../../components/board/legalMoves";
 import { OccupancyPanel } from "../../components/board/OccupancyPanel";
-import { OCCUPANCY_TOGGLE_KEY_HINT, useOccupancy } from "../../components/board/useOccupancy";
+import { useOccupancy } from "../../components/board/useOccupancy";
 import {
   BOARD_HINT_CLASSES,
   BOARD_SIDEBAR_GRID_CLASS,
-  buttonClasses,
   MOVE_LIST_HEIGHT_CLASS,
 } from "../../components/styles";
 import { api } from "../../lib/api";
-import { formatBoardTitleFromPgnHeaders } from "../../lib/format";
+import { formatBoardTitleFromPgnHeaders, formatOpponentName } from "../../lib/format";
 import { moveNumberLabel } from "../../lib/moves";
 import { fromPgn } from "../board/tree";
 import { outcomeFor, outcomeSentence, turnsOf } from "./sparring";
+import { ExerciseStatusBadge } from "./ExerciseStatusBadge";
 import { SPARRING_GAMES_QUERY_KEY } from "./SparringPage";
-import { TrainingHeader } from "./TrainingHeader";
 
 export function SparringGamePage() {
-  const { sparringGameId } = useParams({ from: "/training/sparring/$sparringGameId" });
+  const { sparringGameId } = useParams({
+    from: "/training/sparring/$sparringGameId",
+  });
   const gameId = Number(sparringGameId);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -95,7 +97,10 @@ export function SparringGamePage() {
       });
     },
     onSuccess: (board) =>
-      navigate({ to: "/boards/$boardId", params: { boardId: String(board.id) } }),
+      navigate({
+        to: "/boards/$boardId",
+        params: { boardId: String(board.id) },
+      }),
   });
 
   const isEngineThinking = moveMutation.isPending;
@@ -109,7 +114,9 @@ export function SparringGamePage() {
    * recibe un FEN vacío del que `computeOccupancy` ya devuelve `null`. Las
    * marcas arrancan apagadas: las colgadas de RF-7.4 durante una partida en
    * marcha son el aviso de blunder que un rival calibrado no debe dar. */
-  const occupancyController = useOccupancy(game?.fen ?? "", { marksOnByDefault: false });
+  const occupancyController = useOccupancy(game?.fen ?? "", {
+    marksOnByDefault: false,
+  });
 
   function tryMove(from: string, to: string) {
     if (!game || !canMove) return;
@@ -131,26 +138,95 @@ export function SparringGamePage() {
   if (!game) return null;
 
   const playerColor = game.player_color === "black" ? "black" : "white";
+  /** El nombre del rival se compone aquí, como en el formulario que abrió la
+   * partida y en el listado: es el mismo formateador para los tres (fila 96
+   * del inventario). */
+  const opponentName = formatOpponentName(game.engine, game.engine_elo);
   const outcome = outcomeFor(game);
-  const turns = turnsOf(game.moves_san);
+  const turns = turnsOf(game.moves_san, game.starting_ply);
 
   return (
     <div className="space-y-6">
-      <TrainingHeader>
-        Partida contra {game.opponent_name}. No cuenta en tus estadísticas.
-      </TrainingHeader>
+      {/* Una partida concreta es una pantalla de detalle, y se encabeza como
+          las otras dos que lo son —el visor y el tablero de análisis—: el
+          enlace de vuelta sobre un título que nombra lo que se tiene delante.
+          Llevaba la cabecera de la sección (`TrainingHeader`), así que se
+          titulaba "Entrenamiento", volvía atrás con un botón al final del
+          lateral y la pestaña "Sparring" hacía lo mismo con otro nombre —dos
+          controles para una sola cosa— (fila 94 del inventario de
+          docs/07-coherencia-ui.md, criterio C-2). */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <Link to="/training/sparring" className="text-sm opacity-70 hover:underline">
+            ← Volver a sparring
+          </Link>
+          <h1 className="mt-1 text-2xl font-bold">Partida contra {opponentName}</h1>
+          <p className="mt-1 text-sm opacity-70">No cuenta en tus estadísticas.</p>
+        </div>
+
+        {/* La acción de la partida va en la cabecera y no al final del lateral,
+            que es donde la ponen las otras dos pantallas de detalle: desde que
+            esta se encabeza como ellas (fila 94), "Abrir como tablero" se
+            llamaba igual que allí y vivía en otro sitio (fila 109, criterio
+            C-2). Solo hay una a la vez, porque abandonar y llevarse la partida
+            al tablero son de dos momentos distintos. */}
+        <div className="flex flex-wrap items-center gap-2">
+          {outcome === null ? (
+            <Button
+              variant="danger"
+              disabled={resignMutation.isPending || isEngineThinking}
+              // Pregunta antes, como eliminar un tablero, borrar una variante o
+              // quitar la marca de partida propia: abandonar termina la partida
+              // y no hay deshacer (criterio C-2, la misma regla que cerró la
+              // fila 87).
+              onClick={() => {
+                const question =
+                  "¿Abandonar la partida? Cuenta como derrota y no se puede deshacer.";
+                if (window.confirm(question)) resignMutation.mutate();
+              }}
+            >
+              {resignMutation.isPending ? "Abandonando…" : "Abandonar"}
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              disabled={openAsBoardMutation.isPending}
+              onClick={() => openAsBoardMutation.mutate()}
+            >
+              {/* Mismo nombre que en el visor, que es la otra pantalla desde la
+                  que se lleva una partida al tablero (C-2). */}
+              {openAsBoardMutation.isPending ? "Abriendo…" : "Abrir como tablero"}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Qué hace la acción, a la vista y no en un `title`, con la misma forma y
+          en el mismo sitio que en el visor (fila 103, criterios C-6 y C-7). */}
+      <p className="text-xs opacity-60">
+        {outcome === null
+          ? "Abandonar cuenta como derrota y no se puede deshacer."
+          : "«Abrir como tablero» crea un tablero de análisis con las jugadas de esta partida. Allí se puede analizar entera; la partida de sparring se queda como está."}
+      </p>
+
+      {/* El fallo de cada acción, junto a la acción: en el lateral quedaba a
+          dos columnas del botón que lo provocó (criterio C-3). */}
+      {resignMutation.isError && <ErrorBox error={resignMutation.error} />}
+      {openAsBoardMutation.isError && <ErrorBox error={openAsBoardMutation.error} />}
 
       <div className={BOARD_SIDEBAR_GRID_CLASS}>
         <div className="space-y-3">
-          <Chessboard
-            fen={game.fen}
-            orientation={playerColor}
-            turnColor={playerColor}
-            legalMoves={legalMoves}
-            onMove={tryMove}
-            lastMoveUci={game.last_move_uci}
-            occupancyController={occupancyController}
-          />
+          <BoardFrame>
+            <Chessboard
+              fen={game.fen}
+              orientation={playerColor}
+              turnColor={playerColor}
+              legalMoves={legalMoves}
+              onMove={tryMove}
+              lastMoveUci={game.last_move_uci}
+              occupancyController={occupancyController}
+            />
+          </BoardFrame>
           {/* Lo que hay que saber del tablero, en la misma frase y en el mismo
               sitio que en el visor, el tablero de análisis y los puzzles
               (criterio C-1). */}
@@ -159,6 +235,13 @@ export function SparringGamePage() {
               ? "La partida terminó: el tablero ya no se mueve."
               : "Arrastra una pieza para jugar. Las promociones se coronan en dama."}{" "}
             {OCCUPANCY_TOGGLE_KEY_HINT}
+            {/* El teclado se anuncia donde se anuncia el arrastre y no más,
+                igual que en el puzzle y en el drill: con la partida terminada
+                el tablero no acepta jugadas por ninguna de las dos vías
+                (criterio C-1). Mientras el motor piensa sí se sigue anunciando,
+                como el arrastre: es una espera de un segundo, no un estado de
+                la pantalla. */}
+            {outcome === null ? ` ${KEYBOARD_MOVE_HINT}` : ""}
           </p>
 
           <OccupancyPanel controller={occupancyController} />
@@ -167,9 +250,16 @@ export function SparringGamePage() {
         <aside className="space-y-3">
           <Panel
             title={`Juegas con ${playerColor === "white" ? "blancas" : "negras"}`}
-            aside={<TurnBadge isPlayerTurn={game.is_player_turn} isThinking={isEngineThinking} />}
+            aside={
+              <ExerciseStatusBadge
+                isPlayerTurn={game.is_player_turn}
+                isWaitingForServer={isEngineThinking}
+                waitingLabel="el motor piensa…"
+                finishedLabel="partida terminada"
+              />
+            }
           >
-            <p className="text-sm">Rival: {game.opponent_name}</p>
+            <p className="text-sm">Rival: {opponentName}</p>
             <p className="mt-1 text-xs opacity-70">
               {game.engine === "stockfish"
                 ? "Stockfish jugando al Elo que le pediste: juega bien y se contiene."
@@ -177,14 +267,14 @@ export function SparringGamePage() {
             </p>
             {/* De dónde salió, cuando se retomó una partida propia (RF-4.4):
                 sin esto, una partida que empieza a mitad no dice por qué
-                empieza ahí. El número se saca del `origin_ply`, que es
-                relativo al inicio de la partida de origen: si esa empezaba en
-                una posición dada, el visor la numera desde su jugada real y
-                aquí sale otro número (fila 101 del inventario, criterio
-                C-5). */}
+                empieza ahí. El número sale de `starting_ply` —el ply real de
+                la posición desde la que se juega— y no de `origin_ply`, que es
+                relativo al inicio de la partida de origen y daría otro número
+                si esa no empezaba en la salida. Es el mismo con el que numera
+                la lista de jugadas de aquí al lado (criterio C-5). */}
             {game.origin_game_id !== null && game.origin_ply !== null && (
               <p className="mt-2 text-xs opacity-70">
-                Retomada desde la jugada {moveNumberLabel(game.origin_ply)} de{" "}
+                Retomada desde la jugada {moveNumberLabel(game.starting_ply)} de{" "}
                 <Link
                   to="/games/$gameId"
                   params={{ gameId: String(game.origin_game_id) }}
@@ -198,8 +288,6 @@ export function SparringGamePage() {
           </Panel>
 
           {moveMutation.isError && <ErrorBox error={moveMutation.error} />}
-          {resignMutation.isError && <ErrorBox error={resignMutation.error} />}
-          {openAsBoardMutation.isError && <ErrorBox error={openAsBoardMutation.error} />}
 
           {outcome !== null &&
             (outcome === "win" ? (
@@ -232,60 +320,8 @@ export function SparringGamePage() {
               </ol>
             )}
           </Panel>
-
-          <div className="flex flex-wrap gap-2">
-            {outcome === null ? (
-              <Button
-                variant="danger"
-                disabled={resignMutation.isPending || isEngineThinking}
-                // Pregunta antes, como eliminar un tablero, borrar una variante
-                // o quitar la marca de partida propia: abandonar termina la
-                // partida y no hay deshacer (criterio C-2, la misma regla que
-                // cerró la fila 87).
-                onClick={() => {
-                  const question =
-                    "¿Abandonar la partida? Cuenta como derrota y no se puede deshacer.";
-                  if (window.confirm(question)) resignMutation.mutate();
-                }}
-              >
-                {resignMutation.isPending ? "Abandonando…" : "Abandonar"}
-              </Button>
-            ) : (
-              <Button
-                variant="primary"
-                disabled={openAsBoardMutation.isPending}
-                // Qué se lleva el tablero, con la misma forma y casi las mismas
-                // palabras que el "Abrir como tablero" del visor (criterio
-                // C-6): sin esto la diferencia se descubre al llegar.
-                title="Crea un tablero de análisis con las jugadas de esta partida. Allí se puede analizar entera; la partida de sparring se queda como está."
-                onClick={() => openAsBoardMutation.mutate()}
-              >
-                {/* Mismo nombre que en el visor, que es la otra pantalla desde
-                    la que se lleva una partida al tablero (criterio C-2). */}
-                {openAsBoardMutation.isPending ? "Abriendo…" : "Abrir como tablero"}
-              </Button>
-            )}
-            <Link to="/training/sparring" className={buttonClasses()}>
-              Volver a Sparring
-            </Link>
-          </div>
         </aside>
       </div>
     </div>
   );
-}
-
-/** De quién es el turno, dicho arriba del panel y no solo por si el tablero
- * deja mover: "el motor está pensando" es un estado del sistema y tiene que
- * verse (criterio C-3). */
-function TurnBadge({
-  isPlayerTurn,
-  isThinking,
-}: {
-  isPlayerTurn: boolean;
-  isThinking: boolean;
-}) {
-  if (isThinking) return <Badge tone="info">el motor piensa…</Badge>;
-  if (isPlayerTurn) return <Badge tone="success">te toca</Badge>;
-  return <Badge tone="neutral">terminada</Badge>;
 }
