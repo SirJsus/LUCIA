@@ -112,12 +112,17 @@ export function BoardsPage() {
             campo de arriba. Va debajo del campo y no en otra pantalla porque
             es un ayudante de ese campo, no otra manera de crear. */}
         <div>
-          <Button
-            onClick={() => setEditorOpen(!isEditorOpen)}
-            title="Coloca las piezas sobre un tablero y usa esa posición"
-          >
+          <Button onClick={() => setEditorOpen(!isEditorOpen)}>
             {isEditorOpen ? "Cancelar" : "Editor de posición"}
           </Button>
+          {/* Qué hace el botón, a la vista y no en un `title`, que con teclado
+              no aparece nunca: es la misma línea con la que el visor explica
+              sus acciones y la que cerró la fila 103 (criterios C-6 y C-7). */}
+          {!isEditorOpen && (
+            <p className="mt-1 text-xs opacity-60">
+              Coloca las piezas sobre un tablero y escribe esa posición en el campo de arriba.
+            </p>
+          )}
         </div>
         {isEditorOpen && (
           <PositionEditor
@@ -142,7 +147,7 @@ export function BoardsPage() {
       </form>
 
       {deleteMutation.isError && <ErrorBox error={deleteMutation.error} />}
-      {boardsQuery.isPending && <Spinner />}
+      {boardsQuery.isPending && <Spinner label="Cargando tus tableros…" />}
       {boardsQuery.isError && <ErrorBox error={boardsQuery.error} onRetry={boardsQuery.refetch} />}
 
       {boardsQuery.data?.length === 0 && (

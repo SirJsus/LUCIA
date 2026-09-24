@@ -288,9 +288,9 @@ export const api = {
   getPuzzleQueue: () => request<PuzzleQueue>("/training/puzzles"),
 
   /** Contesta un puzzle. `uci` a `null` es rendirse y ver la solución;
-   * `attempt` es el número de intento, y con él el servidor distingue acertar
-   * a la primera de acertar tropezando (RF-4.1, repetición espaciada). */
-  answerPuzzle: (puzzleId: number, body: { uci: string | null; attempt: number }) =>
+   * `attempt_number` es el número de intento, y con él el servidor distingue
+   * acertar a la primera de acertar tropezando (RF-4.1, repetición espaciada). */
+  answerPuzzle: (puzzleId: number, body: { uci: string | null; attempt_number: number }) =>
     request<PuzzleAnswer>(`/training/puzzles/${puzzleId}/answer`, {
       method: "POST",
       body: JSON.stringify(body),

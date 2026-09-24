@@ -113,7 +113,7 @@ export function DashboardPage() {
         />
       </FilterBar>
 
-      {statsQuery.isPending && <Spinner />}
+      {statsQuery.isPending && <Spinner label="Cargando tus estadísticas…" />}
       {statsQuery.isError && <ErrorBox error={statsQuery.error} onRetry={statsQuery.refetch} />}
       {statsQuery.data && <StatsContent stats={statsQuery.data} username={username} />}
     </div>
@@ -192,7 +192,7 @@ function StatsContent({ stats, username }: { stats: PlayerStats; username: strin
       <section className="space-y-2">
         <h2 className="font-semibold">Por fase de la partida</h2>
         {stats.by_phase.length === 0 ? (
-          <EmptyState title="Aún no hay análisis">
+          <EmptyState title="Todavía no hay análisis">
             Analiza alguna partida desde su visor para ver en qué fase se pierde más ventaja.
           </EmptyState>
         ) : (
@@ -203,7 +203,7 @@ function StatsContent({ stats, username }: { stats: PlayerStats; username: strin
       <section className="space-y-2">
         <h2 className="font-semibold">Por qué fallas</h2>
         {stats.by_mistake_type.length === 0 ? (
-          <EmptyState title="Aún no hay errores que repartir">
+          <EmptyState title="Todavía no hay errores que repartir">
             Analiza alguna partida desde su visor para ver de qué tipo son tus errores.
           </EmptyState>
         ) : (
@@ -214,7 +214,7 @@ function StatsContent({ stats, username }: { stats: PlayerStats; username: strin
       <section className="space-y-2">
         <h2 className="font-semibold">Cómo evolucionas</h2>
         {stats.trends.by_month.length === 0 ? (
-          <EmptyState title="Aún no hay análisis que comparar">
+          <EmptyState title="Todavía no hay análisis que comparar">
             La evolución se calcula sobre las partidas analizadas: analiza algunas desde su visor
             para ver si mejoras.
           </EmptyState>

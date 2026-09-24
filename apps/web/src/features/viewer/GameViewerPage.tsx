@@ -159,7 +159,7 @@ export function GameViewerPage() {
   // la última jugada hecha. Se manda la partida y la jugada, no el FEN: la
   // posición la deriva el servidor de lo que ya tiene guardado, que es lo que
   // mantiene esto del lado de RF-4.4 y no de RF-11.1 (ver
-  // `routers/sparring.py::GamePositionIn` y ADR-0020).
+  // `routers/sparring.py::SparringOriginIn` y ADR-0020).
   const [isReplayFormOpen, setReplayFormOpen] = useState(false);
   const startReplayMutation = useMutation({
     mutationFn: (setup: SparringSetup) =>

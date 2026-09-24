@@ -12,7 +12,8 @@
 
 /* Los controles nativos que la aplicación no pinta —el calendario de un
    `input type="date"` en los filtros de Partidas, las flechas de un
-   `input type="number"` en Motores— los dibuja el navegador con su propia
+   `input type="number"` en Motores, las casillas con las que se elige la tanda
+   de análisis del listado— los dibuja el navegador con su propia
    paleta, y sin esto la dibuja siempre clara: icono oscuro sobre fondo oscuro
    y desplegable de calendario blanco en tema oscuro. `color-scheme` es la
    única forma de que sigan al tema (paridad claro/oscuro, criterio C-7). */

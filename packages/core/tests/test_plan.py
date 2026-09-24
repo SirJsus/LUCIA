@@ -21,9 +21,9 @@ from lucia_core.plan import (
     MIN_PHASE_WIN_PERCENT_LOST,
     MIN_TIME_TROUBLE_SHARE,
     Weakness,
+    _task_for_weakness,
     build_weekly_tasks,
     detect_weaknesses,
-    task_for_weakness,
     week_start,
 )
 
@@ -108,7 +108,7 @@ def test_an_unknown_trend_is_not_a_weakness() -> None:
     ],
 )
 def test_every_weakness_knows_what_trains_it(weakness: Weakness, expected: str) -> None:
-    assert task_for_weakness(weakness) == expected
+    assert _task_for_weakness(weakness) == expected
 
 
 def test_without_weaknesses_there_is_no_plan() -> None:
@@ -130,7 +130,7 @@ def test_several_weaknesses_that_ask_for_the_same_training_share_one_task() -> N
     )
     assert len(plan) == 1
     assert plan[0].kind == "puzzles"
-    assert [reason.kind for reason in plan[0].reasons] == ["phase", "mistake_type"]
+    assert [weakness.kind for weakness in plan[0].weaknesses] == ["phase", "mistake_type"]
 
 
 def test_the_target_never_asks_for_more_than_there_is() -> None:

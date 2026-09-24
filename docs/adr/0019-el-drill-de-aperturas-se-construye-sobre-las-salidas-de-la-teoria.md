@@ -48,10 +48,10 @@ Y, en paralelo, qué es "peor": un **corte por porcentaje** ("por debajo del
   **más jugada por los maestros** en esa posición. Termina ahí: no continúa
   por la línea principal.
 - **Las dos barajas comparten material.** "Salidas de la teoría"
-  (`reason="departure"`, RF-3.6) y "peores aperturas" (`reason="opening"`,
+  (`source="departure"`, RF-3.6) y "peores aperturas" (`source="opening"`,
   RF-3.2) se construyen exactamente igual y se recorren en el mismo bucle; lo
   único que cambia es **por qué entra** una línea y qué partidas y qué marcador
-  la justifican. `reason` es lo único que las distingue después.
+  la justifican. `source` es lo único que las distingue después.
 - **"Peor" es daño, no porcentaje**: `points_lost(games, score_percent) =
   games * (50 - score_percent) / 100`. Entra lo que cueste puntos —umbral
   cero— y se juega antes lo que cueste más. El único umbral duro es de hábito:
@@ -100,7 +100,7 @@ Y, en paralelo, qué es "peor": un **corte por porcentaje** ("por debajo del
   ([ADR-0017](0017-puzzle-persistido-con-su-solucion-congelada.md)): un drill
   lleva encima un historial de repasos que no está en ninguna otra parte, y
   volver a sincronizar, reanalizar o refrescar el repertorio no puede
-  llevárselo por delante. El motivo (`games`, `score_percent`) se congela con
+  llevárselo por delante. El motivo (`games_played`, `score_percent`) se congela con
   ella: cambiarlo bajo un historial ya hecho falsearía ese historial.
 - **La clave única es `(bando, línea)` y no la partida de origen**, al revés
   que en los puzzles (`(game_id, ply)`). Un drill no es de una partida: la

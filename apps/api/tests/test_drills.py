@@ -20,7 +20,8 @@ from fastapi.testclient import TestClient
 from lucia_api.db import get_session
 from lucia_api.db.models import ExplorerPositionCache, Game, OpeningDrill, Player
 from lucia_api.main import app
-from lucia_api.services.drills import generate_drills, get_drill_queue
+from lucia_api.services.drills import generate_drills
+from lucia_api.services.review import record_review, review_queue
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -160,8 +161,38 @@ async def test_the_queue_serves_what_is_due(db_session: AsyncSession) -> None:
     await _cache_theory_after_1_e4(db_session, MASTER_REPLIES)
     await generate_drills(db_session, "ana")
 
-    queue = await get_drill_queue(db_session, dt.datetime.now(dt.UTC), 20)
+    queue = await review_queue(db_session, OpeningDrill, dt.datetime.now(dt.UTC), 20)
     assert queue.due == queue.total >= 1  # recién generados, tocan ya
+
+
+async def test_the_queue_announces_the_next_review_in_utc(db_session: AsyncSession) -> None:
+    """Terminada la tanda, «el próximo repaso toca el …» sale del primer
+    vencimiento que **todavía no** ha llegado —el mínimo absoluto incluiría los
+    ya vencidos— y con la zona horaria puesta: sin ella el navegador lo lee en
+    su hora local y enseña el día anterior. Es el mismo trato que reciben los
+    puzzles, porque la cola es una sola."""
+    drill = await _one_drill(db_session)
+    now = dt.datetime.now(dt.UTC)
+    # Otra línea atrasada, que sigue tocando: el próximo repaso no es el suyo.
+    db_session.add(
+        OpeningDrill(
+            source="departure",
+            player_color="white",
+            line_uci="d2d4 d7d5 c2c4",
+            games_played=3,
+            score_percent=20.0,
+            due_at=now - dt.timedelta(days=2),
+        )
+    )
+    record_review(drill, "solved", now)
+    await db_session.commit()
+
+    queue = await review_queue(db_session, OpeningDrill, now, 20)
+
+    assert queue.due == 1  # la atrasada, que es la única que toca
+    assert queue.next_due_at is not None
+    assert queue.next_due_at.tzinfo is not None
+    assert queue.next_due_at == now + dt.timedelta(days=1)
 
 
 def _override_session(db_session: AsyncSession) -> None:
@@ -213,8 +244,8 @@ async def test_a_wrong_move_does_not_reveal_the_right_one(db_session: AsyncSessi
 
     body = response.json()
     assert body["correct"] is False
-    assert body["finished"] is False
-    assert body["line_san"] == []
+    assert body["reviewed"] is False
+    assert body["line_moves_san"] == []
     assert body["next_ply"] == 1  # se vuelve a intentar la misma
 
 
@@ -234,8 +265,8 @@ async def test_finishing_the_line_closes_the_drill_and_books_the_review(
 
     body = response.json()
     assert body["correct"] is True
-    assert body["finished"] is True
-    assert body["line_san"] == ["e4", "c5"]
+    assert body["reviewed"] is True
+    assert body["line_moves_san"] == ["e4", "c5"]
     assert body["interval_days"] == 1  # primer acierto de SM-2
     await db_session.refresh(drill)
     assert drill.repetitions == 1
@@ -255,8 +286,8 @@ async def test_giving_up_closes_the_drill_as_failed(db_session: AsyncSession) ->
 
     body = response.json()
     assert body["correct"] is False
-    assert body["finished"] is True
-    assert body["line_san"] == ["e4", "c5"]
+    assert body["reviewed"] is True
+    assert body["line_moves_san"] == ["e4", "c5"]
     await db_session.refresh(drill)
     assert drill.repetitions == 0  # fallar reinicia los aciertos seguidos
 

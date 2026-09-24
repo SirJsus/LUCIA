@@ -24,41 +24,37 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from lucia_core.drills import DrillLine
-from lucia_core.training import ReviewGrade
+from lucia_core.training import grade_of
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db import get_session
 from lucia_api.db.models import OpeningDrill
 from lucia_api.dependencies import resolved_username
-from lucia_api.services.drills import (
-    count_drills,
-    drill_line,
-    generate_drills,
-    get_drill_queue,
-    record_review,
-)
+from lucia_api.services.drills import count_drills, drill_line, generate_drills
 from lucia_api.services.repertoire import compare_repertoire
+from lucia_api.services.review import (
+    DEFAULT_QUEUE_LIMIT,
+    MAX_QUEUE_LIMIT,
+    record_review,
+    review_queue,
+    utc_now,
+)
 
 router = APIRouter(prefix="/training", tags=["training"])
-
-#: Cuántos drills se reparten de una vez, por lo mismo que los puzzles: una
-#: sesión se hace de unos pocos.
-DEFAULT_QUEUE_LIMIT = 20
-MAX_QUEUE_LIMIT = 100
 
 
 class DrillOut(BaseModel):
     """Un drill por hacer, sin la línea que lo resuelve."""
 
     id: int
-    reason: str
+    source: str
     """"departure" (aquí te sales de la teoría) u "opening" (esta apertura te
     va mal). Cambia lo que la pantalla cuenta, no cómo se juega."""
     player_color: str
     opening_eco: str | None
     opening_name: str | None
-    games: int
+    games_played: int
     score_percent: float
     """Por qué está en la baraja: cuántas partidas propias lo justifican y qué
     se sacó en ellas (RF-4.2, "las líneas donde mi rendimiento es peor")."""
@@ -71,7 +67,7 @@ class DrillOut(BaseModel):
     preceding_moves_san: list[str]
     """Lo ya jugado para llegar a esa posición, para poder leerlo. Vacío con
     blancas."""
-    length_plies: int
+    line_length_plies: int
     """Cuántas jugadas tiene la línea en total. Es la barra de progreso; no
     dice cuáles son."""
 
@@ -125,9 +121,12 @@ class DrillMoveOut(BaseModel):
     siguiente decisión, o la final."""
     next_ply: int | None
     """Dónde toca acertar la próxima, o `null` si la línea se acabó."""
-    finished: bool
+    reviewed: bool
+    """Si la línea quedó cerrada y su repaso anotado. Se llama igual que en
+    `PuzzleAnswerOut` porque es la misma bandera: mientras sea `false` se puede
+    volver a intentar y no ha pasado nada."""
 
-    line_san: list[str]
+    line_moves_san: list[str]
     """La línea entera, en notación algebraica. Vacía mientras el drill siga
     abierto: es la respuesta."""
     due_at: dt.datetime | None
@@ -163,14 +162,14 @@ async def player_drill_queue(
 ) -> DrillQueueOut:
     """Los drills que toca repetir ahora, del más atrasado al más reciente, y
     cuánta teoría le falta al repertorio del que salen."""
-    queue = await get_drill_queue(session, _now(), limit)
+    queue = await review_queue(session, OpeningDrill, utc_now(), limit)
     # La misma comparación que cuenta «Generar líneas», que es de donde sale
     # este número: pedirla entera sale igual de caro —lo que cuesta es cargar
     # las partidas y la teoría, que se hace en las dos— y así hay un solo sitio
     # donde se decide qué posición falta.
     comparison = await compare_repertoire(session, resolved_username(username))
     return DrillQueueOut(
-        drills=[_to_drill_out(drill) for drill in queue.drills],
+        drills=[_to_drill_out(drill) for drill in queue.items],
         due=queue.due,
         total=queue.total,
         next_due_at=queue.next_due_at,
@@ -242,8 +241,8 @@ def _open_move_out(
         reply_san=reply_san,
         fen=fen,
         next_ply=next_ply,
-        finished=False,
-        line_san=[],
+        reviewed=False,
+        line_moves_san=[],
         due_at=None,
         interval_days=None,
     )
@@ -259,7 +258,7 @@ async def _close_drill(
 ) -> DrillMoveOut:
     """Cierra el drill: anota el repaso —y lo guarda— y enseña la línea
     entera, que es lo único que sale de aquí una vez cerrado."""
-    record_review(drill, _grade_of(correct, wrong_moves), _now())
+    record_review(drill, grade_of(correct, wrong_moves), utc_now())
     await session.commit()
     return DrillMoveOut(
         correct=correct,
@@ -267,21 +266,11 @@ async def _close_drill(
         reply_san=None,
         fen=line.board_at(len(line.moves_uci)).fen(),
         next_ply=None,
-        finished=True,
-        line_san=line.moves_san(),
+        reviewed=True,
+        line_moves_san=line.moves_san(),
         due_at=drill.due_at,
         interval_days=drill.interval_days,
     )
-
-
-def _grade_of(correct: bool, wrong_moves: int) -> ReviewGrade:
-    """Cómo fue la pasada, en el vocabulario de SM-2: rendirse es fallar,
-    recorrer la línea limpia es acertar, y tropezar por el camino queda en
-    medio. Es el mismo criterio que con los puzzles, contando fallos de la
-    línea entera en vez de intentos de una jugada."""
-    if not correct:
-        return "failed"
-    return "solved" if wrong_moves == 0 else "hesitant"
 
 
 def _to_drill_out(drill: OpeningDrill) -> DrillOut:
@@ -290,20 +279,17 @@ def _to_drill_out(drill: OpeningDrill) -> DrillOut:
     board = line.board_at(first_player_ply)
     return DrillOut(
         id=drill.id,
-        reason=drill.reason,
+        source=drill.source,
         player_color=drill.player_color,
         opening_eco=drill.opening_eco,
         opening_name=drill.opening_name,
-        games=drill.games,
+        games_played=drill.games_played,
         score_percent=drill.score_percent,
         fen=board.fen(),
         first_player_ply=first_player_ply,
+        # Como mucho una jugada: la del rival cuando se entrena con negras.
         preceding_moves_san=line.moves_san()[:first_player_ply],
-        length_plies=len(line.moves_uci),
+        line_length_plies=len(line.moves_uci),
         due_at=drill.due_at,
         repetitions=drill.repetitions,
     )
-
-
-def _now() -> dt.datetime:
-    return dt.datetime.now(dt.UTC)

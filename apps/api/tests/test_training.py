@@ -15,7 +15,8 @@ from fastapi.testclient import TestClient
 from lucia_api.db import get_session
 from lucia_api.db.models import Analysis, AnalyzedMove, Game, Player, Puzzle
 from lucia_api.main import app
-from lucia_api.services.training import answer_puzzle, generate_puzzles, get_puzzle_queue
+from lucia_api.services.review import review_queue
+from lucia_api.services.training import answer_puzzle, generate_puzzles
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -171,7 +172,7 @@ async def test_generating_twice_neither_duplicates_nor_resets_the_review(
     await _add_move(db_session, game)
     await generate_puzzles(db_session, "ana")
     puzzle = (await db_session.execute(select(Puzzle))).scalar_one()
-    await answer_puzzle(db_session, puzzle, "e2e4", attempt=1, now=_NOW)
+    await answer_puzzle(db_session, puzzle, "e2e4", attempt_number=1, now=_NOW)
 
     assert await generate_puzzles(db_session, "ana") == 0
 
@@ -195,7 +196,7 @@ async def test_answering_right_at_the_first_try_schedules_it_for_tomorrow(
 ) -> None:
     puzzle = await _one_puzzle(db_session)
 
-    answer = await answer_puzzle(db_session, puzzle, "e2e4", attempt=1, now=_NOW)
+    answer = await answer_puzzle(db_session, puzzle, "e2e4", attempt_number=1, now=_NOW)
 
     assert answer.correct and answer.reviewed
     assert answer.solutions_san == ["e4", "d4"]  # en algebraica, derivadas del FEN
@@ -207,7 +208,7 @@ async def test_answering_right_at_the_first_try_schedules_it_for_tomorrow(
 async def test_an_equivalent_answer_counts_as_right(db_session: AsyncSession) -> None:
     puzzle = await _one_puzzle(db_session)
 
-    answer = await answer_puzzle(db_session, puzzle, "d2d4", attempt=1, now=_NOW)
+    answer = await answer_puzzle(db_session, puzzle, "d2d4", attempt_number=1, now=_NOW)
 
     assert answer.correct
 
@@ -217,7 +218,7 @@ async def test_a_wrong_answer_leaves_the_puzzle_open_and_hides_the_solution(
 ) -> None:
     puzzle = await _one_puzzle(db_session)
 
-    answer = await answer_puzzle(db_session, puzzle, "h2h4", attempt=1, now=_NOW)
+    answer = await answer_puzzle(db_session, puzzle, "h2h4", attempt_number=1, now=_NOW)
 
     assert not answer.correct and not answer.reviewed
     assert answer.solutions_san == [] and answer.played_san is None
@@ -227,7 +228,7 @@ async def test_a_wrong_answer_leaves_the_puzzle_open_and_hides_the_solution(
 async def test_giving_up_closes_it_as_failed(db_session: AsyncSession) -> None:
     puzzle = await _one_puzzle(db_session)
 
-    answer = await answer_puzzle(db_session, puzzle, None, attempt=2, now=_NOW)
+    answer = await answer_puzzle(db_session, puzzle, None, attempt_number=2, now=_NOW)
 
     assert not answer.correct and answer.reviewed
     assert answer.solutions_san == ["e4", "d4"]
@@ -237,11 +238,11 @@ async def test_giving_up_closes_it_as_failed(db_session: AsyncSession) -> None:
 
 async def test_the_queue_only_brings_what_is_due(db_session: AsyncSession) -> None:
     puzzle = await _one_puzzle(db_session)
-    await answer_puzzle(db_session, puzzle, "e2e4", attempt=1, now=_NOW)
+    await answer_puzzle(db_session, puzzle, "e2e4", attempt_number=1, now=_NOW)
 
-    queue = await get_puzzle_queue(db_session, _NOW, limit=10)
+    queue = await review_queue(db_session, Puzzle, _NOW, limit=10)
 
-    assert queue.puzzles == [] and queue.due == 0 and queue.total == 1
+    assert queue.items == [] and queue.due == 0 and queue.total == 1
     assert queue.next_due_at == _NOW + dt.timedelta(days=1)
 
 
@@ -268,7 +269,7 @@ async def test_the_queue_endpoint_never_reveals_the_solution(
     assert body["due"] == 1
     served = body["puzzles"][0]
     assert served["opponent"] == "beto"
-    assert served["color"] == "white"
+    assert served["player_color"] == "white"
     assert "solutions_json" not in served and "played_uci" not in served
 
 
@@ -278,7 +279,7 @@ async def test_the_answer_endpoint_reports_the_next_review(db_session: AsyncSess
     try:
         with TestClient(app) as http:
             response = http.post(
-                f"/training/puzzles/{puzzle.id}/answer", json={"uci": "e2e4", "attempt": 1}
+                f"/training/puzzles/{puzzle.id}/answer", json={"uci": "e2e4", "attempt_number": 1}
             )
     finally:
         app.dependency_overrides.clear()
@@ -302,7 +303,7 @@ async def test_an_open_puzzle_never_travels_with_what_would_solve_it(
     try:
         with TestClient(app) as http:
             response = http.post(
-                f"/training/puzzles/{puzzle.id}/answer", json={"uci": "h2h4", "attempt": 1}
+                f"/training/puzzles/{puzzle.id}/answer", json={"uci": "h2h4", "attempt_number": 1}
             )
     finally:
         app.dependency_overrides.clear()

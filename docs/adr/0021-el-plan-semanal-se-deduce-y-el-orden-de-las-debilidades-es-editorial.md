@@ -53,7 +53,7 @@ cada tarea nunca pide más material del que hay.**
   `sparring_games.created_at` (con `origin_game_id` para separar lo re-jugado
   del sparring a secas). Nadie marca nada a mano: entrenar en las otras
   pestañas es lo que mueve la barra.
-- **Cada tarea viaja con sus `reasons`**, las debilidades que la piden, y la
+- **Cada tarea viaja con sus `weaknesses`**, las debilidades que la piden, y la
   tabla que las une es `_TASK_BY_WEAKNESS` en `lucia_core.plan`. Una
   debilidad sin entrenamiento posible no genera deber, y un deber sin
   debilidad detrás no existe.
@@ -91,7 +91,7 @@ cada tarea nunca pide más material del que hay.**
   debilidades detectadas".** Un objetivo semanal sin la debilidad a la vista es
   una cuota inventada: quien entrena no puede discutirla, ni entender por qué
   cambia de una semana a otra, ni saber qué dejará de aparecer cuando el
-  problema se arregle. Por eso `reasons` viaja en la respuesta y se pinta en la
+  problema se arregle. Por eso `weaknesses` viaja en la respuesta y se pinta en la
   tarjeta, no en un tooltip.
 - **Ordenar por `magnitude` sería inventar una escala común que no existe.**
   "Pierdo 8 puntos de probabilidad de victoria por jugada en el medio juego" y

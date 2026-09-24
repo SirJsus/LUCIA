@@ -62,9 +62,11 @@ class PlanTaskOut(BaseModel):
     done_this_week: int
     """Cuántos van hechos desde el lunes. Nadie lo marca a mano: sale de las
     fechas que la base ya guarda."""
-    reasons: list[WeaknessOut]
+    weaknesses: list[WeaknessOut]
     """Las debilidades que piden esta tarea, en el mismo orden de la lista de
-    arriba. Más de una cuando varias apuntan al mismo entrenamiento."""
+    arriba. Más de una cuando varias apuntan al mismo entrenamiento. Se llaman
+    igual que las de `WeeklyPlanOut` porque son las mismas, filtradas: estas son
+    las que apuntan a esta tarea."""
 
 
 class WeeklyPlanOut(BaseModel):

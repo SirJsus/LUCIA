@@ -124,7 +124,7 @@ def missing_requirement(engine_name: str) -> str | None:
 
 
 @dataclass(frozen=True)
-class GamePosition:
+class SparringOrigin:
     """Una posición de una partida propia, para retomarla desde ahí (RF-4.4)."""
 
     game_id: int
@@ -135,7 +135,7 @@ class GamePosition:
     fen: str
 
 
-async def get_game_position(session: AsyncSession, game_id: int, ply: int) -> GamePosition:
+async def get_sparring_origin(session: AsyncSession, game_id: int, ply: int) -> SparringOrigin:
     """La posición de una partida propia en esa jugada (RF-4.4).
 
     La posición se deriva del PGN que ya está guardado en vez de pedírsela a
@@ -148,7 +148,7 @@ async def get_game_position(session: AsyncSession, game_id: int, ply: int) -> Ga
     game = await session.get(Game, game_id)
     if game is None:
         raise ValueError(f"no existe la partida {game_id}")
-    return GamePosition(game_id=game_id, ply=ply, fen=board_at_ply(game.pgn, ply).fen())
+    return SparringOrigin(game_id=game_id, ply=ply, fen=board_at_ply(game.pgn, ply).fen())
 
 
 async def create_game(
@@ -157,7 +157,7 @@ async def create_game(
     player_color: str,
     engine_name: str,
     engine_elo: int | None,
-    origin: GamePosition | None = None,
+    origin: SparringOrigin | None = None,
 ) -> SparringGame:
     """Abre una partida y, si le toca mover al motor, le pide ya su jugada.
 

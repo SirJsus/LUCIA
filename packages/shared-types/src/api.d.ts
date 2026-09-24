@@ -1018,10 +1018,10 @@ export interface components {
             fen: string;
             /** Next Ply */
             next_ply: number | null;
-            /** Finished */
-            finished: boolean;
-            /** Line San */
-            line_san: string[];
+            /** Reviewed */
+            reviewed: boolean;
+            /** Line Moves San */
+            line_moves_san: string[];
             /** Due At */
             due_at: string | null;
             /** Interval Days */
@@ -1034,16 +1034,16 @@ export interface components {
         DrillOut: {
             /** Id */
             id: number;
-            /** Reason */
-            reason: string;
+            /** Source */
+            source: string;
             /** Player Color */
             player_color: string;
             /** Opening Eco */
             opening_eco: string | null;
             /** Opening Name */
             opening_name: string | null;
-            /** Games */
-            games: number;
+            /** Games Played */
+            games_played: number;
             /** Score Percent */
             score_percent: number;
             /** Fen */
@@ -1052,8 +1052,8 @@ export interface components {
             first_player_ply: number;
             /** Preceding Moves San */
             preceding_moves_san: string[];
-            /** Length Plies */
-            length_plies: number;
+            /** Line Length Plies */
+            line_length_plies: number;
             /**
              * Due At
              * Format: date-time
@@ -1173,20 +1173,20 @@ export interface components {
             starts_from_custom_position: boolean;
             /** Platform */
             platform: string;
+            /**
+             * Analyzed By Engines
+             * @default []
+             */
+            analyzed_by_engines: string[];
+            /**
+             * Has Analysis In Progress
+             * @default false
+             */
+            has_analysis_in_progress: boolean;
             /** Pgn */
             pgn: string;
             /** Clocks Json */
             clocks_json: unknown[] | null;
-        };
-        /**
-         * GamePositionIn
-         * @description Desde qué posición de qué partida propia se retoma (RF-4.4).
-         */
-        GamePositionIn: {
-            /** Game Id */
-            game_id: number;
-            /** Ply */
-            ply: number;
         };
         /** GameSummary */
         GameSummary: {
@@ -1221,6 +1221,16 @@ export interface components {
             starts_from_custom_position: boolean;
             /** Platform */
             platform: string;
+            /**
+             * Analyzed By Engines
+             * @default []
+             */
+            analyzed_by_engines: string[];
+            /**
+             * Has Analysis In Progress
+             * @default false
+             */
+            has_analysis_in_progress: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1415,8 +1425,8 @@ export interface components {
             weekly_target: number;
             /** Done This Week */
             done_this_week: number;
-            /** Reasons */
-            reasons: components["schemas"]["WeaknessOut"][];
+            /** Weaknesses */
+            weaknesses: components["schemas"]["WeaknessOut"][];
         };
         /** PlayerStatsOut */
         PlayerStatsOut: {
@@ -1464,10 +1474,10 @@ export interface components {
             /** Uci */
             uci?: string | null;
             /**
-             * Attempt
+             * Attempt Number
              * @default 1
              */
-            attempt: number;
+            attempt_number: number;
         };
         /** PuzzleAnswerOut */
         PuzzleAnswerOut: {
@@ -1506,8 +1516,8 @@ export interface components {
             id: number;
             /** Fen */
             fen: string;
-            /** Color */
-            color: string;
+            /** Player Color */
+            player_color: string;
             /** Game Id */
             game_id: number;
             /** Ply */
@@ -1611,9 +1621,12 @@ export interface components {
          *     El total no es `len(positions)`: la lista viene recortada a `limit`, así que
          *     sin él la pantalla enseñaba veinte de trescientos sin decir que había más
          *     (fila 102 del inventario de docs/07-coherencia-ui.md). Va en el cuerpo y no
-         *     en una cabecera `X-Total-Count` como el listado de Partidas porque las tres
-         *     pestañas hermanas de esta —puzzles, aperturas y sparring— lo traen así, y es
-         *     con ellas con las que se compara al cambiar de pestaña.
+         *     en una cabecera `X-Total-Count` como el listado de Partidas porque así lo
+         *     traen las **dos** pestañas hermanas que también reparten una cola —puzzles
+         *     y aperturas, `PuzzleQueueOut` y `DrillQueueOut`—, y es con ellas con las que
+         *     se compara al cambiar de pestaña. El sparring no cuenta aquí: su listado es
+         *     de partidas abiertas, no una cola, y `GET /sparring/games` devuelve la lista
+         *     a secas.
          */
         ReplayQueueOut: {
             /** Positions */
@@ -1632,7 +1645,7 @@ export interface components {
             engine: string;
             /** Engine Elo */
             engine_elo?: number | null;
-            origin?: components["schemas"]["GamePositionIn"] | null;
+            origin?: components["schemas"]["SparringOriginIn"] | null;
         };
         /**
          * SparringGameOut
@@ -1682,6 +1695,16 @@ export interface components {
         SparringMoveIn: {
             /** Uci */
             uci: string;
+        };
+        /**
+         * SparringOriginIn
+         * @description Desde qué posición de qué partida propia se retoma (RF-4.4).
+         */
+        SparringOriginIn: {
+            /** Game Id */
+            game_id: number;
+            /** Ply */
+            ply: number;
         };
         /** SyncRequest */
         SyncRequest: {

@@ -87,7 +87,7 @@ describe("taskProgressPercent", () => {
         kind: "puzzles",
         done_this_week,
         weekly_target,
-        reasons: [],
+        weaknesses: [],
       }) as PlanTask;
     expect(taskProgressPercent(task(0, 10))).toBe(0);
     expect(taskProgressPercent(task(5, 10))).toBe(50);
@@ -100,7 +100,7 @@ describe("taskProgressPercent", () => {
         kind: "puzzles",
         done_this_week: 30,
         weekly_target: 10,
-        reasons: [],
+        weaknesses: [],
       } as PlanTask),
     ).toBe(100);
   });
@@ -111,7 +111,7 @@ describe("taskProgressPercent", () => {
         kind: "puzzles",
         done_this_week: 0,
         weekly_target: 0,
-        reasons: [],
+        weaknesses: [],
       } as PlanTask),
     ).toBe(100);
   });

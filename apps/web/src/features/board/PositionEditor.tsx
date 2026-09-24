@@ -23,6 +23,7 @@ import type { Color, Role } from "chessground/types";
 import { createElement, useCallback, useRef, useState } from "react";
 import { Button } from "../../components/Button";
 import { Chessboard, type ChessboardApi } from "../../components/board/Chessboard";
+import { KEYBOARD_PLACE_PIECE_HINT } from "../../components/board/hints";
 import {
   chessgroundColor,
   chessgroundRole,
@@ -167,10 +168,13 @@ export function PositionEditor({
               />
             }
           />
+          {/* La parte del teclado es la frase compartida de
+              `components/board/hints.ts`, no una copia: las cinco pantallas
+              con tablero anuncian las mismas teclas con las mismas palabras
+              (criterios C-1 y C-2). */}
           <p className={BOARD_HINT_CLASSES}>
             Elige una pieza y pulsa las casillas, o arrástrala desde la paleta. Arrastra fuera del
-            tablero para quitar una pieza. Con el teclado: Tab lleva al tablero, las flechas
-            recorren las casillas e Intro coloca la pieza elegida.
+            tablero para quitar una pieza. {KEYBOARD_PLACE_PIECE_HINT}
           </p>
         </div>
 

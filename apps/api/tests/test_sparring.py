@@ -202,7 +202,7 @@ async def test_the_endpoint_serves_the_whole_game(
                 json={"player_color": "white", "engine": "stockfish", "engine_elo": 1500},
                 params={"username": "ana"},
             )
-            played = http.post(
+            play_result = http.post(
                 f"/sparring/games/{created.json()['id']}/moves",
                 json={"uci": "e2e4"},
                 params={"username": "ana"},
@@ -216,7 +216,7 @@ async def test_the_endpoint_serves_the_whole_game(
     # de la retomada a mitad está en `test_replays.py`, que es donde vive la
     # partida de origen.
     assert created.json()["starting_ply"] == 0
-    body = played.json()
+    body = play_result.json()
     assert body["moves_san"] == ["e4", "e5"]
     assert body["last_move_uci"] == "e7e5"
     assert body["is_player_turn"] is True

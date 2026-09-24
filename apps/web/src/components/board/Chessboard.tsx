@@ -161,6 +161,15 @@ export function Chessboard({
     if (!editable && !legalMoves) apiRef.current?.set({ movable: { dests: new Map() } });
   }, [fen, orientation, engineArrows, lastMoveUci, legalMoves, turnColor, editable]);
 
+  // Si el tablero acepta jugadas **ahora mismo** (hay destinos que ofrecer) y
+  // si es de los que las aceptan **en algún momento**. No son lo mismo: las
+  // tres pantallas de entrenamiento se quedan sin destinos mientras el
+  // servidor contesta, y eso no convierte el tablero en uno de lectura. El
+  // editor de posición queda fuera del segundo a propósito: mueve con
+  // `movable.free`, no con destinos, y trae su propia rejilla por `overlay`.
+  const acceptsMovesNow = editable || legalMoves !== undefined;
+  const isMovableBoard = !editable && (legalMoves !== undefined || onMove !== undefined);
+
   function squareUnderPointer(event: { clientX: number; clientY: number }): string | null {
     const bounds = boardRef.current?.getBoundingClientRect();
     return bounds ? squareFromPoint(bounds, event.clientX, event.clientY, orientation) : null;
@@ -175,9 +184,14 @@ export function Chessboard({
   /** Pulsar una casilla, venga del ratón o del teclado: es una sola cosa y hace
    * lo mismo por las dos vías. Para chessground es elegir —la primera pulsación
    * toma el origen y la segunda mueve, que es su propio `selectSquare`— y para
-   * quien escucha, la casilla elegida (la capa de ocupación la inspecciona). */
+   * quien escucha, la casilla elegida (la capa de ocupación la inspecciona).
+   *
+   * Sin jugadas legales **ahora mismo** —el puzzle esperando al servidor, el
+   * ejercicio ya cerrado, el visor— solo se avisa de la casilla: elegirla en
+   * chessground marcaría la pieza como si fuera a moverse y no hay destino
+   * ninguno al que llevarla, que es prometer de más (criterio C-1). */
   function activateSquare(square: string) {
-    apiRef.current?.selectSquare(square as never);
+    if (acceptsMovesNow) apiRef.current?.selectSquare(square as never);
     onSelectSquare?.(square);
   }
 
@@ -207,8 +221,16 @@ export function Chessboard({
           ocupación traía la suya aparte (fila 91 del inventario de
           docs/07-coherencia-ui.md, criterio C-1). El editor de posición
           (RF-6.1) trae la suya por `overlay` y no es movible ni lleva capa, así
-          que no salen dos. */}
-      {(legalMoves !== undefined || occupancyController?.isActive) && (
+          que no salen dos.
+
+          Se monta por lo que el tablero **es** (`isMovableBoard`) y no por si
+          tiene destinos en este instante: las pantallas de entrenamiento se
+          quedan sin ellos mientras el servidor contesta, y desmontar la
+          rejilla ahí tiraba el foco al `<body>` y devolvía la casilla enfocada
+          a e4 en cada jugada, con el pie del tablero prometiendo el teclado.
+          Sigue enfocable e inspeccionable durante la espera; lo que no hace es
+          fingir que mueve (ver `activateSquare`). */}
+      {(isMovableBoard || occupancyController?.isActive) && (
         <SquareKeyboardGrid
           orientation={orientation}
           describeSquare={(square) => describeBoardSquare(fen, square, occupancyController)}

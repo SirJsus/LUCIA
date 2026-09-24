@@ -55,7 +55,7 @@ guarda, y la posición siempre la deriva el servidor de un PGN que ya tiene.**
   generar.
 - **La posición la deriva el servidor** (`lucia_core.sparring.board_at_ply`
   sobre `games.pgn`). Por HTTP se manda **de qué partida y de qué jugada**
-  (`GamePositionIn: {game_id, ply}`), nunca un FEN.
+  (`SparringOriginIn: {game_id, ply}`), nunca un FEN.
 - **Se puede retomar cualquier posición de la partida y con cualquier bando**,
   desde el visor ("Jugar desde aquí"). La lista curada de la pestaña
   "Re-jugar" se ciñe a los errores graves, los mismos de
@@ -137,6 +137,10 @@ guarda, y la posición siempre la deriva el servidor de un PGN que ya tiene.**
   empieza en 1 aunque la partida empiece en la jugada 24 — apuntado como fila
   abierta en [07-coherencia-ui.md](../07-coherencia-ui.md) porque arreglarlo
   pide que el ply de salida viaje en `SparringGameOut`.
+  **Actualización 2026-09-22**: cerrado con `starting_ply` —derivado de
+  `starting_fen` y no de `origin_ply`—, que numera tanto la lista de jugadas
+  como la frase «Retomada desde la jugada 23»; ver la fila **101**, ya cerrada,
+  del inventario de [07-coherencia-ui.md](../07-coherencia-ui.md).
 - **Hay dos puertas a lo mismo, y es a propósito.** La pestaña "Re-jugar"
   responde "¿por dónde empiezo?" con la lista curada; el visor responde
   "quiero rehacer *esta*" desde cualquier posición. Las dos usan el mismo
@@ -165,7 +169,7 @@ guarda, y la posición siempre la deriva el servidor de un PGN que ya tiene.**
   a "¿esto se guarda?", y el criterio que las separa.
 - `packages/core/lucia_core/sparring/__init__.py` (`board_at_ply`),
   `apps/api/lucia_api/services/replays.py` y `routers/replays.py` (la lista),
-  `apps/api/lucia_api/services/sparring.py` (`get_game_position`, `create_game`
+  `apps/api/lucia_api/services/sparring.py` (`get_sparring_origin`, `create_game`
   con `origin`), `apps/web/src/features/training/ReplaysPage.tsx` y
   `SparringSetupForm.tsx`, y la tabla `sparring_games` en
   [03-arquitectura.md](../03-arquitectura.md).

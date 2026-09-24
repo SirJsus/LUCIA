@@ -15,6 +15,14 @@ export function formatDate(isoDate: string): string {
  * que un hueco se reconozca como tal en cualquier pantalla (criterio C-5). */
 const MISSING_VALUE = "—";
 
+/** Una partida que nadie ha mandado analizar todavía, en la columna «Análisis»
+ * de la lista (RF-2.5). **No es `MISSING_VALUE`**: ahí no falta ningún dato
+ * —se sabe que no hay ningún análisis—, y un "—" en esa columna se leería como
+ * el hueco del rating o del control de tiempo, que son datos que no llegaron.
+ * Es además el nombre que ese estado ya tiene en el visor y en el tablero de
+ * análisis, en su `EmptyState` (criterios C-5 y C-6). */
+const NOT_ANALYZED = "Sin analizar";
+
 /** Ritmo con el que se guarda una partida cuyo PGN no dice a qué se jugó
  * (RF-1.5); la API lo escribe así en `games.time_class`. */
 const UNKNOWN_TIME_CLASS = "unknown";
@@ -289,4 +297,22 @@ export function formatTimeControl(timeControl: string): string {
   const minutes = baseSeconds / 60;
   const shown = Number.isInteger(minutes) ? String(minutes) : minutes.toFixed(1);
   return increment ? `${shown}+${increment}` : `${shown}+0`;
+}
+
+/** Con qué motores está analizada una partida, para la columna «Análisis» de
+ * la lista (RF-2.5).
+ *
+ * Los dos datos vienen separados de `GameSummary` —los motores que terminaron
+ * y si queda alguno en marcha— porque significan cosas distintas, y aquí se
+ * juntan en la frase que se lee: sin decir que hay uno corriendo, una partida
+ * recién mandada a analizar se leería igual que una que nadie tocó, y quien
+ * elige la tanda la volvería a mandar.
+ */
+export function formatAnalyzedByEngines(
+  engines: string[],
+  hasAnalysisInProgress: boolean,
+): string {
+  const engineNames = engines.map(formatEngineName).join(" · ");
+  if (!hasAnalysisInProgress) return engineNames || NOT_ANALYZED;
+  return engineNames ? `${engineNames} · analizando…` : "Analizando…";
 }

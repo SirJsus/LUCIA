@@ -41,7 +41,7 @@ from lucia_api.services.sparring import (
     STOCKFISH_ELO_RANGE,
     create_game,
     current_board,
-    get_game_position,
+    get_sparring_origin,
     list_games,
     missing_requirement,
     play_player_move,
@@ -112,7 +112,7 @@ class SparringGameOut(BaseModel):
     updated_at: dt.datetime
 
 
-class GamePositionIn(BaseModel):
+class SparringOriginIn(BaseModel):
     """Desde qué posición de qué partida propia se retoma (RF-4.4)."""
 
     game_id: int
@@ -128,7 +128,7 @@ class SparringGameCreate(BaseModel):
     engine_elo: int | None = None
     """Obligatorio con Stockfish, ignorado con Lc0. El rango se comprueba en
     el endpoint, contra `STOCKFISH_ELO_RANGE`."""
-    origin: GamePositionIn | None = None
+    origin: SparringOriginIn | None = None
     """De dónde se retoma (RF-4.4). Sin esto la partida empieza en la posición
     inicial, que es el sparring de siempre (RF-4.3).
 
@@ -160,7 +160,7 @@ async def start_sparring_game(
     engine_elo = _validated_elo(body) if body.engine == "stockfish" else None
     try:
         origin = (
-            await get_game_position(session, body.origin.game_id, body.origin.ply)
+            await get_sparring_origin(session, body.origin.game_id, body.origin.ply)
             if body.origin
             else None
         )

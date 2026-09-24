@@ -60,9 +60,12 @@ class ReplayQueueOut(BaseModel):
     El total no es `len(positions)`: la lista viene recortada a `limit`, así que
     sin él la pantalla enseñaba veinte de trescientos sin decir que había más
     (fila 102 del inventario de docs/07-coherencia-ui.md). Va en el cuerpo y no
-    en una cabecera `X-Total-Count` como el listado de Partidas porque las tres
-    pestañas hermanas de esta —puzzles, aperturas y sparring— lo traen así, y es
-    con ellas con las que se compara al cambiar de pestaña.
+    en una cabecera `X-Total-Count` como el listado de Partidas porque así lo
+    traen las **dos** pestañas hermanas que también reparten una cola —puzzles
+    y aperturas, `PuzzleQueueOut` y `DrillQueueOut`—, y es con ellas con las que
+    se compara al cambiar de pestaña. El sparring no cuenta aquí: su listado es
+    de partidas abiertas, no una cola, y `GET /sparring/games` devuelve la lista
+    a secas.
     """
 
     positions: list[ReplayPositionOut]

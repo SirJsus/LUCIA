@@ -23,7 +23,7 @@ from lucia_api.db import get_session
 from lucia_api.db.models import Analysis, AnalyzedMove, Game, Player
 from lucia_api.main import app
 from lucia_api.services.replays import replay_positions
-from lucia_api.services.sparring import create_game, get_game_position
+from lucia_api.services.sparring import create_game, get_sparring_origin
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from .test_sparring import FakeEngineBridge, fake_engine  # noqa: F401  (fixture)
@@ -103,7 +103,7 @@ async def test_the_position_comes_from_the_stored_pgn(db_session: AsyncSession) 
     de lo que ya tiene guardado."""
     game = await _add_analyzed_game(db_session)
 
-    position = await get_game_position(db_session, game.id, 4)
+    position = await get_sparring_origin(db_session, game.id, 4)
 
     # Ply 4 = cuatro jugadas hechas = la posición **anterior** a 3.Cg5.
     assert position.fen.startswith("r1bqkbnr/pppp1ppp/2n5/4p3/4P3/5N2/PPPP1PPP/RNBQKB1R w")
@@ -112,19 +112,19 @@ async def test_the_position_comes_from_the_stored_pgn(db_session: AsyncSession) 
 
 async def test_the_start_of_the_game_is_ply_zero(db_session: AsyncSession) -> None:
     game = await _add_analyzed_game(db_session)
-    assert (await get_game_position(db_session, game.id, 0)).fen == chess.STARTING_FEN
+    assert (await get_sparring_origin(db_session, game.id, 0)).fen == chess.STARTING_FEN
 
 
 async def test_a_ply_the_game_never_reached_is_refused(db_session: AsyncSession) -> None:
     """Retomar desde una posición que nunca existió no es retomar nada."""
     game = await _add_analyzed_game(db_session)
     with pytest.raises(ValueError):
-        await get_game_position(db_session, game.id, 40)
+        await get_sparring_origin(db_session, game.id, 40)
 
 
 async def test_a_game_that_is_not_there_is_refused(db_session: AsyncSession) -> None:
     with pytest.raises(ValueError):
-        await get_game_position(db_session, 9999, 0)
+        await get_sparring_origin(db_session, 9999, 0)
 
 
 async def test_the_engine_opens_when_the_retaken_position_is_its_turn(
@@ -134,7 +134,7 @@ async def test_the_engine_opens_when_the_retaken_position_is_its_turn(
     """Retomando a mitad, quien abre no es "las blancas" sino quien tenga el
     turno: aquí toca a blancas y quien entrena eligió negras."""
     game = await _add_analyzed_game(db_session)
-    origin = await get_game_position(db_session, game.id, 4)
+    origin = await get_sparring_origin(db_session, game.id, 4)
 
     sparring = await create_game(
         db_session,
@@ -154,7 +154,7 @@ async def test_the_engine_waits_when_the_retaken_position_is_the_players_turn(
     fake_engine: type[FakeEngineBridge],  # noqa: F811
 ) -> None:
     game = await _add_analyzed_game(db_session)
-    origin = await get_game_position(db_session, game.id, 4)
+    origin = await get_sparring_origin(db_session, game.id, 4)
 
     sparring = await create_game(
         db_session,
@@ -259,7 +259,7 @@ async def test_a_resumed_game_says_from_which_ply_it_starts(
     docs/07-coherencia-ui.md).
     """
     game = await _add_analyzed_game(db_session)
-    origin = await get_game_position(db_session, game.id, 4)
+    origin = await get_sparring_origin(db_session, game.id, 4)
     sparring = await create_game(
         db_session,
         player_color="white",

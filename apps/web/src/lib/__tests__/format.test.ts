@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatAccuracy,
+  formatAnalyzedByEngines,
   formatDate,
   formatDuration,
   formatEngineName,
@@ -181,5 +182,25 @@ describe("formatBoardTitleFromPgnHeaders", () => {
     // Sin ellos, el título que ya tiene el tablero vale más que uno inventado.
     expect(formatBoardTitleFromPgnHeaders({ White: "Ana" })).toBeNull();
     expect(formatBoardTitleFromPgnHeaders({})).toBeNull();
+  });
+});
+
+describe("formatAnalyzedByEngines", () => {
+  it("nombra los motores que terminaron, en el orden en que llegan", () => {
+    expect(formatAnalyzedByEngines(["lc0", "stockfish"], false)).toBe("Lc0 · Stockfish");
+  });
+
+  it("nombra el estado cuando la partida no se ha analizado, en vez de dejar un hueco", () => {
+    // "—" es el hueco de un dato que falta (el rating, el control de tiempo);
+    // aquí no falta nada, y el estado ya se llama así en el visor.
+    expect(formatAnalyzedByEngines([], false)).toBe("Sin analizar");
+  });
+
+  it("dice que hay uno en marcha, que si no se leería como sin analizar", () => {
+    expect(formatAnalyzedByEngines([], true)).toBe("Analizando…");
+  });
+
+  it("distingue lo ya hecho de lo que sigue corriendo", () => {
+    expect(formatAnalyzedByEngines(["stockfish"], true)).toBe("Stockfish · analizando…");
   });
 });

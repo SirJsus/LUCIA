@@ -176,6 +176,58 @@ que cada motor se configure en sus propios términos está razonado en
   compilaron. Medidas y detalle en el ítem de RF-2.6 y en el apéndice de la
   fase 2 de [05-roadmap.md](05-roadmap.md).
 
+**Con qué reglas se cumplió RF-2.5, análisis en lote** (**2026-09-23**). El
+requerimiento es de **alcance congelado de v1.0** y estaba a medias desde hacía
+meses: `POST /analysis` ya aceptaba `game_ids` como lista y un `engine` para
+todas, así que "analiza mis últimas N partidas" se podía pedir con `curl` y no
+desde ninguna pantalla. Lo que se añadió es la mitad que faltaba, en el listado
+de Partidas (RF-5.3), más la columna que hace falta para elegir la tanda.
+Ninguna de estas decisiones estaba en el texto del requerimiento.
+
+- **Un motor para toda la tanda, no uno por partida.** El `EngineSelect` va
+  arriba, junto al botón, y vale para todas las marcadas
+  (`engineForNextBatch`). La pregunta de quien analiza en lote es "con cuál
+  quiero esta remesa", no "cuál para cada una": elegir motor fila a fila
+  convertiría un botón en un formulario, y para el caso raro ya están el visor
+  y el tablero de análisis, que analizan de una en una. Es además lo que la
+  API acepta: `POST /analysis` lleva un `engine` por petición.
+- **"N partidas" son las que están a la vista.** La casilla de la cabecera
+  marca la página visible y nada más. No hay "marcar las 324 que cumplen el
+  filtro": una tanda de trescientas partidas que no se han visto es trabajo de
+  horas de motor pedido a ciegas, y el tamaño de la página (25) es justo lo
+  que hace que el botón "Analizar N partidas" diga algo comprobable mirando la
+  pantalla.
+- **Lo marcado se vacía al cambiar de filtro y al pasar de página**
+  (`updateFilter` y `goToPageAtOffset`). Es la misma regla por la que "marcar
+  todas" no sale de la página: si la selección sobreviviera, el botón contaría
+  partidas que no están en pantalla y no habría forma de saber cuáles son. Se
+  vacía también al mandar la tanda, para que no se mande dos veces seguidas.
+- **La tanda no excluye lo ya analizado con ese mismo motor, a propósito.**
+  Reanalizar es legítimo —se cambió la profundidad, se instaló otra versión
+  del motor, se quiere contrastar—, y descartar en silencio lo repetido
+  dejaría un botón que dice "Analizar 5 partidas" y manda tres. Pero tampoco
+  avisa de que se van a repetir, que es lo que el visor y el tablero sí hacen
+  diciendo "Reanalizar con X": queda apuntado como **fila 111** del inventario
+  de [07-coherencia-ui.md](07-coherencia-ui.md), pendiente de decidir si se
+  avisa, se excluye o se deja marcar solo lo que falta.
+- **La columna «Análisis» es parte de este requerimiento, no otro.** Sin ver
+  qué está ya analizado y con qué, componer una tanda es adivinar. Dice
+  motores, no un sí o un no, porque una partida puede estar analizada con
+  Stockfish y con Lc0 (RF-2.6) y son análisis distintos; y el dato **no sale
+  de `games` sino de `analyses`** —`load_analysis_state_by_game_id`, una sola
+  consulta para toda la página—, porque "estar analizada" no es una propiedad
+  de la partida sino el resultado de las corridas que se le hayan lanzado. Una
+  partida sin ninguna dice "Sin analizar" y no "—": el guion es el hueco de un
+  dato que no llegó (el rating de un PGN manual, RF-1.5), y aquí no falta
+  nada, se sabe que no hay análisis.
+- **El análisis va en segundo plano** (RF-2.4): el botón encola y devuelve, y
+  la pantalla sigue usable. El precio es que la columna dice lo que era verdad
+  cuando se pidió la lista: se refresca al mandar una tanda o al tocar un
+  filtro, pero una partida que termina mientras se mira se queda en
+  "Analizando…" hasta recargar. El visor sí sigue el progreso en vivo, así que
+  el mismo análisis se cuenta de dos maneras según desde dónde se mire; es la
+  **fila 110** del inventario.
+
 ### RF-3 · Estadísticas e insight
 
 | ID | Requerimiento | Prioridad |
@@ -373,8 +425,13 @@ umbrales son constantes con nombre en `lucia_core.training` y en
   resuelva**: ni la solución, ni la jugada que se hizo en la partida, ni la
   clasificación, ni las probabilidades. Saber que aquello fue un blunder de
   treinta puntos ya es media respuesta. Todo eso se manda al cerrarlo, que es
-  cuando la pantalla lo enseña; por lo mismo, esta es la única pantalla con
-  tablero sin barra de evaluación.
+  cuando la pantalla lo enseña; por lo mismo, esta fue la primera pantalla
+  con tablero **sin barra de evaluación** — hoy lo son las tres de
+  entrenamiento: el puzzle, el drill de apertura (RF-4.2) y la partida de
+  sparring (RF-4.3), donde la evaluación delata la línea o avisa del blunder
+  que un rival calibrado no debe avisar. La capa de ocupación de RF-7 sí entra
+  en las tres, que es la otra cara de lo mismo
+  ([ADR-0023](adr/0023-la-ocupacion-entra-en-el-entrenamiento-y-la-barra-no.md)).
 - **El puzzle se guarda entero y con su solución congelada**, desacoplado de
   la jugada analizada de la que salió, porque lleva encima el historial de
   repasos y ese dato no está en ninguna otra parte. Razonado en
@@ -463,7 +520,7 @@ ajustables sin tocar el requerimiento ni
   igual —el camino propio de una partida, corregido en el punto donde se
   abandona el libro con la jugada más jugada por los maestros— y se eligen por
   motivos distintos, que es lo único que las separa en pantalla (columna
-  `reason`). Consecuencia buscada: **una apertura que va mal pero en la que
+  `source`). Consecuencia buscada: **una apertura que va mal pero en la que
   nunca se abandona el libro no da drill**, y es honesto que no lo dé — ahí el
   problema no es la apertura sino lo que viene después, y eso son los puzzles
   de RF-4.1.
@@ -599,10 +656,15 @@ cinco umbrales y los cuatro topes semanales son constantes con nombre en
   victoria por jugada), el tipo de error que más pesa (RF-3.4,
   `MIN_MISTAKE_TYPE_SHARE` = 33 % de los errores, cuando el reparto ciego entre
   cuatro tipos sería el 25 %), la apertura que más cuesta (RF-3.2,
-  `MIN_OPENING_POINTS_LOST` = 1 punto de marcador, el mismo umbral con el que
-  el drill de RF-4.2 decide qué línea merece repetirse), los apuros de reloj
-  (RF-3.5, `MIN_TIME_TROUBLE_SHARE` = 30 % de las partidas) y la precisión que
-  cae (RF-3.7, `MIN_ACCURACY_DROP` = 2 puntos frente a los meses anteriores).
+  `MIN_OPENING_POINTS_LOST` = 1 punto de marcador, **más estricto** que el
+  corte del drill de RF-4.2 —que entrena cualquier línea que cueste algo,
+  `points_lost > 0` sobre `MIN_GAMES_TO_DRILL` = 3 partidas—, porque el drill
+  reparte una baraja ordenada por daño y el plan nombra una sola apertura como
+  **la** debilidad), los apuros de reloj (RF-3.5, `MIN_TIME_TROUBLE_SHARE` =
+  30 % de las partidas analizadas **que traen relojes**, que es el denominador
+  con el que RF-3.5 los cuenta —`analyzed_games_with_clocks`— y no todas las
+  partidas) y la precisión que cae (RF-3.7, `MIN_ACCURACY_DROP` = 2 puntos
+  frente a los meses anteriores).
   Un plan que enumera cinco debilidades siempre, las tenga o no, no ayuda a
   decidir por dónde empezar.
 - **El orden en que se enseñan es fijo por clase y no sale de los números.**
@@ -975,7 +1037,9 @@ sparring no tienen tablero y quedan fuera.
   ejercicio en un análisis asistido—, pero esto es otra cosa: es leer la
   posición que ya está en pantalla, no la opinión del motor sobre ella, y la
   cabecera de esta sección dice desde el primer día que la capa se activa sobre
-  **cualquier** tablero, entrenamiento incluido.
+  **cualquier** tablero, entrenamiento incluido. La frontera —de dónde sale el
+  dato, no en qué pantalla se dibuja— y lo que se descartó están en
+  [ADR-0023](adr/0023-la-ocupacion-entra-en-el-entrenamiento-y-la-barra-no.md).
 - **Ahí las tres marcas arrancan apagadas**, y encendidas en el visor y en el
   tablero de análisis (**2026-09-22**). Rodear las piezas colgadas (RF-7.4) es
   media solución de un puzzle táctico y, en una partida de sparring, el aviso

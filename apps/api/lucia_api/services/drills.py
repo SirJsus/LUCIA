@@ -1,5 +1,9 @@
-"""Drill de aperturas (RF-4.2): generar las líneas que hay que repetir, servir
-la cola de repaso y anotar cómo fue cada pasada.
+"""Drill de aperturas (RF-4.2): generar las líneas que hay que repetir y
+cargarlas para recorrerlas.
+
+La cola de repaso y el apunte de cómo fue cada pasada no están aquí sino en
+`services/review.py`, el mismo que reparte los puzzles: un drill se repasa
+como se repasa un puzzle.
 
 Este módulo es el puente entre lo que ya se sabe del jugador y
 `lucia_core.drills`, igual que `services/training.py` lo es con
@@ -8,11 +12,11 @@ puras: por dónde va la línea, qué jugada toca y qué cuenta como "rendir peor
 
 **Las dos barajas** que pide RF-4.2, con el mismo drill detrás:
 
-- **Salidas de la teoría** (`reason="departure"`, de RF-3.6): los puntos donde
+- **Salidas de la teoría** (`source="departure"`, de RF-3.6): los puntos donde
   se abandona el libro una y otra vez. La línea recorre la apertura como se
   jugó y termina en la jugada de maestros que había que hacer en lugar de la
   que se hizo.
-- **Peores aperturas** (`reason="opening"`, de RF-3.2): las aperturas que
+- **Peores aperturas** (`source="opening"`, de RF-3.2): las aperturas que
   cuestan puntos. La línea es la de una partida propia de esa apertura, con la
   misma corrección en el punto donde se sale del libro.
 
@@ -29,30 +33,19 @@ manda a refrescar el repertorio. Es la misma regla de siempre.
 
 from __future__ import annotations
 
-import datetime as dt
 from collections.abc import Iterator
 from dataclasses import dataclass
 
 import chess
 from lucia_core.drills import DrillLine, is_worth_drilling, line_uci_from_departure, points_lost
 from lucia_core.openings import Opening, identify_opening
-from lucia_core.training import (
-    NEW_PUZZLE_STATE,
-    ReviewGrade,
-    SpacedRepetitionState,
-    next_review,
-)
+from lucia_core.training import NEW_REVIEW_STATE
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db.models import OpeningDrill
 from lucia_api.services.repertoire import RepertoireComparison, compare_repertoire
-from lucia_api.services.stats import OpeningStats, get_player_stats
-
-#: Cuántas aperturas se miran para la baraja de "peores aperturas". Son las
-#: más jugadas, que es como las devuelve RF-3.2; de ellas se quedan las que
-#: cuestan puntos.
-MAX_OPENINGS_CONSIDERED = 40
+from lucia_api.services.stats import MAX_OPENINGS_CONSIDERED, OpeningStats, get_player_stats
 
 
 @dataclass(frozen=True)
@@ -84,7 +77,7 @@ async def generate_drills(session: AsyncSession, username: str) -> DrillGenerati
     created = 0
     candidates = sorted(
         _candidate_drills(comparison, stats.by_opening),
-        key=lambda drill: points_lost(drill.games, drill.score_percent),
+        key=lambda drill: points_lost(drill.games_played, drill.score_percent),
         reverse=True,
     )
     for drill in candidates:
@@ -165,60 +158,27 @@ def _candidate_drills(
 
 
 def _new_drill(
-    reason: str,
+    source: str,
     player_color: str,
     line_uci: tuple[str, ...],
     opening: Opening | None,
-    games: int,
+    games_played: int,
     score_percent: float,
 ) -> OpeningDrill:
-    """La fila de un drill recién nacido: su línea, su motivo y un estado de
-    repaso de estreno, el mismo con el que empieza un puzzle."""
+    """La fila de un drill recién nacido: su línea, de qué baraja sale y un
+    estado de repaso de estreno, el mismo con el que empieza un puzzle."""
     return OpeningDrill(
-        reason=reason,
+        source=source,
         player_color=player_color,
         line_uci=" ".join(line_uci),
         opening_eco=opening.eco if opening else None,
         opening_name=opening.name if opening else None,
-        games=games,
+        games_played=games_played,
         score_percent=score_percent,
-        repetitions=NEW_PUZZLE_STATE.repetitions,
-        interval_days=NEW_PUZZLE_STATE.interval_days,
-        ease_factor=NEW_PUZZLE_STATE.ease_factor,
+        repetitions=NEW_REVIEW_STATE.repetitions,
+        interval_days=NEW_REVIEW_STATE.interval_days,
+        ease_factor=NEW_REVIEW_STATE.ease_factor,
     )
-
-
-@dataclass
-class DrillQueue:
-    """Los drills que toca repasar ahora, y cuántos quedan."""
-
-    drills: list[OpeningDrill]
-    due: int
-    total: int
-    next_due_at: dt.datetime | None
-
-
-async def get_drill_queue(session: AsyncSession, now: dt.datetime, limit: int) -> DrillQueue:
-    """La cola de repaso, del más atrasado al más reciente. Misma forma que la
-    de los puzzles: un drill se reparte como se reparte un puzzle."""
-    due_drills = list(
-        (
-            await session.execute(
-                select(OpeningDrill)
-                .where(OpeningDrill.due_at <= now)
-                .order_by(OpeningDrill.due_at)
-                .limit(limit)
-            )
-        )
-        .scalars()
-        .all()
-    )
-    due = await session.scalar(
-        select(func.count()).select_from(OpeningDrill).where(OpeningDrill.due_at <= now)
-    )
-    total = await session.scalar(select(func.count()).select_from(OpeningDrill))
-    next_due_at = await session.scalar(select(func.min(OpeningDrill.due_at)))
-    return DrillQueue(drills=due_drills, due=due or 0, total=total or 0, next_due_at=next_due_at)
 
 
 def drill_line(drill: OpeningDrill) -> DrillLine:
@@ -227,25 +187,6 @@ def drill_line(drill: OpeningDrill) -> DrillLine:
         moves_uci=tuple(drill.line_uci.split()),
         player_color=chess.WHITE if drill.player_color == "white" else chess.BLACK,
     )
-
-
-def record_review(drill: OpeningDrill, grade: ReviewGrade, now: dt.datetime) -> None:
-    """Anota el repaso con SM-2, igual que un puzzle: el próximo vencimiento se
-    cuenta desde **ahora** y no desde el anterior, para que repasar con retraso
-    no encadene retrasos."""
-    state_after_review = next_review(
-        SpacedRepetitionState(
-            repetitions=drill.repetitions,
-            interval_days=drill.interval_days,
-            ease_factor=drill.ease_factor,
-        ),
-        grade,
-    )
-    drill.repetitions = state_after_review.repetitions
-    drill.interval_days = state_after_review.interval_days
-    drill.ease_factor = state_after_review.ease_factor
-    drill.last_reviewed_at = now
-    drill.due_at = now + dt.timedelta(days=state_after_review.interval_days)
 
 
 async def count_drills(session: AsyncSession) -> int:

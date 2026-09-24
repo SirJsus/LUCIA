@@ -15,6 +15,10 @@ estado de repaso.
 RF-4.3 y RF-4.4 (sparring contra el motor con fuerza calibrada, y retomar
 una partida propia desde una de sus posiciones): `SparringGame`.
 
+Los dos ejercicios que se repasan —`Puzzle` y `OpeningDrill`— comparten el
+estado de SM-2 en el mixin `SpacedRepetition`, que es lo que les da una sola
+cola y un solo apunte de repaso (`services/review.py`).
+
 Las columnas que no se explican solas llevan su porqué al lado; el mapa
 completo, con las relaciones y las reglas entre tablas, está en
 docs/03-arquitectura.md.
@@ -30,6 +34,33 @@ from sqlalchemy import JSON, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .base import Base
+
+
+class SpacedRepetition:
+    """El estado de repaso de un ejercicio, en columnas (SM-2).
+
+    Lo comparten `Puzzle` (RF-4.1) y `OpeningDrill` (RF-4.2) porque un drill se
+    repasa como se repasa un puzzle: el algoritmo es el mismo
+    (`lucia_core.training`) y por tanto el estado también. En un mixin y no
+    copiado en cada tabla para que no puedan separarse sin querer — es lo que
+    permite que la cola y el apunte del repaso sean uno solo
+    (`services/review.py`).
+
+    Una columna por campo de `SpacedRepetitionState` —y no un JSON— para poder
+    ordenar y filtrar por él en SQL, que es lo que hace la cola.
+    """
+
+    repetitions: Mapped[int] = mapped_column(default=0)
+    interval_days: Mapped[int] = mapped_column(default=0)
+    ease_factor: Mapped[float] = mapped_column(default=2.5)
+    due_at: Mapped[dt.datetime] = mapped_column(
+        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC), index=True
+    )
+    """Cuándo vuelve a tocar. Un ejercicio recién generado toca ya. Indexada
+    porque la cola de repaso se pide siempre por ella."""
+    last_reviewed_at: Mapped[dt.datetime | None] = mapped_column(
+        DateTime(timezone=True), default=None
+    )
 
 
 class Player(Base):
@@ -422,7 +453,7 @@ class PositionCache(Base):
     )
 
 
-class Puzzle(Base):
+class Puzzle(SpacedRepetition, Base):
     """Un puzzle sacado de un error propio, con su estado de repaso (RF-4.1).
 
     La posición es la de **antes** del error y quien resuelve es quien lo
@@ -473,19 +504,6 @@ class Puzzle(Base):
     """Probabilidad de victoria **de quien resuelve**, antes y después del
     error: lo que costó, dicho en la unidad de siempre (RF-2.3)."""
 
-    repetitions: Mapped[int] = mapped_column(default=0)
-    interval_days: Mapped[int] = mapped_column(default=0)
-    ease_factor: Mapped[float] = mapped_column(default=2.5)
-    """El estado de SM-2 (`lucia_core.training.SpacedRepetitionState`), una
-    columna por campo para poder ordenar y filtrar por él en SQL."""
-    due_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC), index=True
-    )
-    """Cuándo vuelve a tocar. Un puzzle recién generado toca ya. Indexada
-    porque la cola de repaso se pide siempre por ella."""
-    last_reviewed_at: Mapped[dt.datetime | None] = mapped_column(
-        DateTime(timezone=True), default=None
-    )
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
     )
@@ -567,7 +585,7 @@ class SparringGame(Base):
     jugando ahora va primero."""
 
 
-class OpeningDrill(Base):
+class OpeningDrill(SpacedRepetition, Base):
     """Una línea de apertura que se repite jugando, con su estado de repaso
     (RF-4.2).
 
@@ -579,7 +597,7 @@ class OpeningDrill(Base):
 
     Las dos barajas —salidas de la teoría (RF-3.6) y peores aperturas
     (RF-3.2)— comparten tabla porque son la misma cosa para quien entrena: una
-    línea que hay que reproducir. De dónde salió lo dice `reason`, que es lo
+    línea que hay que reproducir. De dónde salió lo dice `source`, que es lo
     único que las distingue en pantalla.
     """
 
@@ -587,7 +605,7 @@ class OpeningDrill(Base):
     __table_args__ = (UniqueConstraint("player_color", "line_uci", name="uq_drill_color_line"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    reason: Mapped[str]
+    source: Mapped[str]
     """De qué baraja salió: "departure" (te sales de la teoría aquí, RF-3.6) o
     "opening" (esta apertura te va mal, RF-3.2). Cambia lo que la pantalla
     cuenta al presentarla, no cómo se juega."""
@@ -609,7 +627,7 @@ class OpeningDrill(Base):
     poder decir qué se está entrenando. `None` si la línea se sale del libro
     antes de tener nombre, que es justo lo que pasa en las salidas tempranas."""
 
-    games: Mapped[int]
+    games_played: Mapped[int]
     score_percent: Mapped[float]
     """Cuántas partidas propias justifican este drill y qué se sacó en ellas.
     Es el "rendimiento peor" de RF-4.2, y se congela al generar: el drill es el
@@ -617,18 +635,6 @@ class OpeningDrill(Base):
     ya hecho falsearía ese historial (misma regla que las soluciones de
     `Puzzle`)."""
 
-    repetitions: Mapped[int] = mapped_column(default=0)
-    interval_days: Mapped[int] = mapped_column(default=0)
-    ease_factor: Mapped[float] = mapped_column(default=2.5)
-    """El estado de SM-2 (`lucia_core.training.SpacedRepetitionState`), el
-    mismo algoritmo con el que vuelven los puzzles: un drill se repasa como se
-    repasa un puzzle."""
-    due_at: Mapped[dt.datetime] = mapped_column(
-        DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC), index=True
-    )
-    last_reviewed_at: Mapped[dt.datetime | None] = mapped_column(
-        DateTime(timezone=True), default=None
-    )
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: dt.datetime.now(dt.UTC)
     )

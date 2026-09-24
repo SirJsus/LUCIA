@@ -26,22 +26,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from lucia_api.db import get_session
 from lucia_api.db.models import Game, Puzzle
 from lucia_api.dependencies import resolved_username
+from lucia_api.services.review import (
+    DEFAULT_QUEUE_LIMIT,
+    MAX_QUEUE_LIMIT,
+    review_queue,
+    utc_now,
+)
 from lucia_api.services.training import (
     answer_puzzle,
     count_puzzles,
     generate_puzzles,
-    get_puzzle_queue,
     opponent_username,
     solver_color,
 )
 
 router = APIRouter(prefix="/training", tags=["training"])
-
-#: Cuántos puzzles se mandan de una vez. Una sesión de entrenamiento se hace
-#: de unos pocos; pedir los cuatrocientos que puede haber vencidos solo
-#: serviría para que la pantalla tardara en abrirse.
-DEFAULT_QUEUE_LIMIT = 20
-MAX_QUEUE_LIMIT = 100
 
 
 class PuzzleOut(BaseModel):
@@ -50,7 +49,7 @@ class PuzzleOut(BaseModel):
     id: int
     fen: str
     """La posición a resolver. Mueve quien cometió el error."""
-    color: str
+    player_color: str
     """"white" | "black": de qué color juega quien resuelve. Se deduce del
     turno del FEN, y va aparte para que la pantalla oriente el tablero desde
     su lado sin tener que leerlo."""
@@ -85,7 +84,7 @@ class PuzzleGenerationOut(BaseModel):
 class PuzzleAnswerIn(BaseModel):
     uci: str | None = None
     """La jugada intentada, o `null` para rendirse y ver la solución."""
-    attempt: int = Field(default=1, ge=1)
+    attempt_number: int = Field(default=1, ge=1)
     """Cuántas veces se ha intentado este puzzle, contando esta. Lo lleva la
     pantalla porque es suyo el ciclo de reintentos; el servidor solo lo usa
     para distinguir acertar a la primera de acertar tropezando."""
@@ -139,10 +138,10 @@ async def player_puzzle_queue(
     limit: Annotated[int, Query(ge=1, le=MAX_QUEUE_LIMIT)] = DEFAULT_QUEUE_LIMIT,
 ) -> PuzzleQueueOut:
     """Los puzzles que toca repasar ahora, del más atrasado al más reciente."""
-    queue = await get_puzzle_queue(session, _now(), limit)
-    games = await _games_of(session, queue.puzzles)
+    queue = await review_queue(session, Puzzle, utc_now(), limit)
+    games = await _games_of(session, queue.items)
     return PuzzleQueueOut(
-        puzzles=[_to_puzzle_out(puzzle, games[puzzle.game_id]) for puzzle in queue.puzzles],
+        puzzles=[_to_puzzle_out(puzzle, games[puzzle.game_id]) for puzzle in queue.items],
         due=queue.due,
         total=queue.total,
         next_due_at=queue.next_due_at,
@@ -160,7 +159,7 @@ async def answer_player_puzzle(
     if puzzle is None:
         raise HTTPException(status_code=404, detail="ese puzzle no existe")
 
-    answer = await answer_puzzle(session, puzzle, body.uci, body.attempt, _now())
+    answer = await answer_puzzle(session, puzzle, body.uci, body.attempt_number, utc_now())
     if not answer.reviewed:
         # Un puzzle que sigue abierto se va con lo justo: que la respuesta no
         # valía. Todo lo demás que hay en la fila lo resolvería.
@@ -203,7 +202,7 @@ def _to_puzzle_out(puzzle: Puzzle, game: Game) -> PuzzleOut:
     return PuzzleOut(
         id=puzzle.id,
         fen=puzzle.fen,
-        color=solver_color(puzzle),
+        player_color=solver_color(puzzle),
         game_id=puzzle.game_id,
         ply=puzzle.ply,
         opponent=opponent_username(puzzle, game),
@@ -211,7 +210,3 @@ def _to_puzzle_out(puzzle: Puzzle, game: Game) -> PuzzleOut:
         due_at=puzzle.due_at,
         repetitions=puzzle.repetitions,
     )
-
-
-def _now() -> dt.datetime:
-    return dt.datetime.now(dt.UTC)

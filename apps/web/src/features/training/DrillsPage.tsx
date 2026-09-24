@@ -9,7 +9,10 @@
  * **Las dos barajas llegan mezcladas en la misma cola**, ordenadas por cuándo
  * toca repasarlas y no por su origen: para quien entrena son lo mismo —una
  * línea que hay que reproducir— y separarlas obligaría a elegir por cuál
- * empezar cada día. De cuál viene cada una lo dice su insignia.
+ * empezar cada día. De cuál viene cada una lo dice el panel de `DrillRunner`,
+ * con el motivo escrito en una frase ("Abandonas la teoría aquí en 8
+ * partidas…"): fue una insignia hasta que la fila 98 del inventario dejó esa
+ * insignia para el estado del ejercicio, igual en las tres pantallas.
  *
  * **Depende de la teoría que se haya consultado** (RF-3.6): las líneas salen
  * del repertorio comparado, y esa comparación se llena despacio y a propósito
@@ -18,49 +21,32 @@
  * haber pulsado «Generar líneas»: es una condición de la pantalla, porque una
  * cola corta puede serlo porque falta teoría y no porque se juegue bien.
  */
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
 import { Button } from "../../components/Button";
 import { EmptyState, ErrorBox, Spinner, SuccessBox, WarningBox } from "../../components/Feedback";
 import { api } from "../../lib/api";
 import { formatDate } from "../../lib/format";
 import { DrillRunner } from "./DrillRunner";
 import { TrainingHeader } from "./TrainingHeader";
+import { useReviewQueue } from "./useReviewQueue";
 
 const DRILL_QUEUE_QUERY_KEY = ["training", "drills"] as const;
 
 export function DrillsPage() {
-  const queryClient = useQueryClient();
-  const queueQuery = useQuery({
+  const {
+    queueQuery,
+    queue,
+    generateMutation,
+    current: drill,
+    position,
+    batchSize,
+    goToNext,
+  } = useReviewQueue({
     queryKey: DRILL_QUEUE_QUERY_KEY,
-    queryFn: api.getDrillQueue,
+    fetchQueue: api.getDrillQueue,
+    itemsOf: (queue) => queue.drills,
+    generate: () => api.generateDrills(),
   });
-  /** En qué línea de la tanda se está. Se reinicia al traer una tanda nueva. */
-  const [queueIndex, setQueueIndex] = useState(0);
-
-  const generateMutation = useMutation({
-    mutationFn: () => api.generateDrills(),
-    onSuccess: () => {
-      setQueueIndex(0);
-      queryClient.invalidateQueries({ queryKey: DRILL_QUEUE_QUERY_KEY });
-    },
-  });
-
-  const queue = queueQuery.data;
-  const drill = queue?.drills[queueIndex];
-
-  /** Al terminar una: la siguiente de la tanda, o una tanda nueva si era la
-   * última. Se vuelve a pedir en vez de quitarla de la lista en memoria porque
-   * el servidor ya sabe cuál vence ahora y cuál acaba de irse a mañana. */
-  function goToNextDrill() {
-    if (queue && queueIndex + 1 < queue.drills.length) {
-      setQueueIndex(queueIndex + 1);
-      return;
-    }
-    setQueueIndex(0);
-    queryClient.invalidateQueries({ queryKey: DRILL_QUEUE_QUERY_KEY });
-  }
 
   return (
     <div className="space-y-6">
@@ -128,7 +114,7 @@ export function DrillsPage() {
         </EmptyState>
       )}
 
-      {queue && queue.total > 0 && queue.drills.length === 0 && (
+      {queue && queue.total > 0 && batchSize === 0 && (
         <EmptyState title="Por hoy has terminado">
           {queue.next_due_at
             ? `El próximo repaso toca el ${formatDate(queue.next_due_at)}.`
@@ -139,9 +125,9 @@ export function DrillsPage() {
       {drill && (
         <div className="space-y-2">
           <p className="text-sm opacity-70">
-            Línea {queueIndex + 1} de {queue?.drills.length}
+            Línea {position} de {batchSize}
           </p>
-          <DrillRunner key={drill.id} drill={drill} onNext={goToNextDrill} />
+          <DrillRunner key={drill.id} drill={drill} onNext={goToNext} />
         </div>
       )}
     </div>

@@ -47,14 +47,21 @@ MIN_PHASE_WIN_PERCENT_LOST = 5.0
 #: destaca sobre los demás.
 MIN_MISTAKE_TYPE_SHARE = 33.0
 
-#: Cuántos puntos tiene que costar una apertura para entrar en el plan. Es el
-#: mismo umbral con el que el drill de RF-4.2 decide qué línea merece
-#: repetirse, y viene de la misma idea: una apertura que cuesta menos de un
-#: punto no es por donde empezar.
+#: Cuántos puntos tiene que costar una apertura para entrar en el plan. Se
+#: mide con el mismo `points_lost` que el drill de RF-4.2, pero el corte es
+#: **más estricto**: el drill admite cualquier línea que cueste algo
+#: (`points_lost > 0`, con `MIN_GAMES_TO_DRILL` = 3 partidas) porque ofrece una
+#: baraja ordenada por daño y elegir por dónde empezar es de quien entrena;
+#: aquí se nombra **una sola** apertura como debilidad de la semana, y decir
+#: "tu problema son las francesas" por medio punto perdido sería inventarle un
+#: problema.
 MIN_OPENING_POINTS_LOST = 1.0
 
-#: Con qué parte de las partidas jugadas con el reloj encima se considera que
-#: los apuros son un problema propio y no un accidente.
+#: Con qué parte de las partidas se considera que los apuros de reloj son un
+#: problema propio y no un accidente. El denominador lo pone RF-3.5 y son las
+#: partidas analizadas **que traen relojes** (`analyzed_games_with_clocks` en
+#: `services/stats.py`), las únicas sobre las que se puede decir nada: contarlo
+#: sobre todas las partidas diluiría el porcentaje con las que no se sabe.
 MIN_TIME_TROUBLE_SHARE = 30.0
 
 #: Cuántos puntos de precisión hay que haber perdido frente a los meses
@@ -185,7 +192,7 @@ _TASK_BY_WEAKNESS: dict[tuple[WeaknessKind, str], TrainingTaskKind] = {
 }
 
 
-def task_for_weakness(weakness: Weakness) -> TrainingTaskKind | None:
+def _task_for_weakness(weakness: Weakness) -> TrainingTaskKind | None:
     """Qué hay que entrenar para arreglar esa debilidad, o `None` si no hay
     forma de entrenarla con lo que existe hoy."""
     subject = weakness.subject if weakness.kind in ("phase", "mistake_type") else ""
@@ -203,7 +210,7 @@ class PlanTask:
     falso."""
     done_this_week: int
     """Cuántos van hechos desde el lunes, de lo que ya está fechado en la base."""
-    reasons: tuple[Weakness, ...]
+    weaknesses: tuple[Weakness, ...]
     """Las debilidades que piden esta tarea, en el mismo orden en que las
     devuelve `detect_weaknesses`. Más de una cuando varias apuntan al mismo
     entrenamiento, que es lo normal: fallar en el medio juego y fallar por
@@ -243,20 +250,20 @@ def build_weekly_tasks(
     finalmente se pide, el menor de los dos. `done_this_week` es lo que ya se
     hizo desde el lunes.
     """
-    reasons_by_task: dict[TrainingTaskKind, list[Weakness]] = {}
+    weaknesses_by_task: dict[TrainingTaskKind, list[Weakness]] = {}
     for weakness in weaknesses:
-        task_kind = task_for_weakness(weakness)
+        task_kind = _task_for_weakness(weakness)
         if task_kind is not None:
-            reasons_by_task.setdefault(task_kind, []).append(weakness)
+            weaknesses_by_task.setdefault(task_kind, []).append(weakness)
 
     return [
         PlanTask(
             kind=task_kind,
             weekly_target=min(MAX_WEEKLY_TARGETS[task_kind], available_material.get(task_kind, 0)),
             done_this_week=done_this_week.get(task_kind, 0),
-            reasons=tuple(reasons),
+            weaknesses=tuple(task_weaknesses),
         )
-        for task_kind, reasons in reasons_by_task.items()
+        for task_kind, task_weaknesses in weaknesses_by_task.items()
         if available_material.get(task_kind, 0) > 0
     ]
 

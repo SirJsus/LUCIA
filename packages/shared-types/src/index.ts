@@ -109,7 +109,7 @@ export type TrainingTaskKind = "puzzles" | "drills" | "replays" | "sparring";
  * sales de la teoría (RF-3.6) o de una apertura que rinde mal (RF-3.2). El
  * OpenAPI lo expone como `string` y este tipo es la fuente de verdad para la
  * UI, como las clasificaciones. */
-export type DrillReason = "departure" | "opening";
+export type DrillSource = "departure" | "opening";
 
 /** Por qué terminó una partida de sparring (`lucia_core.sparring`, RF-4.3).
  * Como las clasificaciones, el OpenAPI lo expone como `string` y este tipo es

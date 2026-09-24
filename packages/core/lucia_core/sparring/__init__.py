@@ -167,9 +167,13 @@ def to_pgn(
     ha terminado".
 
     `[SetUp]` y `[FEN]` solo se escriben si la partida no arranca de la
-    posición estándar, que es lo que marca una partida desde posición dada
-    (hoy no pasa: el sparring empieza siempre en la inicial, y la posición
-    elegida por quien juega es RF-11.1).
+    posición estándar, y desde RF-4.4 eso pasa en **toda partida retomada**:
+    re-jugar desde el error arranca en la posición que `board_at_ply` sacó del
+    PGN de la partida propia, así que su `starting_fen` no es la inicial. Sin
+    esas dos cabeceras, el PGN exportado se abriría en otro programa como una
+    partida desde la salida y las jugadas no encajarían. Lo que sigue fuera de
+    v1.0 es que la posición la elija quien juega (RF-11.1): aquí siempre la
+    deriva el servidor de una partida guardada.
     """
     game = chess.pgn.Game()
     # `setup` fija la posición de partida y, si no es la estándar, escribe

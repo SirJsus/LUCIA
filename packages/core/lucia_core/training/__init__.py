@@ -9,14 +9,12 @@ lo que hace útil al entrenamiento y tienen que poder probarse solas (RNF-8):
 - **Qué cuenta como acertar** (RF-10.3): no solo la jugada favorita del motor,
   sino cualquiera que pierda lo mismo. Ver `equivalent_solutions`.
 
-Quién lo usa: `lucia_api.services.training`, que carga los errores desde
-`analyzed_moves`, los convierte en puzzles y guarda el estado que estas
-funciones devuelven. Desde RF-4.2 también `lucia_api.services.drills`, que
-reparte con el mismo `next_review` las líneas de apertura de
-`lucia_core.drills`: un drill se repasa como se repasa un puzzle, así que no
+Quién lo usa: `lucia_api.services.review`, que reparte con `next_review` y
+`grade_of` **los dos** ejercicios —los puzzles de RF-4.1 y las líneas de
+apertura de RF-4.2—, porque un drill se repasa como se repasa un puzzle y no
 hay dos algoritmos de repaso que mantener. `equivalent_solutions`, en cambio,
-es solo de los puzzles — en una línea de apertura la respuesta es una y la
-dicen los maestros.
+es solo de los puzzles (`lucia_api.services.training`) — en una línea de
+apertura la respuesta es una y la dicen los maestros.
 """
 
 from __future__ import annotations
@@ -69,8 +67,9 @@ class SpacedRepetitionState:
     un puzzle que cuesta se repite más a menudo que uno fácil."""
 
 
-NEW_PUZZLE_STATE = SpacedRepetitionState()
-"""El estado de un puzzle que nunca se ha repasado: toca hoy."""
+NEW_REVIEW_STATE = SpacedRepetitionState()
+"""El estado de un ejercicio que nunca se ha repasado: toca hoy. Lo
+estrenan por igual los puzzles (RF-4.1) y los drills de apertura (RF-4.2)."""
 
 
 def next_review(state: SpacedRepetitionState, grade: ReviewGrade) -> SpacedRepetitionState:
@@ -98,6 +97,28 @@ def next_review(state: SpacedRepetitionState, grade: ReviewGrade) -> SpacedRepet
     return SpacedRepetitionState(
         repetitions=repetitions, interval_days=interval_days, ease_factor=ease_factor
     )
+
+
+def grade_of(correct: bool, mistakes: int) -> ReviewGrade:
+    """Cómo fue el ejercicio, en el vocabulario de SM-2.
+
+    `mistakes` es cuántas veces se falló **antes** de cerrarlo: cero es haberlo
+    hecho limpio. Una sola convención para los dos ejercicios, porque cada uno
+    llevaba la suya —el puzzle contaba intentos desde 1 y el drill fallos desde
+    0— y eran la misma regla escrita dos veces con un desfase de uno.
+
+    Rendirse es fallar, hacerlo limpio es acertar, y tropezar por el camino
+    queda en medio: cuenta como recordado, pero baja la facilidad.
+
+    Quién llama y con qué, que es donde estaba el desfase: el puzzle
+    (`services/training.py`) cuenta **intentos** empezando en 1, así que pasa
+    `attempt_number - 1`; el drill (`routers/drills.py`) ya cuenta **fallos**
+    desde 0 y pasa los suyos tal cual. En los dos, `correct=False` cubre por
+    igual fallar y rendirse: para SM-2 son lo mismo, no se recordó.
+    """
+    if not correct:
+        return "failed"
+    return "solved" if mistakes == 0 else "hesitant"
 
 
 def _adjusted_ease_factor(ease_factor: float, quality: int) -> float:

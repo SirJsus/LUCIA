@@ -1,6 +1,15 @@
 /** Lista de partidas importadas, con filtros (RF-5.3) y las dos formas de
  * traer partidas: sincronizar con chess.com (RF-1.2) e importar un archivo
- * PGN de otra fuente —OTB, lichess— (RF-1.5). */
+ * PGN de otra fuente —OTB, lichess— (RF-1.5).
+ *
+ * Es además la única pantalla desde la que se manda **analizar una tanda**
+ * (RF-2.5): las casillas de la primera columna componen la selección, el
+ * `EngineSelect` elige un motor para todas y el botón las encola con un solo
+ * `POST /analysis`. La columna «Análisis» viene de `analyzed_by_engines` y
+ * `has_analysis_in_progress` de `GET /games` —que la API saca de `analyses`,
+ * no de `games`— y se escribe con `formatAnalyzedByEngines` de `lib/format`.
+ * Las reglas de la tanda están en la nota de RF-2.5 de
+ * `docs/02-requerimientos.md` y en el README de esta carpeta. */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { useRef, useState } from "react";
@@ -20,12 +29,16 @@ import {
 import type { PgnImportSummary } from "@lucia/shared-types";
 import { api, type GameFilters } from "../../lib/api";
 import {
+  formatAnalyzedByEngines,
   formatDate,
+  formatEngineName,
   formatRating,
   formatTimeClass,
   formatTimeControl,
   gameResult,
+  type EngineId,
 } from "../../lib/format";
+import { EngineSelect } from "../../components/EngineSelect";
 
 const TIME_CLASSES = ["bullet", "blitz", "rapid", "daily"] as const;
 
@@ -66,11 +79,29 @@ export function GamesPage() {
   // `<input type="file">` no admite `value`, así que se lee del elemento al
   // enviar y se vacía por la misma vía al terminar.
   const pgnFileInput = useRef<HTMLInputElement>(null);
+  // Qué partidas van en la próxima tanda de análisis (RF-2.5) y con qué motor.
+  // El motor es uno para toda la tanda: elegirlo por partida convertiría un
+  // botón en un formulario, y la pregunta que se hace quien analiza en lote es
+  // "con cuál quiero esta remesa", no "cuál para cada una".
+  const [gameIdsToAnalyze, setGameIdsToAnalyze] = useState<ReadonlySet<number>>(new Set());
+  const [engineForNextBatch, setEngineForNextBatch] = useState<EngineId>("stockfish");
   const queryClient = useQueryClient();
 
   const gamesQuery = useQuery({
     queryKey: ["games", filters],
     queryFn: () => api.listGames(filters),
+  });
+
+  const batchAnalysisMutation = useMutation({
+    mutationFn: () =>
+      api.createAnalysis({ game_ids: [...gameIdsToAnalyze], engine: engineForNextBatch }),
+    onSuccess: () => {
+      // La lista vuelve a pedirse para que las partidas mandadas pasen a decir
+      // "analizando…" en su columna, y la selección se vacía: dejarla marcada
+      // invitaría a mandar dos veces la misma tanda.
+      setGameIdsToAnalyze(new Set());
+      queryClient.invalidateQueries({ queryKey: ["games"] });
+    },
   });
 
   const syncMutation = useMutation({
@@ -95,6 +126,40 @@ export function GamesPage() {
     // Cualquier cambio de filtro vuelve a la primera página: si estabas en la
     // página 3 y el filtro nuevo devuelve 5 resultados, verías una lista vacía.
     setFilters((current) => ({ ...current, ...patch, offset: 0 }));
+    // Y vacía la selección: lo que se marcó ya no está a la vista, y analizar
+    // partidas que no se ven es justo lo que un lote no debe hacer.
+    setGameIdsToAnalyze(new Set());
+  }
+
+  function goToPageAtOffset(offset: number) {
+    setFilters((current) => ({ ...current, offset: Math.max(0, offset) }));
+    // Vacía la selección por lo mismo que al cambiar de filtro: lo marcado deja
+    // de estar a la vista, y el botón diría "Analizar 2 partidas" sin una sola
+    // casilla marcada en pantalla. Es la misma regla que "marcar todas", que
+    // cubre solo la página visible: una tanda no se compone entre páginas
+    // (criterio C-3; fila 112, ya cerrada, de docs/07-coherencia-ui.md).
+    setGameIdsToAnalyze(new Set());
+  }
+
+  function toggleGameToAnalyze(gameId: number) {
+    setGameIdsToAnalyze((current) => {
+      const next = new Set(current);
+      if (!next.delete(gameId)) next.add(gameId);
+      return next;
+    });
+  }
+
+  const gamesOnPage = gamesQuery.data?.games ?? [];
+  const areAllOnPageSelected =
+    gamesOnPage.length > 0 && gamesOnPage.every((game) => gameIdsToAnalyze.has(game.id));
+  const areSomeOnPageSelected = gamesOnPage.some((game) => gameIdsToAnalyze.has(game.id));
+
+  function toggleAllGamesOnPage() {
+    // "Todas" son las de esta página, no las de todos los filtros: marcar de
+    // golpe 300 partidas que no se han visto es una tanda pedida a ciegas.
+    setGameIdsToAnalyze(
+      areAllOnPageSelected ? new Set() : new Set(gamesOnPage.map((game) => game.id)),
+    );
   }
 
   const page = Math.floor((filters.offset ?? 0) / PAGE_SIZE) + 1;
@@ -330,7 +395,7 @@ export function GamesPage() {
         )}
       </FilterBar>
 
-      {gamesQuery.isPending && <Spinner />}
+      {gamesQuery.isPending && <Spinner label="Cargando tus partidas…" />}
       {gamesQuery.isError && <ErrorBox error={gamesQuery.error} onRetry={gamesQuery.refetch} />}
 
       {gamesQuery.data && gamesQuery.data.games.length === 0 && (
@@ -348,9 +413,107 @@ export function GamesPage() {
 
       {gamesQuery.data && gamesQuery.data.games.length > 0 && (
         <>
-          <DataTable headers={["Fecha", "Blancas", "Negras", "Resultado", "Control", ""]}>
+          {/* Analizar una tanda entera (RF-2.5). Va sobre la tabla y no bajo
+              ella porque se lee antes de elegir: primero con qué motor, luego
+              qué partidas. El desplegable de motor va delante de la acción,
+              como en la cabecera del visor y en la del tablero de análisis
+              (criterio C-2), y el botón dice cuántas van para que nadie lance
+              una tanda sin saber su tamaño (criterio C-3). */}
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <EngineSelect value={engineForNextBatch} onChange={setEngineForNextBatch} />
+              <Button
+                disabled={gameIdsToAnalyze.size === 0 || batchAnalysisMutation.isPending}
+                onClick={() => batchAnalysisMutation.mutate()}
+              >
+                {batchAnalysisMutation.isPending
+                  ? "Mandando…"
+                  : `Analizar ${gameIdsToAnalyze.size} partida${gameIdsToAnalyze.size === 1 ? "" : "s"}`}
+              </Button>
+            </div>
+            {/* Qué hace el botón y qué alcance tiene lo marcado, a la vista y
+                bajo la barra, que es donde Puzzles y Aperturas explican su
+                botón de generar (criterio C-6). Dos cosas que solo se
+                descubrían usándolas: que la casilla de la cabecera marca las
+                de esta página —lo decía únicamente su `aria-label`— y que
+                cambiar un filtro vacía lo marcado. Y el motivo del botón
+                deshabilitado se dice en pantalla, como «Analizar» en el
+                tablero de análisis, porque un `title` con teclado no aparece
+                nunca (criterio C-3). */}
+            <p className="mt-1 text-xs opacity-60">
+              {gameIdsToAnalyze.size === 0
+                ? "El botón se activa en cuanto marques alguna partida con las casillas de la primera columna."
+                : "Se analizan en segundo plano: puedes seguir usando la aplicación."}{" "}
+              La casilla de la cabecera marca solo las partidas de esta página, y cambiar un filtro
+              vacía lo marcado. La columna «Análisis» dice con qué motores está analizada ya cada
+              una.
+            </p>
+          </div>
+
+          {batchAnalysisMutation.isError && (
+            <ErrorBox
+              error={batchAnalysisMutation.error}
+              onRetry={() => batchAnalysisMutation.mutate()}
+            />
+          )}
+          {batchAnalysisMutation.isSuccess && batchAnalysisMutation.data.length > 0 && (
+            // Con qué motor se mandaron, que es lo que el desplegable de al
+            // lado ya no garantiza: se puede cambiar mientras el recuadro sigue
+            // en pantalla. Sale del análisis creado, no del estado del
+            // desplegable. Nombrar el motor es lo que ya hacen las barras de
+            // progreso del visor y del tablero de análisis (criterio C-2).
+            <SuccessBox>
+              {batchAnalysisMutation.data.length} partida
+              {batchAnalysisMutation.data.length === 1 ? "" : "s"} en cola con{" "}
+              {formatEngineName(batchAnalysisMutation.data[0].engine)}.
+            </SuccessBox>
+          )}
+
+          <DataTable
+            headers={[
+              <input
+                key="all"
+                type="checkbox"
+                checked={areAllOnPageSelected}
+                // Con algunas marcadas y otras no, una casilla vacía dice que
+                // no hay nada marcado, que es falso. El estado intermedio del
+                // navegador no se puede pedir por atributo: es una propiedad
+                // del elemento (criterio C-3).
+                ref={(element) => {
+                  if (element)
+                    element.indeterminate = areSomeOnPageSelected && !areAllOnPageSelected;
+                }}
+                onChange={toggleAllGamesOnPage}
+                aria-label="Marcar todas las partidas de esta página"
+                className="align-middle"
+              />,
+              "Fecha",
+              "Blancas",
+              "Negras",
+              "Resultado",
+              "Control",
+              "Análisis",
+              "",
+            ]}
+          >
             {gamesQuery.data.games.map((game) => (
               <tr key={game.id} className={TABLE_ROW_CLASSES}>
+                <td className={TABLE_CELL_CLASSES}>
+                  {/* Casilla nativa a propósito: se tabula y se marca con la
+                      barra espaciadora sin escribir una línea para ello
+                      (criterio C-1). */}
+                  <input
+                    type="checkbox"
+                    checked={gameIdsToAnalyze.has(game.id)}
+                    onChange={() => toggleGameToAnalyze(game.id)}
+                    // Se nombra como la de la cabecera —"marcar", que es lo
+                    // que hace la casilla; analizar lo hace el botón— y lleva
+                    // la fecha, que es lo único que distingue dos partidas
+                    // entre los mismos jugadores (criterio C-7).
+                    aria-label={`Marcar la partida ${game.white_username} contra ${game.black_username} del ${formatDate(game.played_at)}`}
+                    className="align-middle"
+                  />
+                </td>
                 <td className={`whitespace-nowrap opacity-70 ${TABLE_CELL_CLASSES}`}>
                   {formatDate(game.played_at)}
                 </td>
@@ -375,6 +538,12 @@ export function GamesPage() {
                   {formatTimeControl(game.time_control)}{" "}
                   <span className="opacity-70">{formatTimeClass(game.time_class)}</span>
                 </td>
+                <td className={`whitespace-nowrap opacity-70 ${TABLE_CELL_CLASSES}`}>
+                  {formatAnalyzedByEngines(
+                    game.analyzed_by_engines,
+                    game.has_analysis_in_progress,
+                  )}
+                </td>
                 <td className={`text-right ${TABLE_CELL_CLASSES}`}>
                   <Link
                     to="/games/$gameId"
@@ -392,12 +561,7 @@ export function GamesPage() {
             <Button
               size="sm"
               disabled={(filters.offset ?? 0) === 0}
-              onClick={() =>
-                setFilters((current) => ({
-                  ...current,
-                  offset: Math.max(0, (current.offset ?? 0) - PAGE_SIZE),
-                }))
-              }
+              onClick={() => goToPageAtOffset((filters.offset ?? 0) - PAGE_SIZE)}
             >
               ← Anterior
             </Button>
@@ -410,12 +574,7 @@ export function GamesPage() {
             <Button
               size="sm"
               disabled={gamesQuery.data.games.length < PAGE_SIZE}
-              onClick={() =>
-                setFilters((current) => ({
-                  ...current,
-                  offset: (current.offset ?? 0) + PAGE_SIZE,
-                }))
-              }
+              onClick={() => goToPageAtOffset((filters.offset ?? 0) + PAGE_SIZE)}
             >
               Siguiente →
             </Button>

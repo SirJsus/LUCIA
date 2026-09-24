@@ -6,7 +6,7 @@
  */
 import type { SparringGame } from "@lucia/shared-types";
 import { describe, expect, it } from "vitest";
-import { outcomeFor, outcomeSentence, turnsOf } from "../sparring";
+import { outcomeFor, outcomeSentence } from "../sparring";
 
 function game(overrides: Partial<SparringGame>): SparringGame {
   return {
@@ -59,27 +59,5 @@ describe("outcomeSentence", () => {
 
   it("se queda en el resultado si la causa no se reconoce", () => {
     expect(outcomeSentence(game({ result: "1-0", termination: "vete a saber" }))).toBe("Ganaste");
-  });
-});
-
-describe("turnsOf", () => {
-  it("empareja las jugadas por turno y deja el hueco de la última suelta", () => {
-    expect(turnsOf(["e4", "e5", "Cf3"])).toEqual([
-      { number: 1, white: "e4", black: "e5" },
-      { number: 2, white: "Cf3", black: null },
-    ]);
-  });
-
-  it("numera desde la jugada real cuando la partida se retomó a mitad", () => {
-    // Ply 44: turno 23, mueven las blancas (fila 101 del inventario).
-    expect(turnsOf(["Txd4", "exd4"], 44)).toEqual([{ number: 23, white: "Txd4", black: "exd4" }]);
-  });
-
-  it("deja el primer turno sin jugada de blancas si se retomó con negras", () => {
-    // Ply 45: turno 23, mueven las negras, así que ese turno ya está a medias.
-    expect(turnsOf(["Dxd4", "exd4"], 45)).toEqual([
-      { number: 23, white: null, black: "Dxd4" },
-      { number: 24, white: "exd4", black: null },
-    ]);
   });
 });

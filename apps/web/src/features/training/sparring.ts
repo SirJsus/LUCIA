@@ -12,7 +12,6 @@
  * que se viene a saber.
  */
 import type { SparringGame, SparringTermination } from "@lucia/shared-types";
-import { moveNumberOf } from "../../lib/moves";
 
 export type SparringOutcome = "win" | "loss" | "draw";
 
@@ -50,40 +49,4 @@ export function outcomeSentence(game: SparringGame): string | null {
   const label = OUTCOME_LABELS[outcome];
   const reason = TERMINATION_LABELS[game.termination as SparringTermination];
   return reason ? `${label} ${reason}` : label;
-}
-
-/** Las jugadas emparejadas por turno, como se leen en un tablero. La lista de
- * sparring no es la del visor (`features/viewer/MoveList.tsx`): allí cada
- * jugada lleva su clasificación y se puede pulsar para navegar, y aquí no hay
- * análisis que enseñar ni adónde navegar mientras la partida está viva. */
-export interface SparringTurn {
-  number: number;
-  white: string | null;
-  black: string | null;
-}
-
-export function turnsOf(movesSan: string[], startingPly = 0): SparringTurn[] {
-  // Una partida retomada (RF-4.4) empieza a mitad, así que el índice dentro de
-  // `movesSan` no es el ply: hay que sumarle desde dónde arrancó. Sin esto, la
-  // lista numeraba desde 1 una partida que empieza en la jugada 23, dos
-  // centímetros debajo del panel que decía justo eso (fila 101 del inventario
-  // de docs/07-coherencia-ui.md, criterio C-5).
-  //
-  // Con negras la partida arranca en un ply impar, así que el primer turno
-  // tiene solo jugada de negras: se emparejan por número de jugada y no de dos
-  // en dos desde el principio.
-  const turns: SparringTurn[] = [];
-  for (let index = 0; index < movesSan.length;) {
-    const absolutePly = startingPly + index;
-    const isWhiteMove = absolutePly % 2 === 0;
-    turns.push({
-      // El número de jugada sale de `lib/moves.ts`, que es de donde sale en las
-      // otras cinco pantallas que numeran (criterio C-5).
-      number: moveNumberOf(absolutePly),
-      white: isWhiteMove ? (movesSan[index] ?? null) : null,
-      black: isWhiteMove ? (movesSan[index + 1] ?? null) : (movesSan[index] ?? null),
-    });
-    index += isWhiteMove ? 2 : 1;
-  }
-  return turns;
 }

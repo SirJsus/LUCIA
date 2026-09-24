@@ -27,28 +27,18 @@
  */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
-import { Chess } from "chess.js";
-import { useMemo } from "react";
 import { Button } from "../../components/Button";
 import { EmptyState, ErrorBox, Spinner, SuccessBox, WarningBox } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
-import { BoardFrame } from "../../components/board/BoardFrame";
-import { KEYBOARD_MOVE_HINT, OCCUPANCY_TOGGLE_KEY_HINT } from "../../components/board/hints";
-import { Chessboard } from "../../components/board/Chessboard";
-import { legalMovesByOrigin } from "../../components/board/legalMoves";
-import { OccupancyPanel } from "../../components/board/OccupancyPanel";
-import { useOccupancy } from "../../components/board/useOccupancy";
-import {
-  BOARD_HINT_CLASSES,
-  BOARD_SIDEBAR_GRID_CLASS,
-  MOVE_LIST_HEIGHT_CLASS,
-} from "../../components/styles";
+import { TurnList } from "../../components/board/TurnList";
+import { BOARD_SIDEBAR_GRID_CLASS } from "../../components/styles";
 import { api } from "../../lib/api";
 import { formatBoardTitleFromPgnHeaders, formatOpponentName } from "../../lib/format";
-import { moveNumberLabel } from "../../lib/moves";
+import { moveNumberLabel, tryMove, turnsOf } from "../../lib/moves";
 import { fromPgn } from "../board/tree";
-import { outcomeFor, outcomeSentence, turnsOf } from "./sparring";
-import { ExerciseStatusBadge } from "./ExerciseStatusBadge";
+import { outcomeFor, outcomeSentence } from "./sparring";
+import { TrainingStatusBadge } from "./TrainingStatusBadge";
+import { TrainingBoard } from "./TrainingBoard";
 import { SPARRING_GAMES_QUERY_KEY } from "./SparringPage";
 
 export function SparringGamePage() {
@@ -105,30 +95,11 @@ export function SparringGamePage() {
 
   const isEngineThinking = moveMutation.isPending;
   const canMove = game?.is_player_turn === true && !isEngineThinking;
-  const legalMoves = useMemo(
-    () => (game && canMove ? legalMovesByOrigin(game.fen) : undefined),
-    [game, canMove],
-  );
-  /** La capa de ocupación (RF-7) sobre la posición en juego. Va antes de los
-   * retornos tempranos porque es un hook, y mientras la partida se carga
-   * recibe un FEN vacío del que `computeOccupancy` ya devuelve `null`. Las
-   * marcas arrancan apagadas: las colgadas de RF-7.4 durante una partida en
-   * marcha son el aviso de blunder que un rival calibrado no debe dar. */
-  const occupancyController = useOccupancy(game?.fen ?? "", {
-    marksOnByDefault: false,
-  });
 
-  function tryMove(from: string, to: string) {
+  function handleMove(from: string, to: string) {
     if (!game || !canMove) return;
-    const chess = new Chess(game.fen);
-    try {
-      // La promoción siempre a dama, igual que en el tablero de análisis y en
-      // los puzzles.
-      const move = chess.move({ from, to, promotion: "q" });
-      moveMutation.mutate(move.lan);
-    } catch {
-      // jugada ilegal; chessground ya filtra casi todas
-    }
+    const move = tryMove(game.fen, from, to);
+    if (move) moveMutation.mutate(move.uci);
   }
 
   if (gameQuery.isPending) return <Spinner label="Cargando la partida…" />;
@@ -143,7 +114,9 @@ export function SparringGamePage() {
    * del inventario). */
   const opponentName = formatOpponentName(game.engine, game.engine_elo);
   const outcome = outcomeFor(game);
-  const turns = turnsOf(game.moves_san, game.starting_ply);
+  // Una partida retomada (RF-4.4) empieza a mitad, así que el sitio de cada
+  // jugada en la lista no es su ply: hay que sumarle desde dónde arrancó.
+  const turns = turnsOf(game.moves_san, (_san, index) => game.starting_ply + index);
 
   return (
     <div className="space-y-6">
@@ -215,43 +188,25 @@ export function SparringGamePage() {
       {openAsBoardMutation.isError && <ErrorBox error={openAsBoardMutation.error} />}
 
       <div className={BOARD_SIDEBAR_GRID_CLASS}>
-        <div className="space-y-3">
-          <BoardFrame>
-            <Chessboard
-              fen={game.fen}
-              orientation={playerColor}
-              turnColor={playerColor}
-              legalMoves={legalMoves}
-              onMove={tryMove}
-              lastMoveUci={game.last_move_uci}
-              occupancyController={occupancyController}
-            />
-          </BoardFrame>
-          {/* Lo que hay que saber del tablero, en la misma frase y en el mismo
-              sitio que en el visor, el tablero de análisis y los puzzles
-              (criterio C-1). */}
-          <p className={BOARD_HINT_CLASSES}>
-            {outcome !== null
+        <TrainingBoard
+          fen={game.fen}
+          color={playerColor}
+          canMove={canMove}
+          onMove={handleMove}
+          lastMoveUci={game.last_move_uci}
+          acceptsMoves={outcome === null}
+          hint={
+            outcome !== null
               ? "La partida terminó: el tablero ya no se mueve."
-              : "Arrastra una pieza para jugar. Las promociones se coronan en dama."}{" "}
-            {OCCUPANCY_TOGGLE_KEY_HINT}
-            {/* El teclado se anuncia donde se anuncia el arrastre y no más,
-                igual que en el puzzle y en el drill: con la partida terminada
-                el tablero no acepta jugadas por ninguna de las dos vías
-                (criterio C-1). Mientras el motor piensa sí se sigue anunciando,
-                como el arrastre: es una espera de un segundo, no un estado de
-                la pantalla. */}
-            {outcome === null ? ` ${KEYBOARD_MOVE_HINT}` : ""}
-          </p>
-
-          <OccupancyPanel controller={occupancyController} />
-        </div>
+              : "Arrastra una pieza para jugar. Las promociones se coronan en dama."
+          }
+        />
 
         <aside className="space-y-3">
           <Panel
             title={`Juegas con ${playerColor === "white" ? "blancas" : "negras"}`}
             aside={
-              <ExerciseStatusBadge
+              <TrainingStatusBadge
                 isPlayerTurn={game.is_player_turn}
                 isWaitingForServer={isEngineThinking}
                 waitingLabel="el motor piensa…"
@@ -306,18 +261,10 @@ export function SparringGamePage() {
                 <EmptyState title="Todavía no se ha jugado nada" />
               </div>
             ) : (
-              <ol className={`${MOVE_LIST_HEIGHT_CLASS} overflow-y-auto text-sm`}>
-                {turns.map((turn) => (
-                  <li
-                    key={turn.number}
-                    className="grid grid-cols-[2.5rem_1fr_1fr] gap-1 border-b border-slate-100 px-1 py-0.5 dark:border-slate-800"
-                  >
-                    <span className="tabular-nums opacity-50">{turn.number}.</span>
-                    <span>{turn.white}</span>
-                    <span>{turn.black}</span>
-                  </li>
-                ))}
-              </ol>
+              /* La celda es el texto pelado: mientras la partida está viva no
+                 hay análisis que enseñar ni adónde navegar, al contrario que
+                 en la lista del visor. */
+              <TurnList turns={turns} renderMove={(san) => <span>{san}</span>} />
             )}
           </Panel>
         </aside>

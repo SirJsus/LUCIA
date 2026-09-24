@@ -39,11 +39,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from lucia_api.db.base import Base
 from lucia_api.db.models import OpeningDrill, Puzzle, SparringGame
 from lucia_api.services.replays import replay_positions
-from lucia_api.services.stats import PlayerStats, get_player_stats
-
-#: Cuántas aperturas se miran para buscar la que más cuesta. Las más jugadas,
-#: que es como las devuelve RF-3.2.
-MAX_OPENINGS_CONSIDERED = 40
+from lucia_api.services.stats import MAX_OPENINGS_CONSIDERED, PlayerStats, get_player_stats
 
 #: Cuántas posiciones de re-jugar se consideran material disponible. Es el
 #: mismo tope que ofrece su propia pantalla: más allá no son "las peores".

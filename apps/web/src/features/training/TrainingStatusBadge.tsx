@@ -17,7 +17,7 @@
  */
 import { Badge } from "../../components/Badge";
 
-export function ExerciseStatusBadge({
+export function TrainingStatusBadge({
   isPlayerTurn,
   isWaitingForServer,
   waitingLabel = "comprobando…",

@@ -20,8 +20,9 @@ import { Link } from "@tanstack/react-router";
 import { Badge } from "../../components/Badge";
 import { EmptyState, ErrorBox, Spinner } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
+import { PanelList } from "../../components/PanelList";
 import { ProgressBar } from "../../components/ProgressBar";
-import { buttonClasses } from "../../components/styles";
+import { buttonClasses, LIST_ROW_CLASSES, LIST_ROW_SUMMARY_CLASSES } from "../../components/styles";
 import { api } from "../../lib/api";
 import { formatDate } from "../../lib/format";
 import { mistakeTypeStyle } from "../../lib/insights";
@@ -56,35 +57,40 @@ export function PlanPage() {
 
       {plan && plan.analyzed_games > 0 && (
         <>
-          <Panel
-            title="Qué te está costando puntos"
-            aside={
-              <span className="text-xs opacity-60">
-                sobre {plan.analyzed_games}{" "}
-                {plan.analyzed_games === 1 ? "partida analizada" : "partidas analizadas"}
-              </span>
-            }
-            bodyClassName={plan.weaknesses.length > 0 ? "" : "p-3"}
-          >
-            {plan.weaknesses.length === 0 ? (
-              // El vacío es el recuadro compartido y no una frase suelta, como
-              // en el resto de la aplicación (criterio C-4).
+          {/* La lista es la compartida (`PanelList`), como los otros tres
+              listados de Entrenamiento: la receta a mano —el panel sin
+              relleno, la `<ul>` dentro y las clases de la fila— es de las que
+              se sostienen copiando y pegando (criterio C-2). El vacío se queda
+              dentro de un `Panel` con el mismo título y el mismo recuento
+              porque «sobre N partidas analizadas» es justo lo que explica que
+              no haya nada que destacar. */}
+          {plan.weaknesses.length === 0 ? (
+            <Panel
+              title="Qué te está costando puntos"
+              aside={<AnalyzedGamesCount games={plan.analyzed_games} />}
+              bodyClassName="p-3"
+            >
+              {/* El vacío es el recuadro compartido y no una frase suelta, como
+                  en el resto de la aplicación (criterio C-4). */}
               <EmptyState title="No he encontrado nada que destaque">
                 Ninguna de las cosas que miro llega a su umbral. Analiza más partidas para afinar
                 el diagnóstico.
               </EmptyState>
-            ) : (
-              <ul>
-                {plan.weaknesses.map((weakness, position) => (
-                  <WeaknessRow
-                    key={`${weakness.kind}-${weakness.subject}`}
-                    weakness={weakness}
-                    isWorst={position === 0}
-                  />
-                ))}
-              </ul>
-            )}
-          </Panel>
+            </Panel>
+          ) : (
+            <PanelList
+              title="Qué te está costando puntos"
+              aside={<AnalyzedGamesCount games={plan.analyzed_games} />}
+            >
+              {plan.weaknesses.map((weakness, position) => (
+                <WeaknessRow
+                  key={`${weakness.kind}-${weakness.subject}`}
+                  weakness={weakness}
+                  isWorst={position === 0}
+                />
+              ))}
+            </PanelList>
+          )}
 
           <div>
             {/* `font-semibold` a secas: es el tamaño con el que se encabeza
@@ -115,9 +121,20 @@ export function PlanPage() {
   );
 }
 
+/** Sobre cuántas partidas se hizo el diagnóstico, al lado del título. Es la
+ * misma frase con el vacío y con la lista llena: cambia el cuerpo del panel, no
+ * lo que se está mirando (criterio C-2). */
+function AnalyzedGamesCount({ games }: { games: number }) {
+  return (
+    <span className="text-sm font-normal opacity-70">
+      sobre {games} {games === 1 ? "partida analizada" : "partidas analizadas"}
+    </span>
+  );
+}
+
 function WeaknessRow({ weakness, isWorst }: { weakness: Weakness; isWorst: boolean }) {
   return (
-    <li className="flex flex-wrap items-center gap-3 border-b border-slate-100 px-3 py-2 text-sm last:border-b-0 dark:border-slate-800">
+    <li className={`${LIST_ROW_CLASSES} ${LIST_ROW_SUMMARY_CLASSES}`}>
       {/* Por dónde empezar, dicho y no solo insinuado por el orden: una lista
           ordenada no se lee como una prioridad si no lo dice (criterio C-6).
           La primera no es la de número más alto —los cinco números están en
@@ -163,8 +180,8 @@ function TaskCard({ task }: { task: PlanTask }) {
       {/* De dónde sale este deber. Es lo que lo separa de una cuota inventada,
           y por eso va en la tarjeta y no escondido. */}
       <ul className="mt-2 space-y-0.5 text-xs opacity-70">
-        {task.reasons.map((reason) => (
-          <li key={`${reason.kind}-${reason.subject}`}>{formatWeaknessSentence(reason)}</li>
+        {task.weaknesses.map((weakness) => (
+          <li key={`${weakness.kind}-${weakness.subject}`}>{formatWeaknessSentence(weakness)}</li>
         ))}
       </ul>
 

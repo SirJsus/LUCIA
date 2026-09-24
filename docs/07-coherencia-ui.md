@@ -83,7 +83,17 @@ barrido —leer las cinco pantallas con tablero estado por estado— dejó cinco
 arreglos más y destapó la **109**, que se cerró en el mismo commit: dar a la
 partida de sparring cabecera de pantalla de detalle (fila 94) es lo que la puso
 a compararse con el visor también por dónde tiene sus acciones. El inventario
-queda vacío.
+queda vacío. Y **comprobar esa comprobación** al día siguiente, el 2026-09-23,
+con la columna del tablero de entrenamiento ya extraída a un solo componente,
+dejó **diez arreglos más y ninguna fila nueva**; el más serio, una rejilla de
+casillas enfocables que se desmontaba en cada jugada de entrenamiento mientras
+el pie del tablero seguía prometiendo el teclado. El inventario sigue vacío.
+Y ese mismo 2026-09-23 lo vuelve a llenar el **análisis en lote desde el
+listado** (RF-2.5), que le pone a Partidas la segunda forma de mandar analizar
+—la primera es el botón del visor, de una en una— y una columna que dice con
+qué motores está analizada cada partida: abrió las filas **110 a 112**, las
+tres sobre lo que la tanda no cuenta de sí misma, y dejó siete arreglos en el
+mismo commit.
 
 **Qué es cada mitad de este documento.** Los criterios C-1 a C-7 son
 **RNF-11**, que vive en la sección Post 1.0 de
@@ -116,40 +126,41 @@ antes de comitear cambios de front — ver [Cómo se verifica](#cómo-se-verific
 
 ## Inventario de incoherencias abiertas (al 2026-09-23)
 
-**Ninguna.** El barrido de cierre de la fase 3 recorrió las quince que quedaban
-—las dos de la pantalla de puzzles (91 y 92), las tres que abrió el sparring
-(94 a 96), las cuatro del drill de aperturas (97 a 100), las tres de re-jugar
-desde el error (101 a 103), las dos del plan semanal (104 y 105) y la que
-destapó llevar la capa de ocupación a las tres pantallas de entrenamiento
-(107)— y las cerró todas. Comprobarlo a continuación dejó cinco arreglos más y
-destapó una fila nueva, la **109**, consecuencia directa de cerrar la 94: dar
-a la partida de sparring cabecera de pantalla de detalle la puso a compararse
-con el visor y con el tablero de análisis también por dónde tiene sus acciones.
-Se cerró en el mismo commit subiéndolas a la cabecera. El detalle de las
-dieciséis está abajo, en la entrada del 2026-09-22.
+**Dos**, las dos del análisis en lote del listado de Partidas (RF-2.5), y las
+dos de la misma raíz: la tanda se manda bien pero no cuenta lo que hace
+después. Una es que la columna «Análisis» no se entera de nada más una vez
+pedida la lista (110); la otra, que se puede volver a analizar lo ya analizado
+con ese mismo motor sin que nada lo diga, cuando las dos pantallas que analizan
+de una en una llevan meses distinguiéndolo con «Reanalizar» (111). Las dos
+piden decidir comportamiento —cada cuánto se refresca una lista, si una tanda
+deduplica— y por eso no se arreglaron en el mismo commit que las abrió. La
+tercera que abrió esa misma pasada, la **112** —lo marcado sobrevivía al cambio
+de página—, sí se cerró con ella: no pedía decidir nada, porque la regla ya
+estaba tomada para el cambio de filtro.
 
-Es la segunda vez que queda vacío. La primera fue
-el 2026-09-19, al cerrar las cuatro heredadas de la fase 2 —la 65 y la 67 de la pantalla de Partidas y la 68
-y la 70 del control de exportar del visor—, y volvió a llenarse ese mismo día
-con la pantalla de Entrenamiento: era la primera sección que se construía
-entera de una vez, y compararla consigo misma y con lo que ya había daba más de
-lo que cabía en un commit. Por eso se decidió entonces dejarlas para el final
-de la fase, cuando estuvieran las seis pantallas y se pudiera decidir de una
-vez cómo se parecen; esto es ese momento.
+El inventario estuvo vacío dos veces, el 2026-09-19 y el 2026-09-22. Los
+números no se renumeran al cerrar una fila, que es la referencia con la que se
+habla de ella en un commit: la 93 y la 106 están cerradas y sus números no se
+reutilizan. La siguiente fila que se abra será la **113**.
 
-Los números no se renumeran al cerrar una fila, que es la referencia con la que
-se habla de ella en un commit: la 93 y la 106 están cerradas y sus números no
-se reutilizan. La siguiente fila que se abra será la **110**.
+| # | Incoherencia | Dónde | Criterio |
+| --- | --- | --- | --- |
+| 110 | La columna «Análisis» dice lo que era verdad cuando se pidió la lista y nada más: `analyzed_by_engines` y `has_analysis_in_progress` solo se vuelven a consultar al mandar una tanda o al tocar un filtro. Una partida recién mandada se queda en «Analizando…» aunque haya terminado hace diez minutos, y no pasa a nombrar su motor hasta que se recarga la pantalla. El visor sigue el mismo trabajo en vivo —barra de progreso, «posición N de M», reloj— con `useTrackedAnalysis`, así que el mismo análisis se cuenta de dos maneras según desde dónde se mire. Lo barato es un `refetchInterval` mientras alguna fila esté en marcha; lo fino, escuchar el mismo flujo de progreso que el visor. | `apps/web/src/features/games/GamesPage.tsx` (`gamesQuery`, sin `refetchInterval`) frente a `apps/web/src/features/viewer/GameViewerPage.tsx` (`useTrackedAnalysis`) | C-3 |
+| 111 | La tanda no distingue lo ya analizado. El visor y el tablero de análisis dicen «Reanalizar con X» cuando el análisis terminado es de ese motor —regla que cerró una fila entera el 2026-09-18—, y aquí se pueden marcar cinco partidas de las que tres ya están hechas con Stockfish y el botón dice «Analizar 5 partidas» sin avisar de que tres van a repetirse. `POST /analysis` crea un `Analysis` por cada id sin mirar los que ya hay, así que el trabajo se hace dos veces y la columna «Análisis» acaba enseñando el mismo motor. El front tiene el dato en la mano (`game.analyzed_by_engines`): puede decirlo, excluirlas o dejar marcar solo lo que falta. | `apps/web/src/features/games/GamesPage.tsx` (la barra de análisis en lote) y `apps/api/lucia_api/routers/analysis.py::create_analysis` | C-2 / C-3 |
 
 ## Lo que se cerró
 
-Las 109 filas de este inventario, todas cerradas, se cerraron en trece pasadas,
-y aquí queda el rastro de qué se hizo, para que un `git blame` no sea la única
-forma de averiguarlo. Las seis pasadas que construyeron Entrenamiento —la de la
-pantalla de puzzles, la del sparring, la del drill de aperturas, la de re-jugar
-desde el error, la del plan semanal y la de la capa de ocupación— están al
-final: esas no cerraron filas, las abrieron. La decimotercera, el barrido de
-cierre de la fase 3, es la que las cerró todas, y va la última de todas.
+Las 110 filas cerradas de este inventario —las 109 primeras y la 112— se
+cerraron en trece pasadas, a las que se suman las dos del 2026-09-23: la que
+comprobó el barrido de cierre, que no cerró ninguna fila porque no quedaba
+ninguna y solo dejó arreglos, y la del análisis en lote, que abrió tres filas y
+cerró una. Aquí queda el rastro de qué se hizo en cada una, para que un `git
+blame` no sea la única forma de averiguarlo. Las seis pasadas que construyeron
+Entrenamiento —la de la pantalla de puzzles, la del sparring, la del drill de
+aperturas, la de re-jugar desde el error, la del plan semanal y la de la capa
+de ocupación— están al final: esas no cerraron filas, las abrieron. La
+decimotercera, el barrido de cierre de la fase 3, es la que las cerró todas y
+va detrás de ellas, seguida solo por las dos del 2026-09-23.
 
 **2026-09-06 · legibilidad del análisis.** Apareció la barra de evaluación, el
 tablero de análisis empezó a dibujar las flechas del motor, los vacíos del
@@ -891,7 +902,7 @@ commit, sin nada que decidir:
   puzzle, y nombra solo los colores que están dibujados, como la leyenda de la
   capa de ocupación.
 - **C-6 · el contador de intentos contaba uno de más.** Tras fallar el primero,
-  el aviso decía "Llevas 2 intentos": `attempt` es el intento que viene, no los
+  el aviso decía "Llevas 2 intentos": `attemptNumber` es el intento que viene, no los
   hechos. Y con uno solo escribía "1 intentos".
 
 Y dos rupturas deliberadas del patrón, que se revisaron y se dejan como están:
@@ -1022,8 +1033,10 @@ Y cuatro rupturas del patrón que se revisaron y se dejan como están:
   Estadísticas ("Por apertura").
 - **La cola mezcla las dos barajas** —las líneas donde te sales de la teoría
   (RF-3.6) y las aperturas que rinden mal (RF-3.2)— ordenadas por cuándo tocan
-  y no por su origen, que se dice con una insignia. Separarlas obligaría a
-  elegir por cuál empezar cada día, y para quien entrena son lo mismo.
+  y no por su origen, que se dice en el panel de la línea. Separarlas obligaría
+  a elegir por cuál empezar cada día, y para quien entrena son lo mismo. (Ese
+  día el origen era una insignia; la fila 98, al día siguiente, dejó la
+  insignia para el estado del ejercicio y bajó el motivo al cuerpo del panel.)
 
 **2026-09-21 · re-jugar desde el error (RF-4.4).** La cuarta pestaña de
 Entrenamiento —una lista de los errores propios más caros— y la primera acción
@@ -1269,7 +1282,7 @@ era de código; van marcadas como tales.
   título es «Juegas con blancas/negras» en las tres, y la insignia dice siempre
   lo mismo —si el sistema está esperando, si te toca o si se acabó— en vez de
   significar el repaso en el puzzle, la baraja en el drill y el turno en el
-  sparring. Es `features/training/ExerciseStatusBadge.tsx`. Lo que identifica al
+  sparring. Es `features/training/TrainingStatusBadge.tsx`. Lo que identifica al
   ejercicio bajó al cuerpo del panel, y de paso el drill enseña ya sus
   `repetitions`, que la API mandaba y nadie leía.
 - **99 · que falte teoría es condición de la pantalla, no del botón** (C-3).
@@ -1289,9 +1302,10 @@ era de código; van marcadas como tales.
   jugadas como la frase «Retomada desde la jugada 23».
 - **102 · re-jugar dice cuántos errores hay** (C-3). La respuesta es ya
   `ReplayQueueOut` —`positions` y `total`—, con el total en el cuerpo y no en
-  una cabecera `X-Total-Count` como el listado de Partidas, porque las tres
-  pestañas hermanas lo traen así y es con ellas con las que se compara al
-  cambiar de pestaña.
+  una cabecera `X-Total-Count` como el listado de Partidas, porque así lo traen
+  las dos pestañas hermanas que reparten cola —puzzles y aperturas—, que son
+  con las que se compara al cambiar de pestaña. El listado de sparring no lleva
+  total: son las partidas abiertas, no una cola.
 - **103 · las ayudas salen de los `title`** (C-6 / C-7). Las tres acciones que
   sacan la partida del visor —«Exportar PGN anotado», «Abrir como tablero» y
   «Jugar desde aquí»— explicaban qué hacen en un `title`, que con teclado no
@@ -1360,9 +1374,122 @@ con tablero estado por estado, sin nada que decidir:
   `features/training/README.md` seguían diciendo que las **seis** pantallas de
   la sección comparten cabecera, cuando la fila 94 sacó de ahí a la partida de
   sparring; y los cuatro archivos que estrenó el barrido —`PanelList`,
-  `BoardFrame`, `board/hints.ts` y `ExerciseStatusBadge`— no estaban en la tabla de su
+  `BoardFrame`, `board/hints.ts` y `TrainingStatusBadge`— no estaban en la tabla de su
   README, que es donde se mira antes de copiar una receta a mano.
 
+
+**2026-09-23 · comprobar el barrido de cierre.** Volver a leer las seis
+pantallas con el barrido ya aplicado —y con el tablero de entrenamiento ya
+extraído a un solo componente— dejó **diez arreglos más y ninguna fila nueva**:
+los diez eran mecánicos, sin nada que decidir, y por eso van aquí y no en el
+inventario.
+
+- **C-1 / C-7 · la rejilla enfocable deja de desmontarse a media jugada.**
+  `Chessboard` la montaba solo si había jugadas legales **en ese instante**, y
+  las tres pantallas de entrenamiento se quedan sin ellas mientras el servidor
+  contesta: la rejilla desaparecía en cada jugada, el foco caía al `<body>` y
+  la casilla enfocada volvía a e4, mientras el pie del tablero seguía
+  prometiendo el teclado. Se monta ahora por lo que el tablero **es** —de los
+  que aceptan jugadas— y no por si las acepta ahora; durante la espera sigue
+  enfocable e inspeccionable, pero no le devuelve la pulsación a chessground,
+  que marcaría la pieza sin tener adónde llevarla. El visor, el tablero de
+  análisis y el editor de posición no cambian.
+- **C-6 / C-7 · las tres ayudas que quedaban en un `title`.** Un `title` no
+  aparece nunca con teclado y en un control deshabilitado tampoco se tabula: es
+  lo mismo que cerraron las filas 56, 57 y 103. Las cinco acciones de la
+  cabecera del tablero de análisis se explican ya en la línea de debajo, con la
+  misma forma que las del visor; el motivo de «Guardar los datos» deshabilitado
+  en `OwnGamePanel` ya estaba dicho a la vista y el `title` era un resto; y qué
+  hace «Editor de posición» se lee bajo el botón, en Tableros.
+- **C-2 · el plan usa la lista compartida.** `PlanPage` reproducía a mano
+  `PanelList` y las clases de fila de `styles.ts`; usa las dos. El vacío se
+  queda dentro de un `Panel` con el mismo título y el mismo «sobre N partidas
+  analizadas», que es justo lo que explica que no haya nada que destacar.
+- **C-2 / C-3 · cinco esperas que no decían qué esperaban.** Partidas,
+  Estadísticas, Motores, Tableros y la segunda espera del tablero de análisis
+  montaban un `Spinner` pelado mientras las ocho restantes dicen qué están
+  trayendo. Los dos verbos propios de Entrenamiento —«Mirando tus partidas…» y
+  «Buscando tus errores…»— se quedan como están, porque el plan y la lista de
+  re-jugar no traen nada guardado sino que lo deducen al leer; la divergencia
+  queda escrita en `features/training/README.md` para que no se lea como
+  descuido.
+- **C-1 / C-2 · la frase del teclado, con un solo arranque.** El editor de
+  posición repetía a mano el principio de `KEYBOARD_MOVE_HINT`. Las dos frases
+  salen ya del mismo trozo (`KEYBOARD_SQUARES_HINT`) y solo se separan en lo
+  que hace Intro allí: mover una pieza o colocarla.
+- **C-4 · «Todavía no…» en las diez pantallas.** Las tres secciones vacías de
+  Estadísticas decían «Aún no hay…» donde las otras nueve dicen «Todavía
+  no…».
+
+Y un comentario que afirmaba lo contrario de lo que hace el código: el
+docstring de `DrillsPage` decía que de qué baraja viene cada línea «lo dice su
+insignia», cuando la fila 98 dejó esa insignia para el estado del ejercicio y
+bajó el motivo al cuerpo del panel. Lo decía también la entrada del 2026-09-21
+de este documento, corregida con él.
+
+**2026-09-23 · el análisis en lote desde el listado (RF-2.5).** Partidas gana
+una barra sobre la tabla —motor, «Analizar N partidas» y su ayuda—, una columna
+de casillas con la de «marcar toda la página» en la cabecera y la columna
+«Análisis», que dice con qué motores está analizada cada partida. Es la segunda
+forma de mandar analizar: la primera es el botón del visor, de una en una, y
+contra ella se compara. La revisión abrió las filas **110 a 112** y dejó ocho
+arreglos en el mismo commit, uno de los cuales cierra la **112**; las otras dos
+siguen abiertas, arriba, en el inventario:
+
+- **C-5 / C-6 · «sin analizar» no es un hueco.** La columna enseñaba «—» para
+  una partida que nadie ha mandado analizar, que es el mismo signo con el que
+  la fila de al lado dice que no llegó el rating o el control de tiempo
+  (`MISSING_VALUE`). Ahí no falta ningún dato: se sabe que no hay análisis, y
+  el estado ya tiene nombre en la aplicación —el `EmptyState` «Sin analizar»
+  del visor y del tablero—. `formatAnalyzedByEngines` lo escribe con esas
+  palabras (`NOT_ANALYZED`).
+- **C-6 · lo que la selección no dice de sí misma, a la vista.** Que la casilla
+  de la cabecera marca **solo esta página** vivía únicamente en su
+  `aria-label`, invisible para quien ve la pantalla, y que cambiar un filtro
+  vacía lo marcado se descubría viendo el botón volver a cero. Las dos cosas
+  van en la línea de ayuda bajo la barra, que es además donde Puzzles y
+  Aperturas explican su botón de generar.
+- **C-3 · el motivo del botón apagado se dice en pantalla.** Sin nada marcado,
+  la línea de ayuda dice qué hay que hacer para encenderlo —«marca alguna
+  partida con las casillas de la primera columna»—, como «Analizar» en el
+  tablero de análisis desde el 2026-09-18.
+- **C-3 · la casilla de la cabecera no puede decir que no hay nada marcado
+  cuando hay tres.** Con algunas filas marcadas y otras no se veía vacía;
+  ahora lleva el estado intermedio del navegador (`indeterminate`), que no es
+  un atributo sino una propiedad del elemento.
+- **C-2 · la barra se ve como las demás barras de acción.** El botón iba en
+  `sm` —el tamaño de la paginación— y la ayuda, inline al lado del botón; en
+  Puzzles y en Aperturas el botón va al tamaño normal y la ayuda debajo, en su
+  `text-xs opacity-60`.
+- **C-2 / C-7 · las dos casillas se nombran igual.** La de cada fila decía
+  «Analizar Ana contra Beto» —analizar lo hace el botón; la casilla marca— y no
+  distinguía dos partidas entre los mismos jugadores. Dice ahora «Marcar la
+  partida … del 14 de marzo de 2026», en paralelo con «Marcar todas las
+  partidas de esta página».
+- **C-3 · lo marcado deja de sobrevivir al cambio de página (fila 112,
+  cerrada).** `updateFilter` vaciaba la selección a propósito —analizar
+  partidas que no se ven es justo lo que un lote no debe hacer— pero los dos
+  botones de paginación llamaban a `setFilters` directamente, así que marcando
+  dos en la página 1 y pasando a la 2 el botón seguía diciendo «Analizar 2
+  partidas» sin una sola casilla marcada en pantalla. Los dos pasan ahora por
+  `goToPageAtOffset`, que vacía la selección por la misma razón que el cambio
+  de filtro. Era la coherencia que ya estaba decidida: «marcar todas» cubre
+  solo la página visible, así que una tanda tampoco se compone entre páginas;
+  la otra salida —dejar que se componga y decir en pantalla cuántas hay
+  marcadas fuera de esta— habría contradicho a la casilla de la cabecera.
+- **Y el recuadro verde nombra el motor**: «3 partidas en cola con Stockfish»,
+  sacado del análisis creado y no del desplegable, que se puede cambiar con el
+  recuadro todavía en pantalla. Es lo que ya hacen las barras de progreso del
+  visor y del tablero de análisis desde el 2026-09-18.
+
+**Y dos cosas que se revisaron y se dejan como están.** «Mandando…» no es el
+gerundio del botón que se pulsa —el resto de la aplicación dice «Sincronizando…»
+bajo «Sincronizar», «Importando…» bajo «Importar»—, pero aquí pulsar no analiza:
+encola. «Analizando…» prometería lo que no pasa todavía, y el verbo no aparece
+en ninguna otra pantalla, así que no choca con nada. Y que el botón diga
+«Analizar 5 partidas» en vez de «Analizar con Stockfish», como el del visor, es
+la diferencia real entre los dos trabajos: el motor va en el desplegable de al
+lado y el tamaño de la tanda no se sabe mirando otra cosa.
 
 **Y un nombre que se revisó y se deja como está.** Que la acción se llame
 "Exportar PGN anotado" y no "Exportar PGN", teniendo Partidas un "Importar
@@ -1408,6 +1535,6 @@ Antes de comitear cualquier cambio que toque `apps/web`:
    igual — o cambiar las dos a la vez.
 3. Si aparece una incoherencia que no se arregla en el mismo commit, añadirla
    al inventario de arriba —`# · Incoherencia · Dónde · Criterio`, numerando
-   desde el 109— en vez de dejarla suelta. Una fila se borra cuando se arregla,
+   desde el 113— en vez de dejarla suelta. Una fila se borra cuando se arregla,
    y las demás no se renumeran: el número es la referencia con la que se habla
    de ella en un commit o en una revisión.

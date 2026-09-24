@@ -17,7 +17,6 @@
 import type { BoardDetail } from "@lucia/shared-types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "@tanstack/react-router";
-import { Chess } from "chess.js";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "../../components/Button";
 import { EngineSelect } from "../../components/EngineSelect";
@@ -45,6 +44,7 @@ import {
   formatEngineName,
   type EngineId,
 } from "../../lib/format";
+import { tryMove } from "../../lib/moves";
 import { whiteWinPercentFromScore } from "../../lib/score";
 import { EngineLines } from "./EngineLines";
 import { VariationTree } from "./VariationTree";
@@ -332,15 +332,8 @@ export function BoardPage() {
   const handleBoardMove = useCallback(
     (from: string, to: string) => {
       if (!currentFen) return;
-      const chess = new Chess(currentFen);
-      try {
-        // La promoción siempre a dama: elegir pieza es un extra que no aporta
-        // en un tablero de análisis y complicaría el flujo de arrastre.
-        const move = chess.move({ from, to, promotion: "q" });
-        playLine([move.san]);
-      } catch {
-        // movimiento ilegal (chessground ya filtra casi todos)
-      }
+      const move = tryMove(currentFen, from, to);
+      if (move) playLine([move.san]);
     },
     [currentFen, playLine],
   );
@@ -383,7 +376,7 @@ export function BoardPage() {
 
   if (boardQuery.isPending) return <Spinner label="Cargando el tablero…" />;
   if (boardQuery.isError) return <ErrorBox error={boardQuery.error} onRetry={boardQuery.refetch} />;
-  if (!tree || !currentNode) return <Spinner />;
+  if (!tree || !currentNode) return <Spinner label="Cargando el tablero…" />;
 
   const board = boardQuery.data;
   const lastMoveUci = currentNode.uci;
@@ -426,11 +419,7 @@ export function BoardPage() {
               ahora (criterio C-3). Los atajos se anuncian en la línea de
               ayuda de debajo del tablero, que es donde esta pantalla y el
               visor anuncian los suyos. */}
-          <Button
-            onClick={undoBoard}
-            disabled={!board.can_undo || historyMutation.isPending}
-            title="Deshacer el último cambio del árbol (Ctrl+Z)"
-          >
+          <Button onClick={undoBoard} disabled={!board.can_undo || historyMutation.isPending}>
             {/* Mientras la petición viaja, el botón lo dice, como "Eliminando…"
                 en Tableros o "Abriendo…" en el visor: sin esto la única señal
                 era que los dos botones se apagaran (criterio C-3). */}
@@ -438,11 +427,7 @@ export function BoardPage() {
               ? "Deshaciendo…"
               : "Deshacer"}
           </Button>
-          <Button
-            onClick={redoBoard}
-            disabled={!board.can_redo || historyMutation.isPending}
-            title="Rehacer lo último deshecho (Ctrl+Y o Ctrl+Mayús+Z)"
-          >
+          <Button onClick={redoBoard} disabled={!board.can_redo || historyMutation.isPending}>
             {historyMutation.isPending && historyMutation.variables === "redo"
               ? "Rehaciendo…"
               : "Rehacer"}
@@ -463,16 +448,10 @@ export function BoardPage() {
               importPgnMutation.reset();
               setPgnToImport(pgnToImport === null ? "" : null);
             }}
-            title="Trae una partida con variantes y comentarios desde lichess, ChessBase o SCID"
           >
             {pgnToImport === null ? "Importar PGN" : "Cancelar"}
           </Button>
-          <Button
-            onClick={() => copyPgnMutation.mutate(toPgn(tree))}
-            title="Copia el árbol completo, con variantes, al portapapeles"
-          >
-            Copiar PGN
-          </Button>
+          <Button onClick={() => copyPgnMutation.mutate(toPgn(tree))}>Copiar PGN</Button>
           {/* La acción principal de la pantalla pasa a ser esta, como en el
               visor: es la que cuesta minutos de motor y la que se viene a
               hacer. Solo se analiza la línea principal; las variantes se
@@ -482,11 +461,6 @@ export function BoardPage() {
             onClick={() => analyzeBoardMutation.mutate()}
             disabled={
               mainLineMoves.length === 0 || analyzeBoardMutation.isPending || isAnalysisRunning
-            }
-            title={
-              mainLineMoves.length === 0
-                ? "Añade alguna jugada a la línea principal para poder analizarla"
-                : `Clasifica las jugadas de la línea principal con ${formatEngineName(engine)}, como en una partida`
             }
           >
             {/* "Reanalizar" solo si lo terminado es de **este** motor, como
@@ -501,6 +475,23 @@ export function BoardPage() {
           </Button>
         </div>
       </div>
+
+      {/* Qué hacen las acciones de la cabecera, a la vista y no en un `title`:
+          con teclado un `title` no aparece nunca, y en un botón deshabilitado
+          —que es como están "Deshacer" y "Rehacer" sin historial— tampoco. Es
+          la misma línea con la que el visor explica las suyas (fila 103 del
+          inventario de docs/07-coherencia-ui.md, criterios C-6 y C-7). Los
+          atajos de deshacer y rehacer no se repiten aquí: van en la frase bajo
+          el tablero, que es donde las dos pantallas anuncian los suyos. */}
+      <p className="text-xs opacity-60">
+        <strong className="font-medium">Deshacer</strong> y{" "}
+        <strong className="font-medium">Rehacer</strong> recorren los cambios del árbol, jugada a
+        jugada. <strong className="font-medium">Importar PGN</strong> trae una partida con sus
+        variantes y comentarios desde lichess, ChessBase o SCID, y descarta lo que haya aquí.{" "}
+        <strong className="font-medium">Copiar PGN</strong> copia el árbol completo, con variantes,
+        al portapapeles. <strong className="font-medium">Analizar</strong> clasifica las jugadas de
+        la línea principal con {formatEngineName(engine)}, como en una partida.
+      </p>
 
       {isEditingOwnGame && tree && (
         <OwnGamePanel

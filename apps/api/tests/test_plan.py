@@ -122,10 +122,10 @@ async def test_losing_ground_in_the_opening_becomes_a_weakness_and_a_drill_task(
     await _add_analyzed_game(db_session, player)
     db_session.add(
         OpeningDrill(
-            reason="opening",
+            source="opening",
             player_color="white",
             line_uci="e2e4 e7e5 g1f3",
-            games=3,
+            games_played=3,
             score_percent=0.0,
             repetitions=0,
             interval_days=0,
@@ -142,7 +142,7 @@ async def test_losing_ground_in_the_opening_becomes_a_weakness_and_a_drill_task(
     assert ("phase", "opening") in [(w.kind, w.subject) for w in plan.weaknesses]
     drills = next(task for task in plan.tasks if task.kind == "drills")
     assert drills.weekly_target == 1  # solo hay una línea, aunque el tope semanal sea 10
-    assert [reason.kind for reason in drills.reasons]
+    assert [weakness.kind for weakness in drills.weaknesses]
 
 
 async def test_without_analysed_games_there_is_no_diagnosis(
@@ -257,7 +257,7 @@ def _override_session(db_session: AsyncSession) -> None:
     app.dependency_overrides[get_session] = _session
 
 
-async def test_the_endpoint_serves_each_task_with_its_reasons(
+async def test_the_endpoint_serves_each_task_with_its_weaknesses(
     db_session: AsyncSession,
 ) -> None:
     """Cada deber viaja con las debilidades que lo piden: "generado a partir de
@@ -291,4 +291,4 @@ async def test_the_endpoint_serves_each_task_with_its_reasons(
     assert body["analyzed_games"] == 1
     assert body["weaknesses"]
     for task in body["tasks"]:
-        assert task["reasons"], f"la tarea {task['kind']} no dice por qué está"
+        assert task["weaknesses"], f"la tarea {task['kind']} no dice por qué está"

@@ -11,56 +11,330 @@ SemVer para la serie `0.x`).
 
 ## [Sin publicar]
 
-Nada todavía. `0.5.0` cerró la **fase 3 entera** —sus siete ítems, el séptimo
-de ellos el barrido de cierre de RNF-11— y, con ella, **las fases 0 a 3
-enteras**: para `1.0.0` queda la fase 4 y solo la fase 4.
+Nada entregado todavía, pero sí **un defecto encontrado y sin arreglar**; ver
+abajo. Para `1.0.0` queda la **fase 4 y solo la fase 4**; el progreso en
+[docs/05-roadmap.md](docs/05-roadmap.md) y el alcance congelado en
+[docs/02-requerimientos.md](docs/02-requerimientos.md).
 
-Camino a v1.0.0 — ver progreso en [docs/05-roadmap.md](docs/05-roadmap.md) y
-alcance congelado en [docs/02-requerimientos.md](docs/02-requerimientos.md).
-Con `0.3.0` quedaron cerradas las **fases 0, 1 y 2**, con `0.4.0` su
-**apéndice**, con `0.4.1` a `0.4.5` los cinco ítems de RF-4 de la **fase 3** y
-con `0.5.0` los dos últimos, que no eran de RF-4: la capa de ocupación en las
-pantallas de entrenamiento (RF-7) y el barrido de RNF-11.
+### Defecto conocido
 
-**Qué está entregado**: RF-1, RF-2, **RF-4 entero** (4.1 a 4.5, del 2026-09-19
-al 2026-09-21), RF-5, RF-6, RF-10 entero, los siete puntos P1 de **RF-7**
-—desde el 2026-09-22 en las cinco pantallas con tablero, no en dos— y todo RF-3
-salvo su RF-3.8. Con esto los requerimientos funcionales de v1.0 están
-entregados **salvo RF-3.8, RF-7.8 y RF-7.9**, los tres en la fase 4.
+**El árbol de un tablero deja de servirse pasados 127 plies** (**RF-6**,
+encontrado el **2026-09-24** con la aplicación en marcha, diagnosticado y **no
+arreglado**). `pydantic-core` serializa como mucho 127 niveles de anidamiento y
+`boards.tree_json` anida uno por ply, así que un tablero de más de unas 64
+jugadas falla con `Circular reference detected (depth exceeded)` — el mensaje
+habla de ciclo y lo que hay es profundidad. Medido sobre la base del autor: los
+tableros de 31, 49 y 56 plies se sirven; el de 142, no.
 
-**Qué falta para `1.0.0`**, que ahora cabe en una línea: la **fase 4 entera**
-—RF-3.8 (rivales recurrentes), RF-7.8 y RF-7.9 (recordar sub-modo y filtros de
-ocupación entre sesiones, y casillas críticas según motor), explicaciones en
-lenguaje natural, empaquetado y soporte de macOS/Windows—. De esos cinco
-ítems, solo los tres primeros son requerimientos; los otros dos son
-distribución.
+**El dato entra y no sale**: el fallo es al serializar la respuesta, después de
+escribir, así que `POST`/`PUT /boards` guardan la fila y devuelven error, y el
+tablero queda en la base sin poder abrirse. No es un defecto nuevo —es el
+serializador contra una estructura que ya era así—, pero lo destapa el camino
+que abrió la fase 3: una partida de sparring (RF-4.3) abierta como tablero
+(RF-6.6) pasa de 127 plies con facilidad.
 
-Fuera de ese camino, en Post 1.0: **RF-8 · Personalización de interfaz**
-(Fase 5), **RF-11 · Partidas con ventaja (odds) contra el motor** (Fase 6,
-planteado el 2026-09-07: necesitaba antes el editor de posición de RF-6.1 y el
-sparring calibrado de RF-4.3, **los dos entregados ya** —2026-09-18 y
-2026-09-21—, y desde RF-4.4 también está resuelto jugar desde una posición que
-no es la inicial, así que lo que le falta es solo suyo: la posición inventada
-—un FEN o el editor, que por HTTP no se aceptan a propósito— y la ventaja
-material como perilla; sigue fuera del alcance de 1.0 porque se planteó
-después del corte), **RF-9 · Comparación de evaluaciones
-entre motores** (ampliación de RF-2.6, sin fase propia) y **RNF-11 ·
-Coherencia de interfaz**, criterio permanente cuyos incumplimientos concretos
-se arreglan dentro de 1.0: su inventario en
-[docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) **está vacío** desde el
-barrido de cierre de la fase 3, por segunda vez en su historia —la primera fue
-el 2026-09-19, y volvió a llenarse ese mismo día con la sección de
-Entrenamiento—. **La fase 3 cerró con su barrido hecho**, que es como se le
-preveía. Que el inventario esté a cero no cierra RNF-11 ni lo mete en el
-alcance: es un criterio permanente, no cuenta para el progreso hacia 1.0.0, y
-cada cambio de `apps/web` puede volver a abrir filas — las que se abran serán,
-como las dieciséis últimas, trabajo sobre RF ya congelados y se arreglarán
-dentro de 1.0.
+**Arreglo decidido y pendiente**: servir `tree_json` sin pasarlo por el
+serializador de Pydantic (`json.dumps` lo aguanta, comprobado hasta 1000
+niveles) en vez de aplanar el árbol, que sería lo correcto de raíz pero cambia
+el contrato, `tree.ts` y el esquema. Está como ítem de la fase 4.
+
+Son **cuatro requerimientos** —**RF-2.9** (explicaciones en lenguaje natural de
+por qué una jugada es error), **RF-3.8** (rivales recurrentes) y **RF-7.8** y
+**RF-7.9** (recordar sub-modo y filtros de ocupación entre sesiones, y casillas
+críticas según motor)— más el empaquetado y macOS/Windows, que no son
+requerimientos de nadie sino distribución.
+
+**El siguiente movimiento es RF-2.9, y `1.0.0` no se puede cortar sin él**: es
+el único punto de **RF-2** sin entregar, así que el corte afirmaría que RF-2
+está entregado entero y eso sería falso. Hasta `0.6.0` este archivo lo daba por
+hecho sin querer —contaba tres pendientes donde hay cuatro—; el roadmap dice
+ahora por dónde se abre la fase.
+
+**Eran cuatro y estuvieron a punto de ser cinco.** **RF-2.5** (análisis en
+lote, **P0**) tampoco estaba en esta cuenta: entregado solo en el servidor
+desde la fase 1, sin forma de pedirlo desde ninguna pantalla y **sin una sola
+mención** en el roadmap ni aquí. **Se cierra en `0.6.0`**, entero, así que no
+engorda esta lista — pero deja la lección: lo pendiente se contaba por los
+ítems escritos en el roadmap y no por las filas de
+[02-requerimientos.md](docs/02-requerimientos.md), que es la lista que manda.
+Antes de cortar `1.0.0` hay que recorrer esa tabla RF a RF, no este resumen.
+
+## [0.6.0] - 2026-09-23
+
+Dos cosas en el mismo commit. La primera es la **auditoría de cierre de la fase
+3**: volver a leer entera la sección que se acababa de construir y saldar lo
+que salió — **rompe el contrato de la API en ocho campos**, trae **una
+migración**, arregla **un error de verdad** y pone a decir la verdad al relato
+de `0.5.0`, que en tres puntos no la decía. La segunda es la que esa forma de
+mirar destapó fuera de la fase 3: el **análisis en lote desde el listado de
+Partidas**, que **completa RF-2.5** (P0).
+
+**Sí hay prestación nueva, y esta entrada decía lo contrario.** Llegó a decir
+"no hay un solo RF que no estuviera ya entregado", y eso era verdad de los RF
+que el proyecto se contaba a sí mismo: **RF-2.5 estaba a medias y ningún
+documento lo decía** —`POST /analysis` aceptaba una lista de `game_ids` desde
+la fase 1 y no había forma de pedir una tanda desde ninguna pantalla—. Con este
+commit queda **entregado entero**, backend e interfaz; el detalle está abajo,
+en "Añadido", y por qué nadie lo contaba, en "Corregido".
+
+**Por qué sigue siendo `0.6.0` y no `0.7.0`.** Porque `0.6.0` **es** el número
+de este commit, no uno que se le adjudique después: todo esto —auditoría y
+análisis en lote— va en un solo commit, y una versión por commit es
+precisamente la disciplina que esta entrada le reclama a `0.5.0`, que abarcó
+dos. Y porque el número ya está donde tiene que estar: en la serie `0.x` una
+prestación nueva sube el **minor**, que es exactamente lo que este ya es. Subir
+a `0.7.0` inventaría una versión que ningún commit llevó y partiría en dos un
+trabajo que no lo está. Los diez manifiestos, `openapi.json` y
+`packages/shared-types` siguen en `0.6.0`.
+
+**Por qué sube el minor sin cerrar fase.** La regla de casa —minor al cerrar
+una fase del roadmap, patch para lo que pasa dentro de ella— dice cuándo
+**basta** con un patch, no cuándo basta con nada más, y aquí se queda corta por
+debajo: ocho campos renombrados en la API y una migración que renombra dos
+columnas **no caben en un patch**, que es por definición el número que se sube
+cuando actualizar no obliga a tocar nada. En la serie `0.x` el sitio de un
+cambio incompatible es el minor —lo dice la cabecera de este archivo— y ese es
+el segundo motivo por el que un minor existe, además de cerrar fase. `0.5.0`
+usó el otro argumento, "es el mismo commit sin publicar", para meter dos
+rupturas de contrato sin subir nada; **esta versión no lo repite**.
+
+**La fase 3 sigue cerrada por `0.5.0` y la fase 4 sigue sin abrirse.** Esto es
+la deuda de la fase 3, no su continuación: **no se ha reabierto ninguna
+casilla** —los seis ítems están entregados de verdad, comprobados uno a uno— y
+no se ha marcado ninguna nueva. **El análisis en lote tampoco abre una**: es la
+mitad que le faltaba a un requerimiento de la **fase 1**, y está contado como
+**nota al final de esa fase** —no como casilla— por lo mismo que el barrido de
+RNF-11 es una nota de la fase 3: una casilla nueva en una fase cerrada diría
+que esa fase lo entregó, y no lo entregó.
+
+**No hay alcance nuevo**: no se ha añadido ningún RF ni RNF, nada baja a Post
+1.0 y nada sube a 1.0. RF-2.5 es **alcance congelado de v1.0 desde el corte del
+2026-09-05**, y completarlo no amplía nada — solo deja de dar por hecho lo que
+estaba a medias. Lo que cambia es el **conteo**, que venía mal por dos
+sitios, y el **relato**, que afirmaba cosas que no pasaron; los dos están en
+"Corregido".
+
+**Tests**: **356 de Python** (cuatro más: el de regresión del error de abajo y
+tres del listado, que comprueban con qué motores sale analizada cada partida,
+que un análisis en marcha no se cuenta como terminado y que el detalle de una
+partida dice lo mismo que su fila) y **169 del front** (cuatro más y uno
+menos: entran los cuatro de `formatAnalyzedByEngines` —los cuatro estados de la
+columna, incluido el que la distingue de un hueco— y los de `turnsOf` se
+mudaron de `sparring.test.ts` —que pasa de 8 a 5— a `moves.test.ts` —de 10 a
+12—, donde ya vive la función, y al juntarse con los que allí había sobraba
+uno).
+
+### Añadido
+
+- **Análisis en lote desde el listado de Partidas** (**RF-2.5**, sobre RF-2.4 y
+  RF-5.3), que es **la mitad que le faltaba a un P0**: se marcan partidas con
+  las casillas de la primera columna —o la página entera desde la cabecera—,
+  se elige **un** motor para toda la tanda (`engineForNextBatch`) y el botón la
+  manda a la cola de análisis con un solo `POST /analysis`. El endpoint ya
+  aceptaba `game_ids` como lista y un `engine` desde la fase 1; lo que no
+  existía era **pedirlo desde ninguna pantalla** —el único sitio del front que
+  llamaba a `createAnalysis` era el visor, con un lote de una partida—, así que
+  "analiza mis últimas N partidas" solo se podía hacer con `curl`. Las
+  decisiones que el texto del requerimiento no fijaba están en la nota "Con qué
+  reglas se cumplió RF-2.5" de
+  [02-requerimientos.md](docs/02-requerimientos.md).
+  - **Columna «Análisis», que es parte del requerimiento y no un adorno**: dice
+    con qué motores está analizada ya cada partida, porque sin eso la tanda se
+    compone a ciegas. Dice **motores y no un sí o un no** —la misma partida se
+    analiza con Stockfish y con Lc0 (RF-2.6) y son análisis distintos— y una
+    partida sin ninguno dice **"Sin analizar" y no "—"**: el guion es el hueco
+    de un dato que no llegó, y aquí no falta nada.
+  - **Dos campos nuevos en `GameSummary`, los dos aditivos**:
+    `analyzed_by_engines` y `has_analysis_in_progress`, que hereda `GameDetail`.
+    **No rompen contrato** —nada de lo que ya consumía la API deja de
+    funcionar— y **no hay migración**, porque no salen de `games` sino de
+    `analyses`: lo resuelve `services/games.py::load_analysis_state_by_game_id`
+    en **una sola consulta para toda la página**, ya que el listado sirve hasta
+    200 filas de una vez. "Estar analizada" no es una columna de la partida
+    sino el resultado de las corridas que se le hayan lanzado. `openapi.json` y
+    los tipos de `packages/shared-types` regenerados con `make types`; el
+    número de versión de `info.version` no se mueve, sigue en `0.6.0`.
+  - **`lib/format.ts::formatAnalyzedByEngines`**, que es quien decide cómo se
+    lee esa columna: los motores terminados, "Analizando…" cuando hay uno en
+    marcha y nada hecho, y "Stockfish · analizando…" cuando hay las dos cosas
+    —que es el caso que se leería mal con cualquiera de los otros dos textos—.
+    Con sus cuatro tests.
+  - **Quedan dos filas abiertas** del inventario de
+    [07-coherencia-ui.md](docs/07-coherencia-ui.md), las **110** y **111**, las
+    dos de la misma raíz: la tanda se manda bien pero no cuenta lo que hace
+    después. Ver abajo por qué **no impiden dar RF-2.5 por entregado**.
+- **[ADR-0023](docs/adr/0023-la-ocupacion-entra-en-el-entrenamiento-y-la-barra-no.md)**,
+  la decisión que `0.5.0` tomó y no escribió donde se buscan las decisiones: en
+  las pantallas de entrenamiento **entra la capa de ocupación (RF-7.1 a 7.7) y
+  no la barra de evaluación**, y las tres marcas **arrancan apagadas**. Estaba
+  razonada —en este archivo, en la nota de RF-7 de
+  [02-requerimientos.md](docs/02-requerimientos.md) y en el ítem del roadmap—,
+  pero un ADR no es donde se cuenta lo que se hizo sino dónde se va a buscar
+  por qué, y CLAUDE.md manda las decisiones de arquitectura a `docs/adr/`. La
+  entrada de `0.5.0` llegó a decir que "la capa no trae ADR": lo que no lo
+  necesitaba era la capa, no la frontera de dónde entra, que es lo que se
+  decidió y lo que un día alguien querrá discutir.
+- **`apps/api/lucia_api/services/review.py`**: la cola de repaso y el apunte
+  del resultado, **una sola vez** para los dos ejercicios que se repasan
+  —puzzles (RF-4.1) y drills de apertura (RF-4.2)—, genéricos sobre el mixin
+  `SpacedRepetition` del modelo. Nace de la de-duplicación de abajo y del
+  error de abajo, que es exactamente lo que pasa cuando el mismo algoritmo se
+  escribe dos veces: una de las dos copias se quedó atrás.
+- **Un test de regresión** del error de la cola de drills
+  (`test_the_queue_announces_the_next_review_in_utc`), que es el que faltaba
+  para que la copia no volviera a divergir.
+
+### Cambiado
+
+- **Contrato de la API: ocho campos renombrados, los ocho de forma
+  incompatible**, y un esquema renombrado con ellos. Quien consumiera estos
+  nombres deja de funcionar; no hay periodo de gracia ni alias, porque en la
+  serie `0.x` no se debe compatibilidad y arrastrar los dos nombres es la forma
+  segura de que nadie arregle nunca el primero. `openapi.json` y los tipos de
+  `packages/shared-types` regenerados con `make types`.
+  - **`PuzzleOut.color` → `player_color`**: "color" a secas no decía de quién,
+    en una respuesta donde hay dos bandos y el que importa es el de quien
+    resuelve.
+  - **`PuzzleAnswerIn.attempt` → `attempt_number`**: `attempt` se leía como "el
+    intento" —la jugada que se manda— cuando es su número, y esa lectura ya
+    había costado un incumplimiento de coherencia (la fila que contaba un
+    intento de más).
+  - **`DrillOut.reason` → `source`** y **`DrillOut.games` → `games_played`**,
+    con la **migración `e6c4d20b7f19`**, que renombra las dos columnas
+    homónimas de `opening_drills` con `batch_alter_table` —SQLite no renombra
+    columnas con un `ALTER` a secas— conservando el índice de `due_at` y la
+    clave única `(player_color, line_uci)`. **Solo cambian los nombres; los
+    datos se quedan donde están.** `reason` decía "motivo" en una tabla donde
+    el motivo lo cuentan `games_played` y `score_percent`: lo que guarda es de
+    qué baraja salió la línea, que es su procedencia. Y `games` no decía qué se
+    contaba, en una tabla que no guarda partidas.
+  - **`DrillMoveOut.finished` → `reviewed`**, **`DrillMoveOut.line_san` →
+    `line_moves_san`** y **`length_plies` → `line_length_plies`**: `finished`
+    no distinguía "la línea se acabó" de "el repaso quedó apuntado", que es lo
+    que de verdad marca; los otros dos no decían de qué eran las jugadas ni de
+    qué la longitud, en una respuesta que habla de una línea y de una partida.
+  - **`PlanTaskOut.reasons` → `weaknesses`**: son las mismas debilidades que
+    `WeeklyPlanOut.weaknesses`, filtradas a las que apuntan a esa tarea, y
+    llamarlas de dos maneras en el mismo cuerpo hacía dudar de si eran otra
+    cosa.
+  - **El esquema `GamePositionIn` pasa a llamarse `SparringOriginIn`**: no es
+    una posición de una partida, es de dónde sale una partida de sparring
+    (RF-4.4), y con el nombre viejo parecía reutilizable para cualquier cosa
+    que llevara `{game_id, ply}`.
+- **De-duplicación: −269 líneas netas y ningún cambio de comportamiento.** Todo
+  nacido de copias reales, ninguna de anticipación: `services/review.py` (la
+  cola y el apunte de repaso, arriba), `features/training/TrainingBoard.tsx`
+  (la columna del tablero de entrenamiento, que estaba escrita tres veces —el
+  puzzle, el drill y el sparring— y es lo que permitió comparar las tres),
+  `features/training/useReviewQueue.ts` (pedir la cola y refrescarla),
+  `components/board/TurnList.tsx` (la lista de jugadas por turnos) y
+  `tryMove`/`turnsOf` en `lib/moves.ts`, que estaban duplicadas entre el visor
+  y el sparring.
+- **Accesibilidad: la rejilla de casillas enfocables deja de desmontarse a
+  media jugada** (criterios C-1 y C-7). `Chessboard` la montaba según
+  `legalMoves`, es decir según si el tablero acepta jugadas **en ese instante**,
+  y las tres pantallas de entrenamiento se quedan sin ellas mientras el
+  servidor contesta: la rejilla desaparecía en cada jugada, el foco caía al
+  `<body>` y la casilla enfocada volvía a e4, mientras el pie del tablero
+  seguía prometiendo el teclado. Se monta ahora según `isMovableBoard` —lo que
+  el tablero **es** y no lo que puede ahora mismo—, así que durante la espera
+  sigue enfocable e inspeccionable pero no le devuelve la pulsación a
+  chessground. Con ella, **nueve arreglos más de coherencia de interfaz** y
+  **ninguna fila nueva** en esa pasada, que dejó el inventario de RNF-11
+  vacío; el detalle, en la pasada del 2026-09-23 de
+  [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md).
+- **El inventario de RNF-11 vuelve a tener filas, y las abre el análisis en
+  lote**: la **110** (la columna «Análisis» no se entera de nada una vez pedida
+  la lista, así que una partida que termina mientras se mira se queda en
+  "Analizando…" hasta recargar, mientras el visor sí sigue el progreso en
+  vivo), la **111** (la tanda no distingue lo ya analizado con ese mismo motor,
+  cuando las dos pantallas que analizan de una en una lo dicen con "Reanalizar
+  con X") y la **112** (lo marcado sobrevivía al cambio de página), que **se
+  cerró en el mismo commit** porque no pedía decidir nada: la regla ya estaba
+  tomada para el cambio de filtro. Las otras dos quedan abiertas a propósito
+  —piden decidir comportamiento: cada cuánto se refresca una lista y si una
+  tanda deduplica— y con ellas **siete arreglos** más en el mismo commit.
+
+### Corregido
+
+- **La cola de drills anunciaba el día equivocado.** `next_due_at` —el "vuelve
+  el …" que se enseña cuando no queda nada por repasar hoy— salía del
+  vencimiento **más antiguo de todos**, incluidos los ya vencidos, y **sin zona
+  horaria**, así que la pantalla mostraba una fecha pasada y, al interpretarla
+  el navegador en local, podía además correrla de día. La cola de puzzles lo
+  hacía bien: es el precio de haber escrito dos veces el mismo repaso, y por
+  eso el arreglo va con la unificación en `services/review.py` y con un test de
+  regresión, no suelto.
+- **RF-2.5 estaba a medias desde la fase 1 y ningún documento lo decía** — y
+  es **P0**. `RF-2.5 · Análisis en lote: "analiza mis últimas N partidas" o
+  "todo 2025"` (alcance congelado desde el corte del **2026-09-05**) estaba
+  entregado **solo en el servidor**: `POST /analysis` aceptaba `game_ids` como
+  lista y un `engine`, y **ninguna pantalla lo pedía**. Como RF-2.9 y RF-3.8,
+  **no se citaba en ningún sitio** —cero menciones en el roadmap y cero en este
+  archivo—, así que no figuraba ni entre lo pendiente ni entre lo entregado y
+  se daba por hecho. Es el **tercer caso del mismo patrón y el peor**: los
+  otros dos son P2 y estaban sin empezar, este es P0 y estaba medio hecho, que
+  es como se sale de un conteo sin que se note — desde el servidor parecía
+  hecho y desde la pantalla parecía que no existía. **Con este commit queda
+  entregado entero**, backend e interfaz (ver "Añadido"), y citado por ID en la
+  **nota al final de la fase 1** del [roadmap](docs/05-roadmap.md), que es la
+  fase donde se entregó su mitad servidor; va como nota y no como casilla
+  nueva, por lo mismo que el barrido de RNF-11 es una nota de la fase 3. **No
+  cambia lo que falta para `1.0.0`**: entró y salió de lo pendiente en el mismo
+  commit, y siguen siendo RF-2.9, RF-3.8, RF-7.8 y RF-7.9.
+  - **Se da por entregado con las filas 110 y 111 abiertas, y conviene decir
+    por qué.** Lo que pide el requerimiento —mandar a analizar muchas partidas
+    de una vez, eligiendo motor, sin ir de una en una— se puede hacer desde la
+    pantalla, y la columna dice qué hay hecho para no componer la tanda a
+    ciegas. Las dos filas son de **RNF-11**: una lista que no se refresca sola
+    y una tanda que no avisa de que va a repetir trabajo son incoherencias con
+    lo que las otras pantallas prometen, no partes del requerimiento sin
+    hacer. Se arreglan **dentro de 1.0**, como los demás incumplimientos sobre
+    RF ya congelados, y **no bloquean el corte**. La línea es la misma que se
+    usó con las 38 primeras filas del inventario: un RF se da por entregado
+    cuando hace lo que dice, y RNF-11 no se marca nunca como hecho.
+- **RF-2.9 había desaparecido del conteo de lo que falta para `1.0.0`.**
+  `RF-2.9 · Explicación en lenguaje natural de por qué una jugada es error`
+  (P2, alcance congelado desde el corte del **2026-09-05**) existía solo en su
+  fila de [02-requerimientos.md](docs/02-requerimientos.md) y **no se citaba en
+  ningún otro sitio**: ni en el roadmap —donde el ítem "explicaciones en
+  lenguaje natural" de la fase 4 estaba sin ID— ni en este archivo, que daba
+  **RF-2** entre lo entregado y contaba **tres** requerimientos pendientes
+  donde hay **cuatro** (RF-2.9, RF-3.8, RF-7.8 y RF-7.9), colocando además las
+  explicaciones del lado del "pulido". Corregido en los dos documentos, con el
+  ID citado en el ítem de la fase 4 como ya se hizo con RF-3.8. **Consecuencia
+  que no es de redacción: `1.0.0` no se puede cortar hasta que RF-2.9 esté**,
+  porque el corte afirmaría que RF-2 está entregado entero.
+- **`0.5.0` no fue un commit ni un día, y decía que sí.** Su entrada y dos
+  puntos del roadmap afirmaban que la capa de ocupación y el barrido de RNF-11
+  viajaban "en el mismo commit" y "con la misma fecha". Son `c06cdaa`
+  (2026-09-22) y `81de827` (2026-09-23), y el segundo **no toca ningún
+  manifiesto**: llegó después del corte, con dos cambios incompatibles de
+  contrato y un ADR, sin subir versión. Se queda dentro de `0.5.0` —que es el
+  número que ese commit lleva, y nada se ha publicado ni etiquetado— pero
+  diciéndolo; el razonamiento completo, en la propia entrada de `0.5.0`.
+- **RNF-11 figuraba como casilla marcada de la fase 3**, contradiciendo lo que
+  el propio roadmap dice de él dos secciones más abajo: que vive en Post 1.0
+  como criterio permanente, sin fase propia, y que nada de esa sección cuenta
+  para el progreso hacia 1.0.0. El barrido de cierre pasa a ser una **nota de
+  cierre** de la fase, no un ítem: la fase 3 son **seis** casillas y la cierra
+  la sexta. **No se pierde nada del relato ni del alcance** —las dieciséis
+  filas eran incumplimientos de RF ya congelados y por eso se arreglaron dentro
+  de 1.0—; lo que se pierde es la idea de que un criterio permanente se puede
+  dar por terminado.
+- **Documentación que había dejado de ser cierta** al renombrar: los nombres
+  viejos que quedaban en [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) y
+  en las entradas `0.4.5` y `0.5.0` de este archivo
+  (`ExerciseStatusBadge` → `TrainingStatusBadge`, `reasons` → `weaknesses`,
+  `attempt` → `attemptNumber`), y la fila 102, que justificaba el total en el
+  cuerpo "porque las tres pestañas hermanas lo traen así" cuando son dos: el
+  listado de sparring no reparte cola y no lleva total.
 
 ## [0.5.0] - 2026-09-22
 
 **Cierra la fase 3 del roadmap**, y por eso sube el minor y no el patch. Trae
-**dos cosas grandes, en un solo commit y las dos de la misma fase**:
+**dos cosas grandes, en dos commits de dos días** —`c06cdaa` del 2026-09-22 y
+`81de827` del 2026-09-23—, y **solo la primera es un ítem de la fase**:
 
 1. La **capa de ocupación del tablero** (**RF-7.1 a RF-7.7**) entra en las tres
    pantallas de entrenamiento que tienen tablero —el puzzle (RF-4.1), el drill
@@ -71,7 +345,9 @@ dentro de 1.0.
    que la fase 2 dejó dicho que se haría cuando las pantallas de entrenamiento
    existieran.
 2. El **barrido de cierre de la fase 3 para RNF-11** (coherencia de interfaz),
-   su séptimo ítem: las **dieciséis filas** que quedaban del inventario de
+   que **no es un séptimo ítem** —la fase tiene seis y la cierra el de arriba—
+   sino lo que a ese cierre se le preveía: las **dieciséis filas** que quedaban
+   del inventario de
    [docs/07-coherencia-ui.md](docs/07-coherencia-ui.md) cerradas de una vez
    —las quince que la sección de Entrenamiento había ido abriendo pantalla a
    pantalla (91, 92, 94 a 105 y 107) más la **109**, que nació al comprobar el
@@ -81,15 +357,29 @@ dentro de 1.0.
    con la primera delante.
 
 Lo que **cierra la fase es el primero**; el segundo es lo que al cierre se le
-preveía, y va aquí y no en una versión propia porque **RNF-11 es un criterio
-permanente y no una casilla del roadmap**: la fase se cierra con una versión,
-el inventario no.
+preveía, y no tiene versión propia porque **RNF-11 es un criterio permanente y
+no una casilla del roadmap**: la fase se cierra con una versión, el inventario
+no.
 
-**Fechas.** La versión conserva la del cierre de fase, el **2026-09-22**, que
-es la del trabajo: la capa de ocupación y el barrido son de ese día.
-Comprobarlo después —leer las cinco pantallas con tablero estado por estado—
-se llevó hasta el **2026-09-23** y dejó cinco arreglos mecánicos más y la fila
-109. El inventario está vacío **al 2026-09-23**.
+**Fechas y commits, que no son uno solo.** Esta entrada dijo hasta `0.6.0` que
+las dos cosas viajaban "en el mismo commit y la misma fecha", y es falso: la
+capa de ocupación es de `c06cdaa`, del **2026-09-22**, que es el commit que
+subió el número a `0.5.0` en los diez manifiestos; el barrido es de `81de827`,
+comiteado el **2026-09-23**, que **llegó después del corte y no volvió a
+subirlo**. Su trabajo empezó el 22, pero comprobarlo —leer las cinco pantallas
+con tablero estado por estado— se llevó el día siguiente, y es lo que dejó esos
+cinco arreglos mecánicos más y la fila 109 dentro de ese segundo commit. El inventario está vacío **al 2026-09-23**.
+
+**Por qué el segundo commit se queda dentro de `0.5.0` y no lleva un `0.5.1`
+propio**, aun trayendo dos cambios incompatibles: porque `0.5.0` **es** su
+versión, no una que se le adjudique ahora. Sus diez manifiestos dicen `0.5.0`,
+y ni `0.5.0` ni ninguna otra de esta serie se ha publicado ni etiquetado, así
+que no hay nadie a quien un número congelado le hubiera prometido otra cosa.
+Inventar un `0.5.1` sería crear una versión que ningún commit llevó nunca —una
+mentira de otro tipo, y más difícil de ver—. Lo que sí hacía falta era decirlo:
+**`0.5.0` abarca dos commits y dos días**, y el trabajo de su segundo día
+cambió la API sin que el número lo avisara. `0.6.0` es la primera versión que
+no repite esa forma de trabajar: el número se sube con el trabajo, no después.
 
 **Con la fase 3 cerrada quedan cerradas las fases 0 a 3**, y para `1.0.0` queda
 la **fase 4**: RF-3.8 (rivales recurrentes), RF-7.8 y RF-7.9 —que son los dos
@@ -111,9 +401,10 @@ cuando esta entrada solo recogía la capa de ocupación: el barrido cambia tres
 endpoints y **dos de esos cambios son incompatibles** —`SparringGameOut` pierde
 `opponent_name` y `GET /training/replays` deja de devolver una lista—, porque
 la incoherencia estaba en el dato y no en cómo se pintaba. Sigue siendo
-`0.5.0`: es el mismo commit sin publicar, y en la serie `0.x` la API puede
-cambiar sin aviso entre versiones menores, como dice la cabecera de este
-archivo. **Sin migraciones y sin cambios de esquema ni de datos.**
+`0.5.0`, por lo dicho arriba —ese es el número que el commit lleva y nada se ha
+publicado—, y en la serie `0.x` la API puede cambiar sin aviso entre versiones
+menores, como dice la cabecera de este archivo. **Sin migraciones y sin cambios
+de esquema ni de datos.**
 
 ### Añadido
 
@@ -151,10 +442,14 @@ archivo. **Sin migraciones y sin cambios de esquema ni de datos.**
   "Cómo se cumplieron los siete puntos P1" de
   [docs/02-requerimientos.md](docs/02-requerimientos.md), ampliada con esta
   fecha, y en el ítem de cierre de la fase 3 del
-  [roadmap](docs/05-roadmap.md). **La capa no trae ADR**, por lo mismo que no
-  lo trajo en `0.3.0` cuando nació: es una capa de lectura sobre la posición
-  que ya está en pantalla, sin endpoint, sin esquema y sin motor. El ADR-0022
-  de más abajo es del barrido y no de ella.
+  [roadmap](docs/05-roadmap.md). Esta entrada dijo aquí que **"la capa no trae
+  ADR"**, por lo mismo que no lo trajo en `0.3.0` cuando nació —es una capa de
+  lectura sobre la posición que ya está en pantalla, sin endpoint, sin esquema
+  y sin motor—. Se corrigió en `0.6.0`: lo que decide esta versión no es la
+  capa, es **dónde entra y dónde no**, y eso sí es una decisión de arquitectura.
+  Está en el
+  [ADR-0023](docs/adr/0023-la-ocupacion-entra-en-el-entrenamiento-y-la-barra-no.md).
+  El ADR-0022 de más abajo es del barrido y no de ella.
 
 - **Mover una pieza con el teclado en los cuatro tableros donde se juega**
   (RNF-11 fila 91, criterio C-1, sobre RF-4.1, RF-4.2, RF-4.3/RF-4.4 y RF-6):
@@ -179,7 +474,7 @@ archivo. **Sin migraciones y sin cambios de esquema ni de datos.**
   salía de dos tamaños según llevara barra de evaluación o no — fila 107; vive
   ahí y no en `Chessboard` para que el editor de posición no la herede),
   `components/board/hints.ts` (las frases del pie del tablero) y
-  `features/training/ExerciseStatusBadge.tsx` (la insignia del panel lateral,
+  `features/training/TrainingStatusBadge.tsx` (la insignia del panel lateral,
   que significaba tres cosas distintas en las tres pantallas con tablero).
 - **[ADR-0022](docs/adr/0022-la-probabilidad-de-victoria-se-cuenta-desde-quien-entrena.md)**,
   la única excepción escrita del barrido (fila 92): la probabilidad de victoria
@@ -369,7 +664,7 @@ baja a Post 1.0 y nada sube a 1.0.
     estructural a lo más circunstancial, y la primera lleva la insignia "lo
     primero": es una recomendación de la que se responde.
   - **Cada deber nace de una debilidad concreta y la lleva encima**
-    (`_TASK_BY_WEAKNESS`, `reasons`), que es la lectura de "generado a partir
+    (`_TASK_BY_WEAKNESS`, `weaknesses`), que es la lectura de "generado a partir
     de las debilidades detectadas": lo táctico y el medio juego van a puzzles
     (RF-4.1), lo posicional y la apertura a repetir líneas (RF-4.2), el final
     a re-jugar posiciones (RF-4.4), y los apuros de reloj y la precisión que

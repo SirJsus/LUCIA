@@ -15,47 +15,32 @@
  * sorpresa: quien entrena decide cuándo renovarla. Y como la generación no
  * toca lo que ya existe, pulsar de más no cuesta nada.
  */
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useState } from "react";
 import { Button } from "../../components/Button";
 import { EmptyState, ErrorBox, Spinner, SuccessBox } from "../../components/Feedback";
 import { api } from "../../lib/api";
 import { formatDate } from "../../lib/format";
 import { PuzzleSolver } from "./PuzzleSolver";
 import { TrainingHeader } from "./TrainingHeader";
+import { useReviewQueue } from "./useReviewQueue";
 
 const PUZZLE_QUEUE_QUERY_KEY = ["training", "puzzles"] as const;
 
 export function PuzzlesPage() {
-  const queryClient = useQueryClient();
-  const queueQuery = useQuery({ queryKey: PUZZLE_QUEUE_QUERY_KEY, queryFn: api.getPuzzleQueue });
-  /** En qué puzzle de la tanda se está. Se reinicia al traer una tanda nueva. */
-  const [queueIndex, setQueueIndex] = useState(0);
-
-  const generateMutation = useMutation({
-    mutationFn: () => api.generatePuzzles(),
-    onSuccess: () => {
-      setQueueIndex(0);
-      queryClient.invalidateQueries({ queryKey: PUZZLE_QUEUE_QUERY_KEY });
-    },
+  const {
+    queueQuery,
+    queue,
+    generateMutation,
+    current: puzzle,
+    position,
+    batchSize,
+    goToNext,
+  } = useReviewQueue({
+    queryKey: PUZZLE_QUEUE_QUERY_KEY,
+    fetchQueue: api.getPuzzleQueue,
+    itemsOf: (queue) => queue.puzzles,
+    generate: () => api.generatePuzzles(),
   });
-
-  const queue = queueQuery.data;
-  const puzzle = queue?.puzzles[queueIndex];
-
-  /** Al terminar uno: el siguiente de la tanda, o una tanda nueva si era el
-   * último. Se vuelve a pedir en vez de quitarlo de la lista en memoria
-   * porque el servidor ya sabe cuál vence ahora y cuál acaba de irse a
-   * mañana. */
-  function goToNextPuzzle() {
-    if (queue && queueIndex + 1 < queue.puzzles.length) {
-      setQueueIndex(queueIndex + 1);
-      return;
-    }
-    setQueueIndex(0);
-    queryClient.invalidateQueries({ queryKey: PUZZLE_QUEUE_QUERY_KEY });
-  }
 
   return (
     <div className="space-y-6">
@@ -111,7 +96,7 @@ export function PuzzlesPage() {
         </EmptyState>
       )}
 
-      {queue && queue.total > 0 && queue.puzzles.length === 0 && (
+      {queue && queue.total > 0 && batchSize === 0 && (
         <EmptyState title="Por hoy has terminado">
           {queue.next_due_at
             ? `El próximo repaso toca el ${formatDate(queue.next_due_at)}.`
@@ -122,9 +107,9 @@ export function PuzzlesPage() {
       {puzzle && (
         <div className="space-y-2">
           <p className="text-sm opacity-70">
-            Puzzle {queueIndex + 1} de {queue?.puzzles.length}
+            Puzzle {position} de {batchSize}
           </p>
-          <PuzzleSolver key={puzzle.id} puzzle={puzzle} onNext={goToNextPuzzle} />
+          <PuzzleSolver key={puzzle.id} puzzle={puzzle} onNext={goToNext} />
         </div>
       )}
     </div>

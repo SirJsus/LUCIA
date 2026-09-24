@@ -9,6 +9,15 @@
  * docs/07-coherencia-ui.md).
  */
 
+/** Cómo se llega a una casilla sin ratón, que es igual en todo tablero con
+ * rejilla enfocable (`SquareKeyboardGrid`). Lo que cambia es qué hace Intro
+ * allí —mover una pieza o colocarla—, así que cada frase le encadena su
+ * cláusula y el arranque se escribe una sola vez: escrito a mano en cada una,
+ * el día que cambie la tecla de recorrer las casillas la ayuda mentiría en
+ * unos sitios y no en otros (criterios C-1 y C-2). */
+const KEYBOARD_SQUARES_HINT =
+  "Con el teclado: Tab lleva al tablero, las flechas recorren las casillas";
+
 /** Cómo se mueve una pieza sin ratón, en los tableros que aceptan jugadas.
  *
  * Lo hace posible la rejilla enfocable de `Chessboard`
@@ -16,9 +25,11 @@
  * chessground: el primer Intro toma el origen y el segundo, el destino. Se
  * anuncia aquí porque un atajo que solo vive en el `aria-label` de una casilla
  * no lo descubre quien mira la pantalla (fila 91 del inventario). */
-export const KEYBOARD_MOVE_HINT =
-  "Con el teclado: Tab lleva al tablero, las flechas recorren las casillas, " +
-  "Intro elige origen y destino, y Esc suelta la pieza elegida.";
+export const KEYBOARD_MOVE_HINT = `${KEYBOARD_SQUARES_HINT}, Intro elige origen y destino, y Esc suelta la pieza elegida.`;
+
+/** Lo mismo en el editor de posición (RF-6.1), donde una casilla no es origen
+ * ni destino de nada: Intro deja ahí la pieza que esté elegida en la paleta. */
+export const KEYBOARD_PLACE_PIECE_HINT = `${KEYBOARD_SQUARES_HINT} e Intro coloca la pieza elegida.`;
 
 /** Cómo se enciende la capa de ocupación (RF-7). Nombra la tecla que
  * `OCCUPANCY_TOGGLE_KEY` define en `useOccupancy.ts`: si cambia allí, esta

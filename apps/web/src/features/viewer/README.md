@@ -22,7 +22,7 @@ de las dos se desviara, el problema es la desviación, no el compartir.
 | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
 | `GameViewerPage.tsx`   | La pantalla del visor: tablero, navegación, análisis y comparación de motores                                                             | ruta `/games/$gameId` |
 | `EvalChart.tsx`        | Gráfico de evaluación de la partida (**Recharts**), eje Y en win%, con cada punto del color de su clasificación y los errores más grandes | visor                 |
-| `MoveList.tsx`         | Jugadas emparejadas por turno con su clasificación                                                                                        | visor                 |
+| `MoveList.tsx`         | Jugadas emparejadas por turno con su clasificación. La rejilla de turnos es la compartida (`components/board/TurnList`, con `turnsOf` de `lib/moves.ts`, que numera desde la posición de partida real); lo propio de aquí es la celda, un botón que navega | visor                 |
 | `CriticalMoments.tsx`  | Las jugadas donde se decidió la partida y por qué (RF-2.8)                                                                                | visor                 |
 | `EngineComparison.tsx` | Dónde discrepan dos motores sobre la misma partida (RF-2.6)                                                                               | visor                 |
 

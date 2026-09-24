@@ -9,7 +9,7 @@ que un error acabe convertido en puzzle se prueba aparte, en
 
 from lucia_core.training import (
     EQUIVALENT_MOVE_MAX_WIN_PERCENT_LOSS,
-    NEW_PUZZLE_STATE,
+    NEW_REVIEW_STATE,
     SpacedRepetitionState,
     equivalent_solutions,
     next_review,
@@ -17,12 +17,12 @@ from lucia_core.training import (
 
 
 def test_new_puzzle_is_due_right_away() -> None:
-    assert NEW_PUZZLE_STATE.interval_days == 0
-    assert NEW_PUZZLE_STATE.repetitions == 0
+    assert NEW_REVIEW_STATE.interval_days == 0
+    assert NEW_REVIEW_STATE.repetitions == 0
 
 
 def test_first_two_hits_use_the_fixed_intervals() -> None:
-    first = next_review(NEW_PUZZLE_STATE, "solved")
+    first = next_review(NEW_REVIEW_STATE, "solved")
     assert (first.repetitions, first.interval_days) == (1, 1)
     second = next_review(first, "solved")
     assert (second.repetitions, second.interval_days) == (2, 6)
@@ -37,21 +37,21 @@ def test_third_hit_onwards_multiplies_by_the_ease_factor() -> None:
 
 
 def test_solving_raises_the_ease_factor_and_failing_lowers_it() -> None:
-    assert next_review(NEW_PUZZLE_STATE, "solved").ease_factor > NEW_PUZZLE_STATE.ease_factor
-    assert next_review(NEW_PUZZLE_STATE, "failed").ease_factor < NEW_PUZZLE_STATE.ease_factor
+    assert next_review(NEW_REVIEW_STATE, "solved").ease_factor > NEW_REVIEW_STATE.ease_factor
+    assert next_review(NEW_REVIEW_STATE, "failed").ease_factor < NEW_REVIEW_STATE.ease_factor
 
 
 def test_solving_at_the_second_attempt_counts_but_costs_ease() -> None:
     # Está justo en la frontera de SM-2: cuenta como acierto y el intervalo
     # avanza, pero la facilidad baja un poco, así que el puzzle volverá antes
     # que uno resuelto a la primera.
-    hesitant = next_review(NEW_PUZZLE_STATE, "hesitant")
+    hesitant = next_review(NEW_REVIEW_STATE, "hesitant")
     assert hesitant.repetitions == 1
     assert hesitant.interval_days == 1
     assert (
-        NEW_PUZZLE_STATE.ease_factor
+        NEW_REVIEW_STATE.ease_factor
         > hesitant.ease_factor
-        > next_review(NEW_PUZZLE_STATE, "failed").ease_factor
+        > next_review(NEW_REVIEW_STATE, "failed").ease_factor
     )
 
 

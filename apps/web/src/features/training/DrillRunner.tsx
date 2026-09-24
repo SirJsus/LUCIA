@@ -15,26 +15,17 @@
  */
 import type { Drill, DrillMove } from "@lucia/shared-types";
 import { useMutation } from "@tanstack/react-query";
-import { Chess } from "chess.js";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { Button } from "../../components/Button";
-import { BoardFrame } from "../../components/board/BoardFrame";
-import {
-  KEYBOARD_MOVE_HINT,
-  OCCUPANCY_TOGGLE_KEY_HINT,
-  RETRY_AFTER_WRONG_MOVE_HINT,
-} from "../../components/board/hints";
-import { Chessboard } from "../../components/board/Chessboard";
-import { legalMovesByOrigin } from "../../components/board/legalMoves";
-import { OccupancyPanel } from "../../components/board/OccupancyPanel";
-import { useOccupancy } from "../../components/board/useOccupancy";
+import { RETRY_AFTER_WRONG_MOVE_HINT } from "../../components/board/hints";
 import { ErrorBox, SuccessBox, WarningBox } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
-import { BOARD_HINT_CLASSES, BOARD_SIDEBAR_GRID_CLASS } from "../../components/styles";
+import { BOARD_SIDEBAR_GRID_CLASS } from "../../components/styles";
 import { api } from "../../lib/api";
-import { formatMoveSequence, moveNumberOf } from "../../lib/moves";
-import { playerMoveCount, reasonLabel, reasonSentence } from "./drills";
-import { ExerciseStatusBadge } from "./ExerciseStatusBadge";
+import { formatMoveSequence, moveNumberOf, tryMove } from "../../lib/moves";
+import { drillSourceLabel, drillSourceSentence, playerMoveCount } from "./drills";
+import { TrainingStatusBadge } from "./TrainingStatusBadge";
+import { TrainingBoard } from "./TrainingBoard";
 
 export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => void }) {
   /** La posición que se ve y en qué jugada de la línea va. Arrancan donde la
@@ -61,34 +52,34 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
   const moveMutation = useMutation({
     mutationFn: (uci: string | null) =>
       api.playDrillMove(drill.id, { ply, uci, wrong_moves: wrongMoves }),
-    onSuccess: (result, uci) => applyResult(result, uci),
+    onSuccess: (moveResult, uci) => applyMoveResult(moveResult, uci),
   });
   /** La respuesta que cerró la línea, o `null` si el drill sigue abierto.
    * Se lee de la última respuesta en vez de guardarse aparte: es la misma que
    * trae la línea entera y el próximo repaso, y cerrado ya no se manda nada
    * más (igual que `PuzzleSolver` con su respuesta). */
-  const finished = moveMutation.data?.finished ? moveMutation.data : null;
+  const reviewedMove = moveMutation.data?.reviewed ? moveMutation.data : null;
   /** Si la última respuesta dijo que la jugada no era la de la línea. Se lee de
-   * la respuesta y no se guarda aparte —como `finished`, y como el fallo de
+   * la respuesta y no se guarda aparte —como `reviewedMove`, y como el fallo de
    * `PuzzleSolver`—: el estado propio de aquí es la jugada que quedó encima del
    * tablero, y haber fallado es lo que el servidor contestó de ella. */
-  const wasWrong = moveMutation.data?.finished === false && !moveMutation.data.correct;
+  const wasWrong = moveMutation.data?.reviewed === false && !moveMutation.data.correct;
 
-  function applyResult(result: DrillMove, uci: string | null) {
+  function applyMoveResult(moveResult: DrillMove, uci: string | null) {
     // Fallar es lo único que deja el tablero como estaba: la jugada errónea
     // sigue encima hasta que se pulse «Volver a intentarlo».
-    if (!result.finished && !result.correct) {
+    if (!moveResult.reviewed && !moveResult.correct) {
       setWrongMoves(wrongMoves + 1);
       return;
     }
     setAttemptedMove(null);
-    setFen(result.fen);
-    if (result.finished) {
+    setFen(moveResult.fen);
+    if (moveResult.reviewed) {
       setLastMoveUci(null);
       return;
     }
-    setLastMoveUci(result.reply_uci ?? uci);
-    setPly(result.next_ply ?? ply);
+    setLastMoveUci(moveResult.reply_uci ?? uci);
+    setPly(moveResult.next_ply ?? ply);
   }
 
   /** Quitar del tablero la jugada errónea y volver a la posición de la línea,
@@ -104,68 +95,36 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
    * petición en vuelo: acertar trae la respuesta del rival, así que mover dos
    * veces seguidas sería mover sobre una posición que ya no es la de la
    * pantalla (criterio C-3). */
-  const canMove = finished === null && !moveMutation.isPending && attemptedMove === null;
-  const legalMoves = useMemo(() => (canMove ? legalMovesByOrigin(fen) : undefined), [canMove, fen]);
+  const canMove = reviewedMove === null && !moveMutation.isPending && attemptedMove === null;
   /** Lo que se ve: la posición de la línea, o la jugada intentada encima. */
   const shownFen = attemptedMove?.fen ?? fen;
-  /** La capa de ocupación (RF-7) sobre la posición de la línea. Las marcas
-   * arrancan apagadas como en las otras dos pantallas de entrenamiento: aquí
-   * no delatan la jugada —lo que se entrena es recordar la línea—, pero que la
-   * capa se comporte igual en las tres es lo que evita explicar en cada una
-   * con qué arranca (criterio C-2). */
-  const occupancyController = useOccupancy(shownFen, {
-    marksOnByDefault: false,
-  });
 
-  function tryMove(from: string, to: string) {
+  function handleMove(from: string, to: string) {
     if (!canMove) return;
-    const chess = new Chess(fen);
-    try {
-      // La promoción siempre a dama, como en el resto de tableros.
-      const move = chess.move({ from, to, promotion: "q" });
-      setAttemptedMove({ fen: chess.fen(), uci: move.lan });
-      moveMutation.mutate(move.lan);
-    } catch {
-      // jugada ilegal; chessground ya filtra casi todas
-    }
+    const move = tryMove(fen, from, to);
+    if (!move) return;
+    setAttemptedMove({ fen: move.fen, uci: move.uci });
+    moveMutation.mutate(move.uci);
   }
 
-  const totalMoves = playerMoveCount(drill);
+  const playerMoveTotal = playerMoveCount(drill);
   return (
     <div className={BOARD_SIDEBAR_GRID_CLASS}>
-      <div className="space-y-3">
-        {/* Sin barra de evaluación, como en los puzzles: lo que se entrena es
-            recordar la línea, y una evaluación en pantalla la delata. */}
-        <BoardFrame>
-          <Chessboard
-            fen={shownFen}
-            orientation={color}
-            turnColor={color}
-            legalMoves={legalMoves}
-            onMove={tryMove}
-            lastMoveUci={attemptedMove?.uci ?? lastMoveUci}
-            occupancyController={occupancyController}
-          />
-        </BoardFrame>
-        {/* Lo que hay que saber del tablero, en la misma frase y en el mismo
-            sitio que en las otras cuatro pantallas con tablero, y el atajo
-            anunciado ahí y no solo en el panel (criterio C-1). */}
-        <p className={BOARD_HINT_CLASSES}>
-          {finished
+      <TrainingBoard
+        fen={shownFen}
+        color={color}
+        canMove={canMove}
+        onMove={handleMove}
+        lastMoveUci={attemptedMove?.uci ?? lastMoveUci}
+        acceptsMoves={reviewedMove === null && !wasWrong}
+        hint={
+          reviewedMove
             ? "La línea terminó: el tablero ya no se mueve."
             : wasWrong
               ? RETRY_AFTER_WRONG_MOVE_HINT
-              : "Arrastra una pieza para seguir la línea. Las promociones se coronan en dama."}{" "}
-          {OCCUPANCY_TOGGLE_KEY_HINT}
-          {/* El teclado se anuncia donde se anuncia el arrastre y no más, igual
-              que en el puzzle: con la línea terminada o con la jugada errónea
-              encima el tablero no acepta jugadas por ninguna de las dos vías
-              (criterio C-1). */}
-          {finished === null && !wasWrong ? ` ${KEYBOARD_MOVE_HINT}` : ""}
-        </p>
-
-        <OccupancyPanel controller={occupancyController} />
-      </div>
+              : "Arrastra una pieza para seguir la línea. Las promociones se coronan en dama."
+        }
+      />
 
       <aside className="space-y-3">
         {/* El mismo título y la misma insignia que el puzzle y el sparring:
@@ -175,8 +134,8 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
         <Panel
           title={`Juegas con ${color === "white" ? "blancas" : "negras"}`}
           aside={
-            <ExerciseStatusBadge
-              isPlayerTurn={finished === null}
+            <TrainingStatusBadge
+              isPlayerTurn={reviewedMove === null}
               isWaitingForServer={moveMutation.isPending}
               finishedLabel="línea terminada"
             />
@@ -187,7 +146,7 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
             {drill.opening_eco ? ` · ${drill.opening_eco}` : ""}
           </p>
           <p className="mt-1 text-xs opacity-70">
-            {reasonLabel(drill.reason)}: {reasonSentence(drill)}
+            {drillSourceLabel(drill.source)}: {drillSourceSentence(drill)}
           </p>
           {/* En qué repaso va, como el puzzle: la API lo manda (`repetitions`)
               y era el único de los tres ejercicios que no lo enseñaba. */}
@@ -205,13 +164,13 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
             </p>
           )}
           <p className="mt-2 text-sm">
-            {finished
-              ? `${totalMoves} ${totalMoves === 1 ? "jugada" : "jugadas"} en la línea.`
+            {reviewedMove
+              ? `${playerMoveTotal} ${playerMoveTotal === 1 ? "jugada" : "jugadas"} en la línea.`
               : /* El número de jugada sale de `lib/moves.ts`, como en las
                    seis pantallas que numeran (criterio C-5): una línea
                    arranca en la posición estándar, así que la jugada propia
                    que toca cae justo en ese turno. */
-                `Jugada ${moveNumberOf(ply)} de ${totalMoves}.`}
+                `Jugada ${moveNumberOf(ply)} de ${playerMoveTotal}.`}
           </p>
         </Panel>
 
@@ -239,13 +198,13 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
 
         {/* Rendirse es una sola acción, con un solo nombre y siempre en el
             mismo sitio mientras el drill esté abierto (criterio C-2). */}
-        {!finished && (
+        {!reviewedMove && (
           <Button disabled={moveMutation.isPending} onClick={() => moveMutation.mutate(null)}>
             {moveMutation.isPending ? "Comprobando…" : "Ver la línea"}
           </Button>
         )}
 
-        {finished && <DrillResult drill={drill} result={finished} onNext={onNext} />}
+        {reviewedMove && <DrillResult drill={drill} moveResult={reviewedMove} onNext={onNext} />}
       </aside>
     </div>
   );
@@ -253,25 +212,25 @@ export function DrillRunner({ drill, onNext }: { drill: Drill; onNext: () => voi
 
 function DrillResult({
   drill,
-  result,
+  moveResult,
   onNext,
 }: {
   drill: Drill;
-  result: DrillMove;
+  moveResult: DrillMove;
   onNext: () => void;
 }) {
   return (
     <>
-      {result.correct ? (
+      {moveResult.correct ? (
         <SuccessBox>Línea completa.</SuccessBox>
       ) : (
         <WarningBox>La línea era esta.</WarningBox>
       )}
 
       <Panel title="La línea">
-        <p className="font-mono text-sm">{formatMoveSequence(result.line_san)}</p>
+        <p className="font-mono text-sm">{formatMoveSequence(moveResult.line_moves_san)}</p>
         <p className="mt-1 text-xs opacity-70">
-          {drill.reason === "departure"
+          {drill.source === "departure"
             ? "La última jugada es la que los maestros hacen aquí, en lugar de la que tú haces."
             : "Es la línea principal de esta apertura hasta donde te separas de ella."}
         </p>
@@ -279,12 +238,12 @@ function DrillResult({
 
       <Panel title="Próximo repaso">
         <p className="text-sm">
-          {result.interval_days === 1
+          {moveResult.interval_days === 1
             ? "Vuelve mañana."
-            : `Vuelve dentro de ${result.interval_days} días.`}
+            : `Vuelve dentro de ${moveResult.interval_days} días.`}
         </p>
         <p className="mt-1 text-xs opacity-70">
-          {result.correct
+          {moveResult.correct
             ? "Se espacia cada vez que la recorres entera."
             : "Un fallo la devuelve al principio de la cola."}
         </p>

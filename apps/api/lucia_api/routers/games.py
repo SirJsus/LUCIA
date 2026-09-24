@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Self
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from pydantic import BaseModel, ConfigDict
@@ -12,7 +12,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db import get_session
 from lucia_api.db.models import Game
-from lucia_api.services.games import is_black, is_player, is_white, outcome_of
+from lucia_api.services.games import (
+    GameAnalysisState,
+    is_black,
+    is_player,
+    is_white,
+    load_analysis_state_by_game_id,
+    outcome_of,
+)
 
 router = APIRouter(tags=["games"])
 
@@ -46,6 +53,31 @@ class GameSummary(BaseModel):
     no trae ratings, ritmo ni control de tiempo, y sin decir de dónde viene,
     cuatro columnas vacías al lado de sus vecinas llenas se leen como un fallo
     de la aplicación (fila 67 del inventario de docs/07-coherencia-ui.md)."""
+    analyzed_by_engines: list[str] = []
+    """Motores cuyo análisis de esta partida ya terminó, en orden alfabético.
+
+    **No sale de `games` sino de `analyses`** (`services/games.py`): una
+    partida puede tener varias corridas de motor, así que lo que se dice no es
+    "analizada" sino con qué se analizó. Vacío mientras no haya ninguna
+    terminada. Lo pinta la columna «Análisis» de la lista y es lo que permite
+    elegir una tanda sin repetir trabajo (RF-2.5)."""
+    has_analysis_in_progress: bool = False
+    """Hay un análisis suyo en la cola o corriendo (RF-2.4).
+
+    Va aparte de `analyzed_by_engines` porque es lo que explica que una partida
+    recién mandada a analizar no enseñe todavía ningún motor."""
+
+    @classmethod
+    def from_game(cls, game: Game, analysis_state: GameAnalysisState) -> Self:
+        """La fila de `games` más lo que se sabe de sus análisis, que viven en
+        otra tabla. Lo usan el listado y el detalle, que hereda estos dos
+        campos: sin llenarlos dirían que la partida no tiene ningún análisis."""
+        return cls.model_validate(game).model_copy(
+            update={
+                "analyzed_by_engines": list(analysis_state.analyzed_by_engines),
+                "has_analysis_in_progress": analysis_state.has_analysis_in_progress,
+            }
+        )
 
 
 class GameDetail(GameSummary):
@@ -162,7 +194,13 @@ async def list_games(
     response.headers["X-Total-Count"] = str(total or 0)
 
     result_rows = await session.execute(query)
-    return [GameSummary.model_validate(game) for game in result_rows.scalars().all()]
+    games = list(result_rows.scalars().all())
+    # El estado de análisis de toda la página en una sola consulta, no una por
+    # fila: ver `load_analysis_state_by_game_id`.
+    analysis_state_by_game_id = await load_analysis_state_by_game_id(
+        session, [game.id for game in games]
+    )
+    return [GameSummary.from_game(game, analysis_state_by_game_id[game.id]) for game in games]
 
 
 @router.get("/games/{game_id}", response_model=GameDetail)
@@ -172,4 +210,5 @@ async def get_game(
     game = await session.get(Game, game_id)
     if game is None:
         raise HTTPException(status_code=404, detail="no existe esa partida")
-    return GameDetail.model_validate(game)
+    analysis_state_by_game_id = await load_analysis_state_by_game_id(session, [game.id])
+    return GameDetail.from_game(game, analysis_state_by_game_id[game.id])

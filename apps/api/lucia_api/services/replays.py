@@ -59,9 +59,10 @@ async def count_replay_positions(session: AsyncSession, username: str) -> int:
     """Cuántos errores propios hay en total, sin el recorte de `limit`.
 
     Viaja con la lista porque sin él la pantalla enseña veinte de trescientos y
-    nada dice que haya más, mientras sus tres pestañas hermanas dicen siempre
-    cuántas quedan de cuántas (fila 102 del inventario de
-    docs/07-coherencia-ui.md, criterio C-3).
+    nada dice que haya más, mientras las dos pestañas hermanas que reparten cola
+    —puzzles y aperturas— dicen siempre cuántas quedan de cuántas (fila 102 del
+    inventario de docs/07-coherencia-ui.md, criterio C-3). La quinta, el
+    sparring, no entra en la comparación: lista partidas abiertas y no una cola.
     """
     total = await session.scalar(
         select(func.count()).select_from(_own_serious_mistake_ids(username).subquery())

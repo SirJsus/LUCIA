@@ -3,7 +3,7 @@
   "info": {
     "title": "L.U.C.I.A. API",
     "description": "Logic & Ultimate Chess Insight Algorithm",
-    "version": "0.5.0"
+    "version": "0.6.0"
   },
   "paths": {
     "/health": {
@@ -3040,16 +3040,16 @@
             ],
             "title": "Next Ply"
           },
-          "finished": {
+          "reviewed": {
             "type": "boolean",
-            "title": "Finished"
+            "title": "Reviewed"
           },
-          "line_san": {
+          "line_moves_san": {
             "items": {
               "type": "string"
             },
             "type": "array",
-            "title": "Line San"
+            "title": "Line Moves San"
           },
           "due_at": {
             "anyOf": [
@@ -3082,8 +3082,8 @@
           "reply_san",
           "fen",
           "next_ply",
-          "finished",
-          "line_san",
+          "reviewed",
+          "line_moves_san",
           "due_at",
           "interval_days"
         ],
@@ -3095,9 +3095,9 @@
             "type": "integer",
             "title": "Id"
           },
-          "reason": {
+          "source": {
             "type": "string",
-            "title": "Reason"
+            "title": "Source"
           },
           "player_color": {
             "type": "string",
@@ -3125,9 +3125,9 @@
             ],
             "title": "Opening Name"
           },
-          "games": {
+          "games_played": {
             "type": "integer",
-            "title": "Games"
+            "title": "Games Played"
           },
           "score_percent": {
             "type": "number",
@@ -3148,9 +3148,9 @@
             "type": "array",
             "title": "Preceding Moves San"
           },
-          "length_plies": {
+          "line_length_plies": {
             "type": "integer",
-            "title": "Length Plies"
+            "title": "Line Length Plies"
           },
           "due_at": {
             "type": "string",
@@ -3165,16 +3165,16 @@
         "type": "object",
         "required": [
           "id",
-          "reason",
+          "source",
           "player_color",
           "opening_eco",
           "opening_name",
-          "games",
+          "games_played",
           "score_percent",
           "fen",
           "first_player_ply",
           "preceding_moves_san",
-          "length_plies",
+          "line_length_plies",
           "due_at",
           "repetitions"
         ],
@@ -3488,6 +3488,19 @@
             "type": "string",
             "title": "Platform"
           },
+          "analyzed_by_engines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Analyzed By Engines",
+            "default": []
+          },
+          "has_analysis_in_progress": {
+            "type": "boolean",
+            "title": "Has Analysis In Progress",
+            "default": false
+          },
           "pgn": {
             "type": "string",
             "title": "Pgn"
@@ -3525,26 +3538,6 @@
           "clocks_json"
         ],
         "title": "GameDetail"
-      },
-      "GamePositionIn": {
-        "properties": {
-          "game_id": {
-            "type": "integer",
-            "title": "Game Id"
-          },
-          "ply": {
-            "type": "integer",
-            "minimum": 0.0,
-            "title": "Ply"
-          }
-        },
-        "type": "object",
-        "required": [
-          "game_id",
-          "ply"
-        ],
-        "title": "GamePositionIn",
-        "description": "Desde qué posición de qué partida propia se retoma (RF-4.4)."
       },
       "GameSummary": {
         "properties": {
@@ -3611,6 +3604,19 @@
           "platform": {
             "type": "string",
             "title": "Platform"
+          },
+          "analyzed_by_engines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Analyzed By Engines",
+            "default": []
+          },
+          "has_analysis_in_progress": {
+            "type": "boolean",
+            "title": "Has Analysis In Progress",
+            "default": false
           }
         },
         "type": "object",
@@ -4118,12 +4124,12 @@
             "type": "integer",
             "title": "Done This Week"
           },
-          "reasons": {
+          "weaknesses": {
             "items": {
               "$ref": "#/components/schemas/WeaknessOut"
             },
             "type": "array",
-            "title": "Reasons"
+            "title": "Weaknesses"
           }
         },
         "type": "object",
@@ -4131,7 +4137,7 @@
           "kind",
           "weekly_target",
           "done_this_week",
-          "reasons"
+          "weaknesses"
         ],
         "title": "PlanTaskOut",
         "description": "Un deber de la semana: qué entrenar, cuánto y por qué."
@@ -4299,10 +4305,10 @@
             ],
             "title": "Uci"
           },
-          "attempt": {
+          "attempt_number": {
             "type": "integer",
             "minimum": 1.0,
-            "title": "Attempt",
+            "title": "Attempt Number",
             "default": 1
           }
         },
@@ -4436,9 +4442,9 @@
             "type": "string",
             "title": "Fen"
           },
-          "color": {
+          "player_color": {
             "type": "string",
-            "title": "Color"
+            "title": "Player Color"
           },
           "game_id": {
             "type": "integer",
@@ -4471,7 +4477,7 @@
         "required": [
           "id",
           "fen",
-          "color",
+          "player_color",
           "game_id",
           "ply",
           "opponent",
@@ -4698,7 +4704,7 @@
           "total"
         ],
         "title": "ReplayQueueOut",
-        "description": "La lista y cuántos errores hay, como la cola de puzzles y la de drills.\n\nEl total no es `len(positions)`: la lista viene recortada a `limit`, así que\nsin él la pantalla enseñaba veinte de trescientos sin decir que había más\n(fila 102 del inventario de docs/07-coherencia-ui.md). Va en el cuerpo y no\nen una cabecera `X-Total-Count` como el listado de Partidas porque las tres\npestañas hermanas de esta —puzzles, aperturas y sparring— lo traen así, y es\ncon ellas con las que se compara al cambiar de pestaña."
+        "description": "La lista y cuántos errores hay, como la cola de puzzles y la de drills.\n\nEl total no es `len(positions)`: la lista viene recortada a `limit`, así que\nsin él la pantalla enseñaba veinte de trescientos sin decir que había más\n(fila 102 del inventario de docs/07-coherencia-ui.md). Va en el cuerpo y no\nen una cabecera `X-Total-Count` como el listado de Partidas porque así lo\ntraen las **dos** pestañas hermanas que también reparten una cola —puzzles\ny aperturas, `PuzzleQueueOut` y `DrillQueueOut`—, y es con ellas con las que\nse compara al cambiar de pestaña. El sparring no cuenta aquí: su listado es\nde partidas abiertas, no una cola, y `GET /sparring/games` devuelve la lista\na secas."
       },
       "SparringGameCreate": {
         "properties": {
@@ -4726,7 +4732,7 @@
           "origin": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/GamePositionIn"
+                "$ref": "#/components/schemas/SparringOriginIn"
               },
               {
                 "type": "null"
@@ -4888,6 +4894,26 @@
           "uci"
         ],
         "title": "SparringMoveIn"
+      },
+      "SparringOriginIn": {
+        "properties": {
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "ply": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ply"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game_id",
+          "ply"
+        ],
+        "title": "SparringOriginIn",
+        "description": "Desde qué posición de qué partida propia se retoma (RF-4.4)."
       },
       "SyncRequest": {
         "properties": {

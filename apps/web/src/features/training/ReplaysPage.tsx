@@ -115,11 +115,11 @@ export function ReplaysPage() {
           }
         >
           {positions.map((position) => {
-            const key = `${position.game_id}-${position.ply}`;
-            const isChosen = key === chosenPositionKey;
+            const positionKey = `${position.game_id}-${position.ply}`;
+            const isChosen = positionKey === chosenPositionKey;
             return (
               <ReplayRow
-                key={key}
+                key={positionKey}
                 position={position}
                 isChosen={isChosen}
                 isPending={startMutation.isPending}
@@ -129,7 +129,7 @@ export function ReplaysPage() {
                 // `reset()` que se hizo al abrir "Importar PGN").
                 onChoose={() => {
                   startMutation.reset();
-                  setChosenPositionKey(key);
+                  setChosenPositionKey(positionKey);
                 }}
                 onCancel={() => setChosenPositionKey(null)}
                 onStart={(setup) => startMutation.mutate({ position, setup })}

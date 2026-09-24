@@ -16,33 +16,20 @@
 import type { Puzzle, PuzzleAnswer } from "@lucia/shared-types";
 import { useMutation } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { Chess } from "chess.js";
 import { useMemo, useState } from "react";
 import { Button } from "../../components/Button";
 import { ClassificationBadge } from "../../components/ClassificationBadge";
-import { BoardFrame } from "../../components/board/BoardFrame";
-import {
-  KEYBOARD_MOVE_HINT,
-  OCCUPANCY_TOGGLE_KEY_HINT,
-  RETRY_AFTER_WRONG_MOVE_HINT,
-} from "../../components/board/hints";
-import { Chessboard } from "../../components/board/Chessboard";
+import { RETRY_AFTER_WRONG_MOVE_HINT } from "../../components/board/hints";
 import type { EngineArrow } from "../../components/board/boardConfig";
-import { legalMovesByOrigin } from "../../components/board/legalMoves";
-import { OccupancyPanel } from "../../components/board/OccupancyPanel";
-import { useOccupancy } from "../../components/board/useOccupancy";
 import { arrowsFromPuzzleAnswer } from "./arrows";
-import { ExerciseStatusBadge } from "./ExerciseStatusBadge";
+import { TrainingStatusBadge } from "./TrainingStatusBadge";
+import { TrainingBoard } from "./TrainingBoard";
 import { ErrorBox, SuccessBox, WarningBox } from "../../components/Feedback";
 import { Panel } from "../../components/Panel";
-import {
-  BOARD_HINT_CLASSES,
-  BOARD_SIDEBAR_GRID_CLASS,
-  buttonClasses,
-} from "../../components/styles";
+import { BOARD_SIDEBAR_GRID_CLASS, buttonClasses } from "../../components/styles";
 import { api } from "../../lib/api";
 import { formatDate, formatOwnWinPercentLossSentence } from "../../lib/format";
-import { moveNumberLabel, plyFromFen } from "../../lib/moves";
+import { moveNumberLabel, plyFromFen, tryMove } from "../../lib/moves";
 
 export function PuzzleSolver({ puzzle, onNext }: { puzzle: Puzzle; onNext: () => void }) {
   /** La posición que se ve. Es la del puzzle salvo justo después de un
@@ -52,20 +39,20 @@ export function PuzzleSolver({ puzzle, onNext }: { puzzle: Puzzle; onNext: () =>
   const [shownFen, setShownFen] = useState(puzzle.fen);
   const [attemptedUci, setAttemptedUci] = useState<string | null>(null);
   /** Cuántas veces se ha intentado, contando la que está en curso. */
-  const [attempt, setAttempt] = useState(1);
+  const [attemptNumber, setAttemptNumber] = useState(1);
   /** El bando de quien resuelve, que es el del turno: orienta el tablero y es
    * el único que puede mover. */
-  const color = puzzle.color === "black" ? "black" : "white";
+  const color = puzzle.player_color === "black" ? "black" : "white";
 
   const answerMutation = useMutation({
-    mutationFn: ({ uci, attempt }: { uci: string | null; attempt: number }) =>
-      api.answerPuzzle(puzzle.id, { uci, attempt }),
+    mutationFn: (body: { uci: string | null; attempt_number: number }) =>
+      api.answerPuzzle(puzzle.id, body),
   });
   const answer = answerMutation.data;
   /** La respuesta cuando el puzzle ya está cerrado, o `null` si sigue
    * abierto. Mientras lo está, el servidor manda a `null` todo lo que lo
    * resolvería, así que solo desde aquí se puede leer sin comprobar nada. */
-  const reviewedAnswer = answer ? asReviewed(answer) : null;
+  const reviewedAnswer = answer ? toReviewedAnswer(answer) : null;
   const isReviewed = reviewedAnswer !== null;
   const isWrongAndOpen = answer !== undefined && !answer.reviewed;
 
@@ -76,17 +63,6 @@ export function PuzzleSolver({ puzzle, onNext }: { puzzle: Puzzle; onNext: () =>
    * piezas de una posición distinta de la que hay en pantalla: hay que pulsar
    * «Volver a intentarlo» primero (criterio C-3). */
   const canMove = !isReviewed && !answerMutation.isPending && shownFen === puzzle.fen;
-  const legalMoves = useMemo(
-    () => (canMove ? legalMovesByOrigin(puzzle.fen) : undefined),
-    [canMove, puzzle.fen],
-  );
-  /** La capa de ocupación (RF-7) sobre la posición que se ve, que tras fallar
-   * es la del intento y no la del puzzle: lo que se lee es lo que hay en
-   * pantalla. Las marcas arrancan apagadas porque las colgadas de RF-7.4 son
-   * media solución de un puzzle táctico. */
-  const occupancyController = useOccupancy(shownFen, {
-    marksOnByDefault: false,
-  });
   const arrows = useMemo(
     () =>
       reviewedAnswer
@@ -99,26 +75,21 @@ export function PuzzleSolver({ puzzle, onNext }: { puzzle: Puzzle; onNext: () =>
     [puzzle.fen, reviewedAnswer],
   );
 
-  function tryMove(from: string, to: string) {
+  function handleMove(from: string, to: string) {
     if (isReviewed || answerMutation.isPending) return;
+    const move = tryMove(puzzle.fen, from, to);
+    if (!move) return;
 
-    const chess = new Chess(puzzle.fen);
-    try {
-      // La promoción siempre a dama, igual que en el tablero de análisis.
-      const move = chess.move({ from, to, promotion: "q" });
-      setShownFen(chess.fen());
-      setAttemptedUci(move.lan);
-      answerMutation.mutate(
-        { uci: move.lan, attempt },
-        {
-          onSuccess: (result) => {
-            if (!result.reviewed) setAttempt(attempt + 1);
-          },
+    setShownFen(move.fen);
+    setAttemptedUci(move.uci);
+    answerMutation.mutate(
+      { uci: move.uci, attempt_number: attemptNumber },
+      {
+        onSuccess: (answer) => {
+          if (!answer.reviewed) setAttemptNumber(attemptNumber + 1);
         },
-      );
-    } catch {
-      // jugada ilegal; chessground ya filtra casi todas
-    }
+      },
+    );
   }
 
   function retry() {
@@ -129,47 +100,26 @@ export function PuzzleSolver({ puzzle, onNext }: { puzzle: Puzzle; onNext: () =>
 
   return (
     <div className={BOARD_SIDEBAR_GRID_CLASS}>
-      <div className="space-y-3">
-        {/* Sin barra de evaluación, al contrario que el visor y el tablero de
-            análisis: aquí la evaluación de la posición es media respuesta.
-            Aparece al cerrar el puzzle, en números, dentro del panel. */}
-        <BoardFrame>
-          <Chessboard
-            fen={shownFen}
-            orientation={color}
-            turnColor={color}
-            legalMoves={legalMoves}
-            onMove={tryMove}
-            lastMoveUci={attemptedUci}
-            engineArrows={arrows}
-            occupancyController={occupancyController}
-          />
-        </BoardFrame>
-        {/* Lo que hay que saber del tablero, en la misma frase y con la misma
-            forma que en el visor y en el tablero de análisis (criterio C-1).
-            Con el puzzle cerrado el tablero ya no se mueve y lo que hay que
-            saber es qué significa cada flecha: el color no puede ser lo único
-            que lo diga (criterios C-6 y C-7), como ya hace la leyenda de la
-            capa de ocupación. */}
-        <p className={BOARD_HINT_CLASSES}>
-          {isReviewed
+      {/* Con el puzzle cerrado el tablero ya no se mueve y lo que hay que
+          saber es qué significa cada flecha: el color no puede ser lo único
+          que lo diga (criterios C-6 y C-7), como ya hace la leyenda de la capa
+          de ocupación. */}
+      <TrainingBoard
+        fen={shownFen}
+        color={color}
+        canMove={canMove}
+        onMove={handleMove}
+        lastMoveUci={attemptedUci}
+        arrows={arrows}
+        acceptsMoves={!isReviewed && !isWrongAndOpen}
+        hint={
+          isReviewed
             ? arrowLegend(arrows)
             : isWrongAndOpen
               ? RETRY_AFTER_WRONG_MOVE_HINT
-              : "Arrastra una pieza para responder. Las promociones se coronan en dama."}{" "}
-          {OCCUPANCY_TOGGLE_KEY_HINT}
-          {/* El teclado se anuncia donde se anuncia el arrastre y no más: con
-              el puzzle cerrado o con la jugada errónea encima, el tablero no
-              acepta jugadas por ninguna de las dos vías, y prometer «Intro
-              elige origen y destino» ahí es anunciar una tecla que no hace
-              nada (criterio C-1). Mientras el servidor comprueba sí se sigue
-              anunciando, como el arrastre: es una espera, no un estado de la
-              pantalla. */}
-          {!isReviewed && !isWrongAndOpen ? ` ${KEYBOARD_MOVE_HINT}` : ""}
-        </p>
-
-        <OccupancyPanel controller={occupancyController} />
-      </div>
+              : "Arrastra una pieza para responder. Las promociones se coronan en dama."
+        }
+      />
 
       <aside className="space-y-3">
         {/* El mismo título y la misma insignia que el drill y el sparring: qué
@@ -179,7 +129,7 @@ export function PuzzleSolver({ puzzle, onNext }: { puzzle: Puzzle; onNext: () =>
         <Panel
           title={`Juegas con ${color === "white" ? "blancas" : "negras"}`}
           aside={
-            <ExerciseStatusBadge
+            <TrainingStatusBadge
               isPlayerTurn={!isReviewed}
               isWaitingForServer={answerMutation.isPending}
               finishedLabel="puzzle cerrado"
@@ -213,12 +163,14 @@ export function PuzzleSolver({ puzzle, onNext }: { puzzle: Puzzle; onNext: () =>
 
         {isWrongAndOpen && (
           <WarningBox>
-            {/* `attempt` es el intento que viene, así que los hechos son uno
-                menos: tras fallar el primero decía "llevas 2 intentos", y con
-                el singular escribía "1 intentos". */}
+            {/* `attemptNumber` es el intento que viene, así que los hechos son
+                uno menos: tras fallar el primero decía "llevas 2 intentos", y
+                con el singular escribía "1 intentos". */}
             <p>
               Esa no es la jugada.{" "}
-              {attempt === 2 ? "Es tu primer intento." : `Llevas ${attempt - 1} intentos.`}
+              {attemptNumber === 2
+                ? "Es tu primer intento."
+                : `Llevas ${attemptNumber - 1} intentos.`}
             </p>
             <div className="mt-2">
               <Button size="sm" variant="primary" onClick={retry}>
@@ -236,7 +188,7 @@ export function PuzzleSolver({ puzzle, onNext }: { puzzle: Puzzle; onNext: () =>
         {!isReviewed && (
           <Button
             disabled={answerMutation.isPending}
-            onClick={() => answerMutation.mutate({ uci: null, attempt })}
+            onClick={() => answerMutation.mutate({ uci: null, attempt_number: attemptNumber })}
           >
             {answerMutation.isPending ? "Comprobando…" : "Ver la solución"}
           </Button>
@@ -273,7 +225,7 @@ type ReviewedPuzzleAnswer = PuzzleAnswer & {
   interval_days: number;
 };
 
-function asReviewed(answer: PuzzleAnswer): ReviewedPuzzleAnswer | null {
+function toReviewedAnswer(answer: PuzzleAnswer): ReviewedPuzzleAnswer | null {
   const { classification, win_percent_before, win_percent_after, interval_days } = answer;
   if (
     !answer.reviewed ||
