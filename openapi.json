@@ -1,0 +1,5258 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "L.U.C.I.A. API",
+    "description": "Logic & Ultimate Chess Insight Algorithm",
+    "version": "0.6.0"
+  },
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "health"
+        ],
+        "summary": "Health",
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sync": {
+      "post": {
+        "tags": [
+          "sync"
+        ],
+        "summary": "Sync",
+        "operationId": "sync_sync_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/SyncRequest"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SyncSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/games": {
+      "get": {
+        "tags": [
+          "games"
+        ],
+        "summary": "List Games",
+        "description": "Listado filtrado de partidas (RF-5.3).\n\n**Tres de los filtros necesitan `username` y sin él se ignoran**: `color`,\n`result` y `opponent`. \"Blancas\", \"ganadas\" o \"contra fulano\" no significan\nnada sin decir de quién se habla; aplicarlos a medias daría un resultado\nplausible y equivocado, que es peor que no filtrar.\n\n`opening` busca por subcadena en el nombre de la apertura, para que\n\"sicilian\" traiga todas las sicilianas, no solo la variante exacta. El\nnombre es el de la tabla ECO propia (`lucia_core.openings`), así que las\npartidas que no empiezan en la posición estándar no salen con ningún\nfiltro de apertura: no tienen apertura que nombrar.\n\n`since` y `until` son fechas inclusivas por los dos lados: `until` cubre el\ndía entero, no hasta su medianoche.\n\nLa cabecera **`X-Total-Count`** trae cuántas partidas cumplen los filtros,\nsin la paginación. Va en cabecera y no en el cuerpo para no envolver la\nlista: con ella la pantalla puede decir \"25 de 324\" en vez de solo el\nnúmero de página, que no dice si el filtro dejó fuera media colección.",
+        "operationId": "list_games_games_get",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          },
+          {
+            "name": "color",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "white",
+                    "black"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Color"
+            }
+          },
+          {
+            "name": "result",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "win",
+                    "draw",
+                    "loss"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Result"
+            }
+          },
+          {
+            "name": "opponent",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Opponent"
+            }
+          },
+          {
+            "name": "opening",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Opening"
+            }
+          },
+          {
+            "name": "time_class",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Time Class"
+            }
+          },
+          {
+            "name": "rated",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "boolean"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Rated"
+            }
+          },
+          {
+            "name": "since",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since"
+            }
+          },
+          {
+            "name": "until",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Until"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/GameSummary"
+                  },
+                  "title": "Response List Games Games Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/games/{game_id}": {
+      "get": {
+        "tags": [
+          "games"
+        ],
+        "summary": "Get Game",
+        "operationId": "get_game_games__game_id__get",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GameDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/import/pgn": {
+      "post": {
+        "tags": [
+          "import"
+        ],
+        "summary": "Import Pgn File",
+        "description": "Guarda en el historial las partidas del archivo (RF-1.5).\n\n- `username`: a quién se le atribuyen; si se omite, `CHESSCOM_USERNAME`.\n- `player_name_in_pgn`: **cómo aparece ese jugador dentro del PGN**. Un archivo de\n  torneo lo nombra \"Durán, Jesús\" y no con su usuario, así que sin esto la\n  partida se guarda pero no cuenta en el dashboard ni en los filtros por\n  color, resultado o rival, que casan por nombre. El PGN se guarda entero,\n  de modo que el nombre original no se pierde.\n\nLas partidas repetidas no se duplican: se identifican por el contenido del\nPGN, así que reimportar el mismo archivo reescribe las mismas filas.",
+        "operationId": "import_pgn_file_import_pgn_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_import_pgn_file_import_pgn_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PgnImportSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis": {
+      "post": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Create Analysis",
+        "operationId": "create_analysis_analysis_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnalysisRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AnalysisSummary"
+                  },
+                  "title": "Response Create Analysis Analysis Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "List Analyses",
+        "description": "Análisis existentes, opcionalmente los de una partida o un tablero\nconcretos. Sirve para que el visor —y el tablero de análisis (RF-6.9)—\nsepan si ya hay uno hecho en vez de volver a analizar.",
+        "operationId": "list_analyses_analysis_get",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Game Id"
+            }
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Board Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AnalysisSummary"
+                  },
+                  "title": "Response List Analyses Analysis Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis/position": {
+      "post": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Position Analysis",
+        "description": "Analiza una posición suelta y devuelve las mejores líneas (RF-5.2 /\nRF-6.2). Para el tablero de análisis y la exploración en vivo.",
+        "operationId": "position_analysis_analysis_position_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PositionAnalysisRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EngineLineOut"
+                  },
+                  "type": "array",
+                  "title": "Response Position Analysis Analysis Position Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis/compare": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Compare",
+        "description": "Dónde discrepan dos análisis de la misma partida (RF-2.6), típicamente\nuno de Stockfish y otro de Lc0.",
+        "operationId": "compare_analysis_compare_get",
+        "parameters": [
+          {
+            "name": "analysis_a",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Analysis A"
+            }
+          },
+          {
+            "name": "analysis_b",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Analysis B"
+            }
+          },
+          {
+            "name": "threshold",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "number",
+              "maximum": 100,
+              "minimum": 0,
+              "default": 10.0,
+              "title": "Threshold"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisComparisonOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis/{analysis_id}": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Get Analysis",
+        "operationId": "get_analysis_analysis__analysis_id__get",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Analysis Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/analysis/{analysis_id}/pgn": {
+      "get": {
+        "tags": [
+          "analysis"
+        ],
+        "summary": "Get Analysis Pgn",
+        "description": "El PGN de la partida con las anotaciones del análisis (RF-5.5).\n\nSe descarga como archivo —de ahí el `Content-Disposition`— porque lo que\nse quiere hacer con él es abrirlo en lichess, ChessBase o SCID, no leerlo\nen el navegador.\n\nSolo se exporta un análisis **terminado**: uno a medias daría una partida\ncomentada hasta la jugada 20 y muda a partir de ahí, que se lee como un\narchivo roto y no como un análisis en curso.",
+        "operationId": "get_analysis_pgn_analysis__analysis_id__pgn_get",
+        "parameters": [
+          {
+            "name": "analysis_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Analysis Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/engines/config": {
+      "get": {
+        "tags": [
+          "engines"
+        ],
+        "summary": "Engines Config",
+        "operationId": "engines_config_engines_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EnginesConfigOut"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/engines/config/{engine_name}": {
+      "put": {
+        "tags": [
+          "engines"
+        ],
+        "summary": "Update Engine Config",
+        "operationId": "update_engine_config_engines_config__engine_name__put",
+        "parameters": [
+          {
+            "name": "engine_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Engine Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EngineConfigUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EngineConfigOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "tags": [
+          "stats"
+        ],
+        "summary": "Player Stats",
+        "description": "Estadísticas del jugador indicado, o del de `CHESSCOM_USERNAME` si se\nomite. Se pide el nombre porque la base guarda partidas de ambos bandos:\nsin saber quién es \"yo\", un marcador de victorias no significa nada.",
+        "operationId": "player_stats_stats_get",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          },
+          {
+            "name": "limit_openings",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 50,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit Openings"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlayerStatsOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards": {
+      "get": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "List Boards",
+        "operationId": "list_boards_boards_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 200,
+              "minimum": 1,
+              "default": 50,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/BoardSummary"
+                  },
+                  "title": "Response List Boards Boards Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Create Board",
+        "operationId": "create_board_boards_post",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards/{board_id}": {
+      "get": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Get Board",
+        "operationId": "get_board_boards__board_id__get",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Update Board",
+        "operationId": "update_board_boards__board_id__put",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardUpdate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Delete Board",
+        "operationId": "delete_board_boards__board_id__delete",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards/{board_id}/undo": {
+      "post": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Undo Board",
+        "description": "Devuelve el tablero a su estado anterior (RF-6.8).\n\n409 y no 400 cuando no hay nada que deshacer: la petición es correcta, es\nel estado del tablero el que no la admite.",
+        "operationId": "undo_board_boards__board_id__undo_post",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards/{board_id}/redo": {
+      "post": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Redo Board",
+        "operationId": "redo_board_boards__board_id__redo_post",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards/{board_id}/own-game": {
+      "put": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Publish Own Game",
+        "description": "Publica el tablero en el historial como partida propia (RF-6.5).\n\nA partir de aquí cuenta en el dashboard, en los patrones y en los filtros\ndel listado como cualquier otra partida. La misma llamada sirve para\ncorregir los datos y para poner al día las jugadas después de deshacer o\nrehacer: reescribe la partida publicada en vez de crear otra.",
+        "operationId": "publish_own_game_boards__board_id__own_game_put",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OwnGamePublishRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Withdraw Own Game",
+        "description": "Retira la marca de partida propia: el tablero deja de contar y su\npartida se va del historial (RF-6.5). El tablero se queda como estaba.",
+        "operationId": "withdraw_own_game_boards__board_id__own_game_delete",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BoardDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/boards/{board_id}/analysis": {
+      "post": {
+        "tags": [
+          "boards"
+        ],
+        "summary": "Analyze Board",
+        "description": "Encola el análisis completo de la línea principal del tablero (RF-6.9).\n\nDevuelve en cuanto está en la cola, con el id que el front usa para\nseguir el progreso por `WS /ws/analysis/{id}`, igual que una partida. El\nanálisis **no cuenta en las estadísticas** salvo que el tablero esté\npublicado como partida propia (RF-6.5), que es cuando nace con `game_id`.",
+        "operationId": "analyze_board_boards__board_id__analysis_post",
+        "parameters": [
+          {
+            "name": "board_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Board Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BoardAnalysisRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AnalysisSummary"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repertoire": {
+      "get": {
+        "tags": [
+          "repertoire"
+        ],
+        "summary": "Player Repertoire",
+        "description": "Dónde se sale el jugador de la teoría, con lo que ya está en la caché.",
+        "operationId": "player_repertoire_repertoire_get",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepertoireOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/repertoire/refresh": {
+      "post": {
+        "tags": [
+          "repertoire"
+        ],
+        "summary": "Refresh Player Repertoire",
+        "description": "Pregunta a Lichess por las posiciones que falten, hasta `budget`.\n\nDevuelve cuántas se preguntaron y cuántas siguen faltando, que es lo que\npermite a la pantalla decir si hace falta volver a pulsar.",
+        "operationId": "refresh_player_repertoire_repertoire_refresh_post",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          },
+          {
+            "name": "budget",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 60,
+              "minimum": 1,
+              "default": 25,
+              "title": "Budget"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RefreshResultOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/puzzles": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Generate Player Puzzles",
+        "description": "Crea puzzles a partir de los errores de las partidas ya analizadas.\n\nSe pide a mano y no al analizar: quien entrena decide cuándo renovar su\nbaraja, y así analizar una tanda de partidas no cambia la cola de repaso\npor sorpresa. Volver a pulsar solo añade lo nuevo.",
+        "operationId": "generate_player_puzzles_training_puzzles_post",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuzzleGenerationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Player Puzzle Queue",
+        "description": "Los puzzles que toca repasar ahora, del más atrasado al más reciente.",
+        "operationId": "player_puzzle_queue_training_puzzles_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuzzleQueueOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/puzzles/{puzzle_id}/answer": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Answer Player Puzzle",
+        "description": "Comprueba una respuesta y, si cierra el puzzle, anota el repaso.",
+        "operationId": "answer_player_puzzle_training_puzzles__puzzle_id__answer_post",
+        "parameters": [
+          {
+            "name": "puzzle_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Puzzle Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PuzzleAnswerIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuzzleAnswerOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/drills": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Generate Opening Drills",
+        "description": "Crea los drills que falten a partir del repertorio y de las aperturas.\n\nSe pide a mano, como los puzzles: quien entrena decide cuándo renovar su\nbaraja. Volver a pulsar solo añade lo nuevo y no toca el estado de repaso\nde lo que ya había.",
+        "operationId": "generate_opening_drills_training_drills_post",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrillGenerationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Player Drill Queue",
+        "description": "Los drills que toca repetir ahora, del más atrasado al más reciente, y\ncuánta teoría le falta al repertorio del que salen.",
+        "operationId": "player_drill_queue_training_drills_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrillQueueOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/drills/{drill_id}/moves": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Play Drill Move",
+        "description": "Comprueba una jugada de la línea y contesta por el rival.\n\nFallar **no** cierra el drill ni enseña la jugada buena: se puede volver a\nintentar, igual que en un puzzle. Rendirse (`uci` a `null`) sí lo cierra,\ncomo fallado, y entonces se ve la línea entera.",
+        "operationId": "play_drill_move_training_drills__drill_id__moves_post",
+        "parameters": [
+          {
+            "name": "drill_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Drill Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DrillMoveIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrillMoveOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/replays": {
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Player Replay Positions",
+        "description": "Los errores propios desde los que se puede retomar, del más caro al más\nbarato, y cuántos hay en total.",
+        "operationId": "player_replay_positions_training_replays_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayQueueOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/plan": {
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Player Weekly Plan",
+        "description": "El plan de esta semana: qué falla y qué hacer al respecto.",
+        "operationId": "player_weekly_plan_training_plan_get",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyPlanOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sparring/games": {
+      "post": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "Start Sparring Game",
+        "description": "Abre una partida contra el motor, desde el principio o retomando una\npartida propia (RF-4.4). Si al motor le toca mover, ya ha movido cuando la\nrespuesta llega.",
+        "operationId": "start_sparring_game_sparring_games_post",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SparringGameCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringGameOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "List Sparring Games",
+        "description": "Las partidas jugadas, la de la última jugada primero. La pantalla\ndistingue las vivas de las terminadas por `result`.",
+        "operationId": "list_sparring_games_sparring_games_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SparringGameOut"
+                  },
+                  "title": "Response List Sparring Games Sparring Games Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sparring/games/{game_id}": {
+      "get": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "Get Sparring Game",
+        "description": "Retomar una partida: es lo que permite cerrar la pestaña a mitad y\nseguir después, porque el estado vive en la base y no en la pantalla.",
+        "operationId": "get_sparring_game_sparring_games__game_id__get",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringGameOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sparring/games/{game_id}/moves": {
+      "post": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "Play Sparring Move",
+        "description": "Juega una jugada y devuelve la partida con la respuesta del motor.",
+        "operationId": "play_sparring_move_sparring_games__game_id__moves_post",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SparringMoveIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringGameOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sparring/games/{game_id}/resign": {
+      "post": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "Resign Sparring Game",
+        "description": "Abandona la partida: gana el motor y la partida queda cerrada.",
+        "operationId": "resign_sparring_game_sparring_games__game_id__resign_post",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringGameOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AnalysisComparisonOut": {
+        "properties": {
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "analysis_a": {
+            "type": "integer",
+            "title": "Analysis A"
+          },
+          "analysis_b": {
+            "type": "integer",
+            "title": "Analysis B"
+          },
+          "engine_a": {
+            "type": "string",
+            "title": "Engine A"
+          },
+          "engine_b": {
+            "type": "string",
+            "title": "Engine B"
+          },
+          "total_moves": {
+            "type": "integer",
+            "title": "Total Moves"
+          },
+          "agreed_best_moves": {
+            "type": "integer",
+            "title": "Agreed Best Moves"
+          },
+          "best_move_agreement_percent": {
+            "type": "number",
+            "title": "Best Move Agreement Percent"
+          },
+          "disagreements": {
+            "items": {
+              "$ref": "#/components/schemas/MoveComparisonOut"
+            },
+            "type": "array",
+            "title": "Disagreements"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game_id",
+          "analysis_a",
+          "analysis_b",
+          "engine_a",
+          "engine_b",
+          "total_moves",
+          "agreed_best_moves",
+          "best_move_agreement_percent",
+          "disagreements"
+        ],
+        "title": "AnalysisComparisonOut"
+      },
+      "AnalysisDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "game_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game Id"
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "multipv": {
+            "type": "integer",
+            "title": "Multipv"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "white_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "White Accuracy"
+          },
+          "black_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Black Accuracy"
+          },
+          "moves": {
+            "items": {
+              "$ref": "#/components/schemas/AnalyzedMoveOut"
+            },
+            "type": "array",
+            "title": "Moves"
+          },
+          "critical_moments": {
+            "items": {
+              "$ref": "#/components/schemas/CriticalMomentOut"
+            },
+            "type": "array",
+            "title": "Critical Moments",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "game_id",
+          "board_id",
+          "engine",
+          "depth",
+          "multipv",
+          "status",
+          "error",
+          "white_accuracy",
+          "black_accuracy",
+          "moves"
+        ],
+        "title": "AnalysisDetail"
+      },
+      "AnalysisRequest": {
+        "properties": {
+          "game_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Game Ids"
+          },
+          "engine": {
+            "type": "string",
+            "enum": [
+              "stockfish",
+              "lc0"
+            ],
+            "title": "Engine",
+            "default": "stockfish"
+          },
+          "depth": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depth"
+          },
+          "multipv": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multipv"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game_ids"
+        ],
+        "title": "AnalysisRequest"
+      },
+      "AnalysisSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "game_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Game Id"
+          },
+          "board_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Board Id"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "multipv": {
+            "type": "integer",
+            "title": "Multipv"
+          },
+          "status": {
+            "type": "string",
+            "title": "Status"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "white_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "White Accuracy"
+          },
+          "black_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Black Accuracy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "game_id",
+          "board_id",
+          "engine",
+          "depth",
+          "multipv",
+          "status",
+          "error",
+          "white_accuracy",
+          "black_accuracy"
+        ],
+        "title": "AnalysisSummary"
+      },
+      "AnalyzedMoveOut": {
+        "properties": {
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "san": {
+            "type": "string",
+            "title": "San"
+          },
+          "uci": {
+            "type": "string",
+            "title": "Uci"
+          },
+          "fen_before": {
+            "type": "string",
+            "title": "Fen Before"
+          },
+          "classification": {
+            "type": "string",
+            "title": "Classification"
+          },
+          "phase": {
+            "type": "string",
+            "title": "Phase"
+          },
+          "move_accuracy": {
+            "type": "number",
+            "title": "Move Accuracy"
+          },
+          "win_percent_before": {
+            "type": "number",
+            "title": "Win Percent Before"
+          },
+          "win_percent_after": {
+            "type": "number",
+            "title": "Win Percent After"
+          },
+          "best_move_uci": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Move Uci"
+          },
+          "alternatives": {
+            "items": {
+              "$ref": "#/components/schemas/EngineLineOut"
+            },
+            "type": "array",
+            "title": "Alternatives",
+            "default": []
+          }
+        },
+        "type": "object",
+        "required": [
+          "ply",
+          "color",
+          "san",
+          "uci",
+          "fen_before",
+          "classification",
+          "phase",
+          "move_accuracy",
+          "win_percent_before",
+          "win_percent_after",
+          "best_move_uci"
+        ],
+        "title": "AnalyzedMoveOut"
+      },
+      "BoardAnalysisRequest": {
+        "properties": {
+          "pgn": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Pgn"
+          },
+          "engine": {
+            "type": "string",
+            "enum": [
+              "stockfish",
+              "lc0"
+            ],
+            "title": "Engine",
+            "default": "stockfish"
+          },
+          "depth": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depth"
+          },
+          "multipv": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multipv"
+          }
+        },
+        "type": "object",
+        "required": [
+          "pgn"
+        ],
+        "title": "BoardAnalysisRequest",
+        "description": "Lo que hace falta para analizar la línea principal de un tablero\n(RF-6.9)."
+      },
+      "BoardCreate": {
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Title"
+          },
+          "root_fen": {
+            "type": "string",
+            "title": "Root Fen",
+            "default": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+          },
+          "tree_json": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Tree Json"
+          },
+          "tags_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags Json"
+          }
+        },
+        "type": "object",
+        "required": [
+          "title"
+        ],
+        "title": "BoardCreate"
+      },
+      "BoardDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "tags_json": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags Json"
+          },
+          "root_fen": {
+            "type": "string",
+            "title": "Root Fen"
+          },
+          "is_own_game": {
+            "type": "boolean",
+            "title": "Is Own Game"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          },
+          "tree_json": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Tree Json"
+          },
+          "can_undo": {
+            "type": "boolean",
+            "title": "Can Undo"
+          },
+          "can_redo": {
+            "type": "boolean",
+            "title": "Can Redo"
+          },
+          "own_game": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OwnGameLink"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "tags_json",
+          "root_fen",
+          "is_own_game",
+          "created_at",
+          "updated_at",
+          "tree_json",
+          "can_undo",
+          "can_redo"
+        ],
+        "title": "BoardDetail"
+      },
+      "BoardSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "tags_json": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags Json"
+          },
+          "root_fen": {
+            "type": "string",
+            "title": "Root Fen"
+          },
+          "is_own_game": {
+            "type": "boolean",
+            "title": "Is Own Game"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "tags_json",
+          "root_fen",
+          "is_own_game",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "BoardSummary",
+        "description": "Lo que hace falta para listar; sin el árbol, que puede ser grande."
+      },
+      "BoardUpdate": {
+        "properties": {
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "root_fen": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Root Fen"
+          },
+          "tree_json": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tree Json"
+          },
+          "tags_json": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tags Json"
+          },
+          "pgn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pgn"
+          }
+        },
+        "type": "object",
+        "title": "BoardUpdate",
+        "description": "Todos los campos son opcionales: la UI autoguarda solo lo que cambió."
+      },
+      "Body_import_pgn_file_import_pgn_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "Archivo .pgn con una o varias partidas"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "player_name_in_pgn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Player Name In Pgn"
+          }
+        },
+        "type": "object",
+        "required": [
+          "file"
+        ],
+        "title": "Body_import_pgn_file_import_pgn_post"
+      },
+      "CriticalMomentOut": {
+        "properties": {
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "san": {
+            "type": "string",
+            "title": "San"
+          },
+          "kinds": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Kinds"
+          },
+          "win_percent_before": {
+            "type": "number",
+            "title": "Win Percent Before"
+          },
+          "win_percent_after": {
+            "type": "number",
+            "title": "Win Percent After"
+          },
+          "best_alternative_san": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Alternative San"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ply",
+          "color",
+          "san",
+          "kinds",
+          "win_percent_before",
+          "win_percent_after",
+          "best_alternative_san"
+        ],
+        "title": "CriticalMomentOut",
+        "description": "Una posición donde la partida se decidía (RF-2.8)."
+      },
+      "DepartureOut": {
+        "properties": {
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "san": {
+            "type": "string",
+            "title": "San"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "master_moves": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Master Moves"
+          },
+          "games": {
+            "type": "integer",
+            "title": "Games"
+          },
+          "wins": {
+            "type": "integer",
+            "title": "Wins"
+          },
+          "draws": {
+            "type": "integer",
+            "title": "Draws"
+          },
+          "losses": {
+            "type": "integer",
+            "title": "Losses"
+          },
+          "score_percent": {
+            "type": "number",
+            "title": "Score Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ply",
+          "san",
+          "color",
+          "master_moves",
+          "games",
+          "wins",
+          "draws",
+          "losses",
+          "score_percent"
+        ],
+        "title": "DepartureOut",
+        "description": "Un punto donde el repertorio propio se separa del de los maestros."
+      },
+      "DrillGenerationOut": {
+        "properties": {
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "positions_missing": {
+            "type": "integer",
+            "title": "Positions Missing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "total",
+          "positions_missing"
+        ],
+        "title": "DrillGenerationOut"
+      },
+      "DrillMoveIn": {
+        "properties": {
+          "ply": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ply"
+          },
+          "uci": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uci"
+          },
+          "wrong_moves": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Wrong Moves",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "ply"
+        ],
+        "title": "DrillMoveIn"
+      },
+      "DrillMoveOut": {
+        "properties": {
+          "correct": {
+            "type": "boolean",
+            "title": "Correct"
+          },
+          "reply_uci": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Uci"
+          },
+          "reply_san": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply San"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "next_ply": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Ply"
+          },
+          "reviewed": {
+            "type": "boolean",
+            "title": "Reviewed"
+          },
+          "line_moves_san": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Line Moves San"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "interval_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "correct",
+          "reply_uci",
+          "reply_san",
+          "fen",
+          "next_ply",
+          "reviewed",
+          "line_moves_san",
+          "due_at",
+          "interval_days"
+        ],
+        "title": "DrillMoveOut"
+      },
+      "DrillOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "player_color": {
+            "type": "string",
+            "title": "Player Color"
+          },
+          "opening_eco": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opening Eco"
+          },
+          "opening_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opening Name"
+          },
+          "games_played": {
+            "type": "integer",
+            "title": "Games Played"
+          },
+          "score_percent": {
+            "type": "number",
+            "title": "Score Percent"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "first_player_ply": {
+            "type": "integer",
+            "title": "First Player Ply"
+          },
+          "preceding_moves_san": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Preceding Moves San"
+          },
+          "line_length_plies": {
+            "type": "integer",
+            "title": "Line Length Plies"
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Due At"
+          },
+          "repetitions": {
+            "type": "integer",
+            "title": "Repetitions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "source",
+          "player_color",
+          "opening_eco",
+          "opening_name",
+          "games_played",
+          "score_percent",
+          "fen",
+          "first_player_ply",
+          "preceding_moves_san",
+          "line_length_plies",
+          "due_at",
+          "repetitions"
+        ],
+        "title": "DrillOut",
+        "description": "Un drill por hacer, sin la línea que lo resuelve."
+      },
+      "DrillQueueOut": {
+        "properties": {
+          "drills": {
+            "items": {
+              "$ref": "#/components/schemas/DrillOut"
+            },
+            "type": "array",
+            "title": "Drills"
+          },
+          "due": {
+            "type": "integer",
+            "title": "Due"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "next_due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Due At"
+          },
+          "positions_missing": {
+            "type": "integer",
+            "title": "Positions Missing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "drills",
+          "due",
+          "total",
+          "next_due_at",
+          "positions_missing"
+        ],
+        "title": "DrillQueueOut"
+      },
+      "EngineConfigOut": {
+        "properties": {
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "threads": {
+            "type": "integer",
+            "title": "Threads"
+          },
+          "hash_mb": {
+            "type": "integer",
+            "title": "Hash Mb"
+          },
+          "depth": {
+            "type": "integer",
+            "title": "Depth"
+          },
+          "multipv": {
+            "type": "integer",
+            "title": "Multipv"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path"
+          },
+          "available": {
+            "type": "boolean",
+            "title": "Available"
+          },
+          "weights_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights Path"
+          },
+          "weights_available": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weights Available"
+          },
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Backend"
+          },
+          "limit_kind": {
+            "type": "string",
+            "title": "Limit Kind"
+          }
+        },
+        "type": "object",
+        "required": [
+          "name",
+          "threads",
+          "hash_mb",
+          "depth",
+          "multipv",
+          "path",
+          "available",
+          "limit_kind"
+        ],
+        "title": "EngineConfigOut"
+      },
+      "EngineConfigUpdate": {
+        "properties": {
+          "threads": {
+            "type": "integer",
+            "maximum": 64.0,
+            "minimum": 1.0,
+            "title": "Threads"
+          },
+          "hash_mb": {
+            "type": "integer",
+            "maximum": 8192.0,
+            "minimum": 16.0,
+            "title": "Hash Mb"
+          },
+          "depth": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Depth"
+          },
+          "multipv": {
+            "type": "integer",
+            "maximum": 10.0,
+            "minimum": 1.0,
+            "title": "Multipv"
+          }
+        },
+        "type": "object",
+        "required": [
+          "threads",
+          "hash_mb",
+          "depth",
+          "multipv"
+        ],
+        "title": "EngineConfigUpdate",
+        "description": "Los rangos evitan configuraciones que colgarían la máquina sin darse\ncuenta. El de `depth` se comprueba aparte, en el endpoint, porque depende\nde la unidad del motor (ver `LIMIT_RANGES`)."
+      },
+      "EngineLineOut": {
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "score_cp": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Cp"
+          },
+          "score_mate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Mate"
+          },
+          "pv_uci": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pv Uci"
+          },
+          "pv_san": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Pv San"
+          },
+          "wdl": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WdlOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "rank",
+          "score_cp",
+          "score_mate",
+          "pv_uci",
+          "pv_san"
+        ],
+        "title": "EngineLineOut",
+        "description": "Una línea del motor, igual la calcule en vivo `POST /analysis/position`\no venga guardada con una jugada analizada (RF-10.1): mismo formato en los\ndos sitios, para que el front la dibuje igual."
+      },
+      "EnginesConfigOut": {
+        "properties": {
+          "stockfish": {
+            "$ref": "#/components/schemas/EngineConfigOut"
+          },
+          "lc0": {
+            "$ref": "#/components/schemas/EngineConfigOut"
+          }
+        },
+        "type": "object",
+        "required": [
+          "stockfish",
+          "lc0"
+        ],
+        "title": "EnginesConfigOut"
+      },
+      "GameDetail": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "white_username": {
+            "type": "string",
+            "title": "White Username"
+          },
+          "white_rating": {
+            "type": "integer",
+            "title": "White Rating"
+          },
+          "white_result": {
+            "type": "string",
+            "title": "White Result"
+          },
+          "black_username": {
+            "type": "string",
+            "title": "Black Username"
+          },
+          "black_rating": {
+            "type": "integer",
+            "title": "Black Rating"
+          },
+          "black_result": {
+            "type": "string",
+            "title": "Black Result"
+          },
+          "time_control": {
+            "type": "string",
+            "title": "Time Control"
+          },
+          "time_class": {
+            "type": "string",
+            "title": "Time Class"
+          },
+          "rated": {
+            "type": "boolean",
+            "title": "Rated"
+          },
+          "eco": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eco"
+          },
+          "played_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Played At"
+          },
+          "starts_from_custom_position": {
+            "type": "boolean",
+            "title": "Starts From Custom Position"
+          },
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "analyzed_by_engines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Analyzed By Engines",
+            "default": []
+          },
+          "has_analysis_in_progress": {
+            "type": "boolean",
+            "title": "Has Analysis In Progress",
+            "default": false
+          },
+          "pgn": {
+            "type": "string",
+            "title": "Pgn"
+          },
+          "clocks_json": {
+            "anyOf": [
+              {
+                "items": {},
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Clocks Json"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "white_username",
+          "white_rating",
+          "white_result",
+          "black_username",
+          "black_rating",
+          "black_result",
+          "time_control",
+          "time_class",
+          "rated",
+          "eco",
+          "played_at",
+          "starts_from_custom_position",
+          "platform",
+          "pgn",
+          "clocks_json"
+        ],
+        "title": "GameDetail"
+      },
+      "GameSummary": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "white_username": {
+            "type": "string",
+            "title": "White Username"
+          },
+          "white_rating": {
+            "type": "integer",
+            "title": "White Rating"
+          },
+          "white_result": {
+            "type": "string",
+            "title": "White Result"
+          },
+          "black_username": {
+            "type": "string",
+            "title": "Black Username"
+          },
+          "black_rating": {
+            "type": "integer",
+            "title": "Black Rating"
+          },
+          "black_result": {
+            "type": "string",
+            "title": "Black Result"
+          },
+          "time_control": {
+            "type": "string",
+            "title": "Time Control"
+          },
+          "time_class": {
+            "type": "string",
+            "title": "Time Class"
+          },
+          "rated": {
+            "type": "boolean",
+            "title": "Rated"
+          },
+          "eco": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eco"
+          },
+          "played_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Played At"
+          },
+          "starts_from_custom_position": {
+            "type": "boolean",
+            "title": "Starts From Custom Position"
+          },
+          "platform": {
+            "type": "string",
+            "title": "Platform"
+          },
+          "analyzed_by_engines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Analyzed By Engines",
+            "default": []
+          },
+          "has_analysis_in_progress": {
+            "type": "boolean",
+            "title": "Has Analysis In Progress",
+            "default": false
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "white_username",
+          "white_rating",
+          "white_result",
+          "black_username",
+          "black_rating",
+          "black_result",
+          "time_control",
+          "time_class",
+          "rated",
+          "eco",
+          "played_at",
+          "starts_from_custom_position",
+          "platform"
+        ],
+        "title": "GameSummary"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "MistakeRateOut": {
+        "properties": {
+          "mistake_type": {
+            "type": "string",
+            "title": "Mistake Type"
+          },
+          "per_hundred_moves": {
+            "type": "number",
+            "title": "Per Hundred Moves"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mistake_type",
+          "per_hundred_moves"
+        ],
+        "title": "MistakeRateOut"
+      },
+      "MistakeTypeStatsOut": {
+        "properties": {
+          "mistake_type": {
+            "type": "string",
+            "title": "Mistake Type"
+          },
+          "mistakes": {
+            "type": "integer",
+            "title": "Mistakes"
+          },
+          "blunders": {
+            "type": "integer",
+            "title": "Blunders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "mistake_type",
+          "mistakes",
+          "blunders"
+        ],
+        "title": "MistakeTypeStatsOut",
+        "description": "Cuántos errores de cada tipo y por qué (RF-3.4)."
+      },
+      "MonthlyCountOut": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "month": {
+            "type": "integer",
+            "title": "Month"
+          },
+          "games": {
+            "type": "integer",
+            "title": "Games"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "month",
+          "games"
+        ],
+        "title": "MonthlyCountOut"
+      },
+      "MonthlyQualityOut": {
+        "properties": {
+          "year": {
+            "type": "integer",
+            "title": "Year"
+          },
+          "month": {
+            "type": "integer",
+            "title": "Month"
+          },
+          "analyzed_games": {
+            "type": "integer",
+            "title": "Analyzed Games"
+          },
+          "moves": {
+            "type": "integer",
+            "title": "Moves"
+          },
+          "average_accuracy": {
+            "type": "number",
+            "title": "Average Accuracy"
+          },
+          "blunders_per_hundred_moves": {
+            "type": "number",
+            "title": "Blunders Per Hundred Moves"
+          },
+          "mistakes_per_hundred_moves": {
+            "items": {
+              "$ref": "#/components/schemas/MistakeRateOut"
+            },
+            "type": "array",
+            "title": "Mistakes Per Hundred Moves"
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating"
+          }
+        },
+        "type": "object",
+        "required": [
+          "year",
+          "month",
+          "analyzed_games",
+          "moves",
+          "average_accuracy",
+          "blunders_per_hundred_moves",
+          "mistakes_per_hundred_moves",
+          "rating"
+        ],
+        "title": "MonthlyQualityOut",
+        "description": "Cómo se jugó en un mes (RF-3.7)."
+      },
+      "MoveComparisonOut": {
+        "properties": {
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "san": {
+            "type": "string",
+            "title": "San"
+          },
+          "classification_a": {
+            "type": "string",
+            "title": "Classification A"
+          },
+          "classification_b": {
+            "type": "string",
+            "title": "Classification B"
+          },
+          "win_percent_after_a": {
+            "type": "number",
+            "title": "Win Percent After A"
+          },
+          "win_percent_after_b": {
+            "type": "number",
+            "title": "Win Percent After B"
+          },
+          "win_percent_gap": {
+            "type": "number",
+            "title": "Win Percent Gap"
+          },
+          "best_move_a": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Move A"
+          },
+          "best_move_b": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best Move B"
+          },
+          "same_best_move": {
+            "type": "boolean",
+            "title": "Same Best Move"
+          },
+          "wdl_after_a": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WdlOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "wdl_after_b": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/WdlOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "ply",
+          "color",
+          "san",
+          "classification_a",
+          "classification_b",
+          "win_percent_after_a",
+          "win_percent_after_b",
+          "win_percent_gap",
+          "best_move_a",
+          "best_move_b",
+          "same_best_move"
+        ],
+        "title": "MoveComparisonOut"
+      },
+      "OpeningStatsOut": {
+        "properties": {
+          "opening": {
+            "type": "string",
+            "title": "Opening"
+          },
+          "eco": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eco"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          },
+          "record": {
+            "$ref": "#/components/schemas/RecordOut"
+          },
+          "average_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Accuracy"
+          },
+          "average_opening_exit_win_percent": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Opening Exit Win Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "opening",
+          "eco",
+          "color",
+          "record",
+          "average_accuracy",
+          "average_opening_exit_win_percent"
+        ],
+        "title": "OpeningStatsOut"
+      },
+      "OwnGameLink": {
+        "properties": {
+          "player_color": {
+            "type": "string",
+            "enum": [
+              "white",
+              "black"
+            ],
+            "title": "Player Color"
+          },
+          "opponent_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Opponent Name"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "win",
+              "draw",
+              "loss"
+            ],
+            "title": "Result"
+          },
+          "played_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Played On"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          }
+        },
+        "type": "object",
+        "required": [
+          "player_color",
+          "opponent_name",
+          "result",
+          "played_on",
+          "game_id"
+        ],
+        "title": "OwnGameLink",
+        "description": "La partida del historial en la que está publicado el tablero (RF-6.5).\n\nLleva los datos con los que se publicó para que la pantalla los vuelva a\nenseñar tal cual al corregirlos, y el `game_id` para poder abrirla en el\nvisor como cualquier otra partida."
+      },
+      "OwnGamePublishRequest": {
+        "properties": {
+          "player_color": {
+            "type": "string",
+            "enum": [
+              "white",
+              "black"
+            ],
+            "title": "Player Color"
+          },
+          "opponent_name": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Opponent Name"
+          },
+          "result": {
+            "type": "string",
+            "enum": [
+              "win",
+              "draw",
+              "loss"
+            ],
+            "title": "Result"
+          },
+          "played_on": {
+            "type": "string",
+            "format": "date",
+            "title": "Played On"
+          },
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          },
+          "pgn": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Pgn"
+          }
+        },
+        "type": "object",
+        "required": [
+          "player_color",
+          "opponent_name",
+          "result",
+          "played_on",
+          "pgn"
+        ],
+        "title": "OwnGamePublishRequest",
+        "description": "Marcar el tablero como partida propia (RF-6.5): los datos que el\ntablero no tiene, más las jugadas que sí."
+      },
+      "PgnImportSummary": {
+        "properties": {
+          "games_imported": {
+            "type": "integer",
+            "title": "Games Imported"
+          },
+          "games_already_present": {
+            "type": "integer",
+            "title": "Games Already Present"
+          },
+          "skipped_game_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped Game Reasons"
+          },
+          "games_matched_to_player": {
+            "type": "integer",
+            "title": "Games Matched To Player"
+          }
+        },
+        "type": "object",
+        "required": [
+          "games_imported",
+          "games_already_present",
+          "skipped_game_reasons",
+          "games_matched_to_player"
+        ],
+        "title": "PgnImportSummary",
+        "description": "Qué pasó con cada partida del archivo."
+      },
+      "PhaseStatsOut": {
+        "properties": {
+          "phase": {
+            "type": "string",
+            "title": "Phase"
+          },
+          "moves": {
+            "type": "integer",
+            "title": "Moves"
+          },
+          "average_accuracy": {
+            "type": "number",
+            "title": "Average Accuracy"
+          },
+          "average_win_percent_lost": {
+            "type": "number",
+            "title": "Average Win Percent Lost"
+          },
+          "blunders": {
+            "type": "integer",
+            "title": "Blunders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "phase",
+          "moves",
+          "average_accuracy",
+          "average_win_percent_lost",
+          "blunders"
+        ],
+        "title": "PhaseStatsOut"
+      },
+      "PlanTaskOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "weekly_target": {
+            "type": "integer",
+            "title": "Weekly Target"
+          },
+          "done_this_week": {
+            "type": "integer",
+            "title": "Done This Week"
+          },
+          "weaknesses": {
+            "items": {
+              "$ref": "#/components/schemas/WeaknessOut"
+            },
+            "type": "array",
+            "title": "Weaknesses"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "weekly_target",
+          "done_this_week",
+          "weaknesses"
+        ],
+        "title": "PlanTaskOut",
+        "description": "Un deber de la semana: qué entrenar, cuánto y por qué."
+      },
+      "PlayerStatsOut": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "total_games": {
+            "type": "integer",
+            "title": "Total Games"
+          },
+          "overall": {
+            "$ref": "#/components/schemas/RecordOut"
+          },
+          "by_time_class": {
+            "items": {
+              "$ref": "#/components/schemas/TimeClassStatsOut"
+            },
+            "type": "array",
+            "title": "By Time Class"
+          },
+          "by_month": {
+            "items": {
+              "$ref": "#/components/schemas/MonthlyCountOut"
+            },
+            "type": "array",
+            "title": "By Month"
+          },
+          "by_opening": {
+            "items": {
+              "$ref": "#/components/schemas/OpeningStatsOut"
+            },
+            "type": "array",
+            "title": "By Opening"
+          },
+          "by_phase": {
+            "items": {
+              "$ref": "#/components/schemas/PhaseStatsOut"
+            },
+            "type": "array",
+            "title": "By Phase"
+          },
+          "by_mistake_type": {
+            "items": {
+              "$ref": "#/components/schemas/MistakeTypeStatsOut"
+            },
+            "type": "array",
+            "title": "By Mistake Type"
+          },
+          "by_time_left": {
+            "items": {
+              "$ref": "#/components/schemas/TimeBucketStatsOut"
+            },
+            "type": "array",
+            "title": "By Time Left"
+          },
+          "time_trouble": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TimeTroubleOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "trends": {
+            "$ref": "#/components/schemas/TrendsOut"
+          },
+          "analyzed_games": {
+            "type": "integer",
+            "title": "Analyzed Games"
+          },
+          "average_accuracy": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Average Accuracy"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "total_games",
+          "overall",
+          "by_time_class",
+          "by_month",
+          "by_opening",
+          "by_phase",
+          "by_mistake_type",
+          "by_time_left",
+          "time_trouble",
+          "trends",
+          "analyzed_games",
+          "average_accuracy"
+        ],
+        "title": "PlayerStatsOut"
+      },
+      "PositionAnalysisRequest": {
+        "properties": {
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "engine": {
+            "type": "string",
+            "enum": [
+              "stockfish",
+              "lc0"
+            ],
+            "title": "Engine",
+            "default": "stockfish"
+          },
+          "depth": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 22.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Depth"
+          },
+          "multipv": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 10.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Multipv"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fen"
+        ],
+        "title": "PositionAnalysisRequest"
+      },
+      "PuzzleAnswerIn": {
+        "properties": {
+          "uci": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uci"
+          },
+          "attempt_number": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Attempt Number",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "title": "PuzzleAnswerIn"
+      },
+      "PuzzleAnswerOut": {
+        "properties": {
+          "correct": {
+            "type": "boolean",
+            "title": "Correct"
+          },
+          "reviewed": {
+            "type": "boolean",
+            "title": "Reviewed"
+          },
+          "solutions_san": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Solutions San"
+          },
+          "played_san": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Played San"
+          },
+          "classification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Classification"
+          },
+          "win_percent_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Percent Before"
+          },
+          "win_percent_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Percent After"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "interval_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "correct",
+          "reviewed",
+          "solutions_san",
+          "played_san",
+          "classification",
+          "win_percent_before",
+          "win_percent_after",
+          "due_at",
+          "interval_days"
+        ],
+        "title": "PuzzleAnswerOut"
+      },
+      "PuzzleGenerationOut": {
+        "properties": {
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "total"
+        ],
+        "title": "PuzzleGenerationOut"
+      },
+      "PuzzleOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "player_color": {
+            "type": "string",
+            "title": "Player Color"
+          },
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "opponent": {
+            "type": "string",
+            "title": "Opponent"
+          },
+          "played_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Played At"
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Due At"
+          },
+          "repetitions": {
+            "type": "integer",
+            "title": "Repetitions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "fen",
+          "player_color",
+          "game_id",
+          "ply",
+          "opponent",
+          "played_at",
+          "due_at",
+          "repetitions"
+        ],
+        "title": "PuzzleOut",
+        "description": "Un puzzle por resolver, sin nada que lo resuelva."
+      },
+      "PuzzleQueueOut": {
+        "properties": {
+          "puzzles": {
+            "items": {
+              "$ref": "#/components/schemas/PuzzleOut"
+            },
+            "type": "array",
+            "title": "Puzzles"
+          },
+          "due": {
+            "type": "integer",
+            "title": "Due"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "next_due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Due At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "puzzles",
+          "due",
+          "total",
+          "next_due_at"
+        ],
+        "title": "PuzzleQueueOut"
+      },
+      "RecordOut": {
+        "properties": {
+          "wins": {
+            "type": "integer",
+            "title": "Wins"
+          },
+          "draws": {
+            "type": "integer",
+            "title": "Draws"
+          },
+          "losses": {
+            "type": "integer",
+            "title": "Losses"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "score_percent": {
+            "type": "number",
+            "title": "Score Percent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "wins",
+          "draws",
+          "losses",
+          "total",
+          "score_percent"
+        ],
+        "title": "RecordOut"
+      },
+      "RefreshResultOut": {
+        "properties": {
+          "fetched": {
+            "type": "integer",
+            "title": "Fetched"
+          },
+          "remaining": {
+            "type": "integer",
+            "title": "Remaining"
+          }
+        },
+        "type": "object",
+        "required": [
+          "fetched",
+          "remaining"
+        ],
+        "title": "RefreshResultOut"
+      },
+      "RepertoireOut": {
+        "properties": {
+          "departures": {
+            "items": {
+              "$ref": "#/components/schemas/DepartureOut"
+            },
+            "type": "array",
+            "title": "Departures"
+          },
+          "games_compared": {
+            "type": "integer",
+            "title": "Games Compared"
+          },
+          "positions_known": {
+            "type": "integer",
+            "title": "Positions Known"
+          },
+          "positions_missing": {
+            "type": "integer",
+            "title": "Positions Missing"
+          },
+          "explorer_token_configured": {
+            "type": "boolean",
+            "title": "Explorer Token Configured"
+          },
+          "positions_per_refresh": {
+            "type": "integer",
+            "title": "Positions Per Refresh"
+          },
+          "seconds_between_positions": {
+            "type": "number",
+            "title": "Seconds Between Positions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "departures",
+          "games_compared",
+          "positions_known",
+          "positions_missing",
+          "explorer_token_configured",
+          "positions_per_refresh",
+          "seconds_between_positions"
+        ],
+        "title": "RepertoireOut"
+      },
+      "ReplayPositionOut": {
+        "properties": {
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "player_color": {
+            "type": "string",
+            "title": "Player Color"
+          },
+          "san": {
+            "type": "string",
+            "title": "San"
+          },
+          "classification": {
+            "type": "string",
+            "title": "Classification"
+          },
+          "win_percent_before": {
+            "type": "number",
+            "title": "Win Percent Before"
+          },
+          "win_percent_after": {
+            "type": "number",
+            "title": "Win Percent After"
+          },
+          "opponent": {
+            "type": "string",
+            "title": "Opponent"
+          },
+          "played_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Played At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game_id",
+          "ply",
+          "fen",
+          "player_color",
+          "san",
+          "classification",
+          "win_percent_before",
+          "win_percent_after",
+          "opponent",
+          "played_at"
+        ],
+        "title": "ReplayPositionOut",
+        "description": "Un error propio desde el que se puede retomar la partida."
+      },
+      "ReplayQueueOut": {
+        "properties": {
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayPositionOut"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "positions",
+          "total"
+        ],
+        "title": "ReplayQueueOut",
+        "description": "La lista y cuántos errores hay, como la cola de puzzles y la de drills.\n\nEl total no es `len(positions)`: la lista viene recortada a `limit`, así que\nsin él la pantalla enseñaba veinte de trescientos sin decir que había más\n(fila 102 del inventario de docs/07-coherencia-ui.md). Va en el cuerpo y no\nen una cabecera `X-Total-Count` como el listado de Partidas porque así lo\ntraen las **dos** pestañas hermanas que también reparten una cola —puzzles\ny aperturas, `PuzzleQueueOut` y `DrillQueueOut`—, y es con ellas con las que\nse compara al cambiar de pestaña. El sparring no cuenta aquí: su listado es\nde partidas abiertas, no una cola, y `GET /sparring/games` devuelve la lista\na secas."
+      },
+      "SparringGameCreate": {
+        "properties": {
+          "player_color": {
+            "type": "string",
+            "pattern": "^(white|black)$",
+            "title": "Player Color"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine",
+            "default": "stockfish"
+          },
+          "engine_elo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Elo"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SparringOriginIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "player_color"
+        ],
+        "title": "SparringGameCreate"
+      },
+      "SparringGameOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "player_color": {
+            "type": "string",
+            "title": "Player Color"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "engine_elo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Elo"
+          },
+          "origin_game_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Game Id"
+          },
+          "origin_ply": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Ply"
+          },
+          "starting_ply": {
+            "type": "integer",
+            "title": "Starting Ply"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "moves_san": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Moves San"
+          },
+          "last_move_uci": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Move Uci"
+          },
+          "is_player_turn": {
+            "type": "boolean",
+            "title": "Is Player Turn"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "termination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Termination"
+          },
+          "pgn": {
+            "type": "string",
+            "title": "Pgn"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "player_color",
+          "engine",
+          "engine_elo",
+          "origin_game_id",
+          "origin_ply",
+          "starting_ply",
+          "fen",
+          "moves_san",
+          "last_move_uci",
+          "is_player_turn",
+          "result",
+          "termination",
+          "pgn",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SparringGameOut",
+        "description": "Una partida de sparring entera: lo que hay en el tablero y cómo se llegó."
+      },
+      "SparringMoveIn": {
+        "properties": {
+          "uci": {
+            "type": "string",
+            "title": "Uci"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uci"
+        ],
+        "title": "SparringMoveIn"
+      },
+      "SparringOriginIn": {
+        "properties": {
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "ply": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ply"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game_id",
+          "ply"
+        ],
+        "title": "SparringOriginIn",
+        "description": "Desde qué posición de qué partida propia se retoma (RF-4.4)."
+      },
+      "SyncRequest": {
+        "properties": {
+          "username": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Username"
+          }
+        },
+        "type": "object",
+        "title": "SyncRequest"
+      },
+      "SyncSummary": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "months_synced": {
+            "items": {
+              "prefixItems": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "integer"
+                }
+              ],
+              "type": "array",
+              "maxItems": 2,
+              "minItems": 2
+            },
+            "type": "array",
+            "title": "Months Synced"
+          },
+          "games_upserted": {
+            "type": "integer",
+            "title": "Games Upserted"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "months_synced",
+          "games_upserted"
+        ],
+        "title": "SyncSummary"
+      },
+      "TimeBucketStatsOut": {
+        "properties": {
+          "max_seconds_left": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Seconds Left"
+          },
+          "moves": {
+            "type": "integer",
+            "title": "Moves"
+          },
+          "average_accuracy": {
+            "type": "number",
+            "title": "Average Accuracy"
+          },
+          "mistakes": {
+            "type": "integer",
+            "title": "Mistakes"
+          },
+          "blunders": {
+            "type": "integer",
+            "title": "Blunders"
+          }
+        },
+        "type": "object",
+        "required": [
+          "max_seconds_left",
+          "moves",
+          "average_accuracy",
+          "mistakes",
+          "blunders"
+        ],
+        "title": "TimeBucketStatsOut",
+        "description": "Calidad de juego con un reloj determinado (RF-3.5)."
+      },
+      "TimeClassStatsOut": {
+        "properties": {
+          "time_class": {
+            "type": "string",
+            "title": "Time Class"
+          },
+          "record": {
+            "$ref": "#/components/schemas/RecordOut"
+          },
+          "current_rating": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Rating"
+          }
+        },
+        "type": "object",
+        "required": [
+          "time_class",
+          "record",
+          "current_rating"
+        ],
+        "title": "TimeClassStatsOut"
+      },
+      "TimeTroubleOut": {
+        "properties": {
+          "games_in_time_trouble": {
+            "type": "integer",
+            "title": "Games In Time Trouble"
+          },
+          "analyzed_games_with_clocks": {
+            "type": "integer",
+            "title": "Analyzed Games With Clocks"
+          },
+          "share_of_games": {
+            "type": "number",
+            "title": "Share Of Games"
+          }
+        },
+        "type": "object",
+        "required": [
+          "games_in_time_trouble",
+          "analyzed_games_with_clocks",
+          "share_of_games"
+        ],
+        "title": "TimeTroubleOut"
+      },
+      "TrendChangeOut": {
+        "properties": {
+          "baseline_months": {
+            "type": "integer",
+            "title": "Baseline Months"
+          },
+          "accuracy_change": {
+            "type": "number",
+            "title": "Accuracy Change"
+          },
+          "mistake_rate_change": {
+            "type": "number",
+            "title": "Mistake Rate Change"
+          }
+        },
+        "type": "object",
+        "required": [
+          "baseline_months",
+          "accuracy_change",
+          "mistake_rate_change"
+        ],
+        "title": "TrendChangeOut",
+        "description": "El último mes frente a los anteriores (RF-3.7)."
+      },
+      "TrendsOut": {
+        "properties": {
+          "by_month": {
+            "items": {
+              "$ref": "#/components/schemas/MonthlyQualityOut"
+            },
+            "type": "array",
+            "title": "By Month"
+          },
+          "change": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TrendChangeOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "rating_time_class": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rating Time Class"
+          }
+        },
+        "type": "object",
+        "required": [
+          "by_month",
+          "change",
+          "rating_time_class"
+        ],
+        "title": "TrendsOut",
+        "description": "Evolución del juego en el tiempo (RF-3.7), lo que el dashboard dibuja\nen \"Cómo evolucionas\"."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WdlOut": {
+        "properties": {
+          "win": {
+            "type": "integer",
+            "title": "Win"
+          },
+          "draw": {
+            "type": "integer",
+            "title": "Draw"
+          },
+          "loss": {
+            "type": "integer",
+            "title": "Loss"
+          }
+        },
+        "type": "object",
+        "required": [
+          "win",
+          "draw",
+          "loss"
+        ],
+        "title": "WdlOut",
+        "description": "Probabilidad de victoria, tablas y derrota **de las blancas** según el\nmotor, en partes por mil (RF-2.6).\n\nEs la opinión del motor, no la fórmula: `win_percent_*` sale de convertir\nel centipeón con el modelo de Lichess y es igual para cualquier motor,\nmientras que esto lo contesta cada uno por su cuenta y es donde Lc0 aporta\nuna segunda opinión de verdad. Los tres suman 1000."
+      },
+      "WeaknessOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "magnitude": {
+            "type": "number",
+            "title": "Magnitude"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "subject",
+          "magnitude",
+          "color"
+        ],
+        "title": "WeaknessOut",
+        "description": "Algo que se está haciendo mal, con su número y de dónde sale."
+      },
+      "WeeklyPlanOut": {
+        "properties": {
+          "week_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Week Start"
+          },
+          "weaknesses": {
+            "items": {
+              "$ref": "#/components/schemas/WeaknessOut"
+            },
+            "type": "array",
+            "title": "Weaknesses"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/PlanTaskOut"
+            },
+            "type": "array",
+            "title": "Tasks"
+          },
+          "analyzed_games": {
+            "type": "integer",
+            "title": "Analyzed Games"
+          }
+        },
+        "type": "object",
+        "required": [
+          "week_start",
+          "weaknesses",
+          "tasks",
+          "analyzed_games"
+        ],
+        "title": "WeeklyPlanOut"
+      }
+    }
+  }
+}
