@@ -21,6 +21,7 @@ import pytest
 from fastapi.testclient import TestClient
 from lucia_api.db import get_session
 from lucia_api.main import app
+from lucia_api.routers import sparring as sparring_router
 from lucia_api.services import sparring as sparring_service
 from lucia_api.services.sparring import create_game, engine_config, play_player_move, resign
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -57,9 +58,13 @@ class FakeEngineBridge:
 @pytest.fixture
 def fake_engine(monkeypatch: pytest.MonkeyPatch) -> type[FakeEngineBridge]:
     """El motor de mentira, en su sitio y sin jugadas dictadas. Cada test le
-    escribe las suyas en `scripted_moves` si le importa cuáles sean."""
+    escribe las suyas en `scripted_moves` si le importa cuáles sean.
+
+    También da por instalado el motor de verdad: el router comprueba que el
+    binario exista antes de abrir la partida, y en CI no está compilado."""
     FakeEngineBridge.scripted_moves = []
     monkeypatch.setattr(sparring_service, "EngineBridge", FakeEngineBridge)
+    monkeypatch.setattr(sparring_router, "missing_requirement", lambda engine_name: None)
     return FakeEngineBridge
 
 

@@ -216,7 +216,7 @@ async def test_the_queue_does_not_leak_the_line(db_session: AsyncSession) -> Non
     _override_session(db_session)
     try:
         with TestClient(app) as http:
-            response = http.get("/training/drills")
+            response = http.get("/training/drills", params={"username": "ana"})
     finally:
         app.dependency_overrides.clear()
 
