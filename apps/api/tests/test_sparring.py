@@ -258,4 +258,3 @@ async def test_a_calibrated_stockfish_answers_with_a_legal_move(db_session: Asyn
     board = chess.Board()
     for uci in game.moves_uci_json:
         board.push(chess.Move.from_uci(uci))  # lanza si alguna no era legal
-
