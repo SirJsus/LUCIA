@@ -218,15 +218,7 @@ export function OwnGamePanel({
         {/* Secundaria: la acción principal de la pantalla es «Analizar» y
             solo hay una por pantalla (components/Button.tsx), la misma regla
             por la que «Importar» tampoco la es. */}
-        <Button
-          type="submit"
-          disabled={form.opponent_name.trim() === "" || !hasMoves || isSaving}
-          title={
-            hasMoves
-              ? undefined
-              : "Añade alguna jugada a la línea principal: una partida sin jugadas no cuenta nada"
-          }
-        >
+        <Button type="submit" disabled={form.opponent_name.trim() === "" || !hasMoves || isSaving}>
           {/* "Marcar como partida propia" es el nombre del botón que abre
               este panel (`OwnGameStatus`): repetirlo aquí daría el mismo
               texto a dos acciones distintas —abrir el formulario y

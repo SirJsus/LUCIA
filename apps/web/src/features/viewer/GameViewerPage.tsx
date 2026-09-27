@@ -13,12 +13,12 @@ import { EngineSelect } from "../../components/EngineSelect";
 import { ClassificationBadge } from "../../components/ClassificationBadge";
 import { CustomPositionBadge } from "../../components/CustomPositionBadge";
 import { GameSourceBadge } from "../../components/GameSourceBadge";
+import { OCCUPANCY_TOGGLE_KEY_HINT } from "../../components/board/hints";
 import { BoardWithEvalBar } from "../../components/board/BoardWithEvalBar";
 import { EngineLineList } from "../../components/board/EngineLineList";
 import { arrowsFromEngineLines, arrowsFromPreviewLine } from "../../components/board/boardConfig";
 import { MoveButton } from "../../components/board/MoveButton";
 import { MoveNavigator } from "../../components/board/MoveNavigator";
-import { OccupancyLayer } from "../../components/board/OccupancyLayer";
 import { OccupancyPanel } from "../../components/board/OccupancyPanel";
 import { useMoveNavigationKeys } from "../../components/board/useMoveNavigationKeys";
 import { useOccupancy } from "../../components/board/useOccupancy";
@@ -44,6 +44,7 @@ import {
   type EngineId,
 } from "../../lib/format";
 import { moveNumberLabel, plyFromFen } from "../../lib/moves";
+import { SparringSetupForm, type SparringSetup } from "../training/SparringSetupForm";
 import { fromPgn } from "../board/tree";
 import { whiteWinPercentAfterMove } from "../../lib/score";
 import { CriticalMoments } from "./CriticalMoments";
@@ -77,7 +78,10 @@ export function GameViewerPage() {
   const [engine, setEngine] = useState<EngineId>("stockfish");
   const [previewPvUci, setPreviewPvUci] = useState<string[] | null>(null);
 
-  const gameQuery = useQuery({ queryKey: ["game", id], queryFn: () => api.getGame(id) });
+  const gameQuery = useQuery({
+    queryKey: ["game", id],
+    queryFn: () => api.getGame(id),
+  });
 
   // Si la partida ya se analizó antes, se reutiliza en vez de volver a
   // gastar minutos de motor.
@@ -139,7 +143,35 @@ export function GameViewerPage() {
         // estadísticas, y publicar la copia la contaría dos veces.
       });
     },
-    onSuccess: (board) => navigate({ to: "/boards/$boardId", params: { boardId: String(board.id) } }),
+    onSuccess: (board) =>
+      navigate({
+        to: "/boards/$boardId",
+        params: { boardId: String(board.id) },
+      }),
+  });
+
+  // --- Jugar desde aquí contra el motor (RF-4.4) ---
+  // La otra puerta de "re-juega desde el error", además de la lista curada de
+  // `features/training/ReplaysPage`: desde aquí se retoma **cualquier**
+  // posición de la partida, no solo los errores graves.
+  // Se retoma la que hay **en pantalla**, y por eso se manda `currentPly + 1`:
+  // el ply de la API cuenta jugadas ya hechas y el del visor es el índice de
+  // la última jugada hecha. Se manda la partida y la jugada, no el FEN: la
+  // posición la deriva el servidor de lo que ya tiene guardado, que es lo que
+  // mantiene esto del lado de RF-4.4 y no de RF-11.1 (ver
+  // `routers/sparring.py::SparringOriginIn` y ADR-0020).
+  const [isReplayFormOpen, setReplayFormOpen] = useState(false);
+  const startReplayMutation = useMutation({
+    mutationFn: (setup: SparringSetup) =>
+      api.startSparringGame({
+        ...setup,
+        origin: { game_id: id, ply: currentPly + 1 },
+      }),
+    onSuccess: (sparringGame) =>
+      navigate({
+        to: "/training/sparring/$sparringGameId",
+        params: { sparringGameId: String(sparringGame.id) },
+      }),
   });
 
   // Con análisis terminados de dos motores distintos se puede comparar (RF-2.6).
@@ -290,11 +322,6 @@ export function GameViewerPage() {
           <Button
             onClick={() => analysis && exportPgnMutation.mutate(analysis.id)}
             disabled={analysis?.status !== "done" || exportPgnMutation.isPending}
-            title={
-              analysis?.status === "done"
-                ? "Descarga la partida con los comentarios del análisis y las variantes, para abrirla en lichess o ChessBase"
-                : "Analiza la partida para poder exportarla con los comentarios del motor"
-            }
           >
             {exportPgnMutation.isPending ? "Exportando…" : "Exportar PGN anotado"}
           </Button>
@@ -305,16 +332,18 @@ export function GameViewerPage() {
           <Button
             onClick={() => openAsBoardMutation.mutate()}
             disabled={openAsBoardMutation.isPending}
-            // Qué se lleva el tablero, con la misma forma que "Copiar PGN" y
-            // "Exportar PGN anotado", que son las otras dos que sacan la
-            // partida de donde está (criterio C-6).
-            title={
-              analysis?.status === "done"
-                ? "Crea un tablero de análisis con las jugadas de esta partida y los comentarios del análisis. Lo que pruebes allí no toca ni la partida ni su análisis."
-                : "Crea un tablero de análisis con las jugadas de esta partida. Lo que pruebes allí no toca la partida; analízala antes si quieres llevarte también los comentarios."
-            }
           >
             {openAsBoardMutation.isPending ? "Abriendo…" : "Abrir como tablero"}
+          </Button>
+          {/* Junto a "Abrir como tablero" porque las dos se llevan la partida
+              de aquí a otra pantalla; esta se lleva solo la posición, para
+              seguir jugándola contra el motor. Tampoco necesita análisis: se
+              puede retomar cualquier posición (criterio C-3). */}
+          <Button
+            onClick={() => setReplayFormOpen(!isReplayFormOpen)}
+            disabled={startReplayMutation.isPending}
+          >
+            {isReplayFormOpen ? "Cancelar" : "Jugar desde aquí"}
           </Button>
           <Button
             variant="primary"
@@ -330,6 +359,47 @@ export function GameViewerPage() {
         </div>
       </div>
 
+      {/* Qué hacen las tres acciones que sacan la partida de aquí, a la vista y
+          no en un `title`: con teclado un `title` no aparece nunca, y en un
+          botón deshabilitado —que es como está "Exportar PGN anotado" sin
+          análisis— tampoco. Es la misma forma con la que Puzzles y Aperturas
+          explican su botón de generar, y lo que cerraron las filas 56 y 57 en
+          la barra de filtros de Partidas y en la goma del editor de posición
+          (fila 103 del inventario, criterios C-6 y C-7). */}
+      <p className="text-xs opacity-60">
+        <strong className="font-medium">Exportar PGN anotado</strong> descarga la partida con los
+        comentarios del análisis y sus variantes, para abrirla en lichess o ChessBase
+        {analysis?.status === "done" ? "" : "; hay que analizarla antes"}.{" "}
+        <strong className="font-medium">Abrir como tablero</strong> crea un tablero de análisis con
+        sus jugadas
+        {analysis?.status === "done"
+          ? " y los comentarios del análisis"
+          : "; analízala antes si quieres llevarte también los comentarios"}
+        . <strong className="font-medium">Jugar desde aquí</strong> abre una partida contra el motor
+        desde la posición que estás viendo. Ninguna de las tres toca esta partida ni su análisis.
+      </p>
+
+      {isReplayFormOpen && (
+        <Panel title={`Jugar desde la jugada ${moveNumberLabel(currentPly + startingPly + 1)}`}>
+          {/* El bando que se ofrece es el que tiene el turno en esa posición,
+              que es lo que se viene a hacer: seguir desde ahí. Se puede
+              cambiar, y entonces abre el motor.
+
+              El botón dice "Retomar la partida", igual que en la lista de
+              re-jugar: es la misma acción desde otra pantalla (criterio C-2).
+              "Empezar partida" es la de Sparring, que es otra cosa —una
+              partida desde cero— y por eso conserva su nombre. */}
+          <SparringSetupForm
+            defaultPlayerColor={plyFromFen(currentFen) % 2 === 0 ? "white" : "black"}
+            submitLabel="Retomar la partida"
+            pendingLabel="Abriendo partida…"
+            isPending={startReplayMutation.isPending}
+            onSubmit={(setup) => startReplayMutation.mutate(setup)}
+          />
+        </Panel>
+      )}
+
+      {startReplayMutation.isError && <ErrorBox error={startReplayMutation.error} />}
       {analyzeMutation.isError && <ErrorBox error={analyzeMutation.error} />}
       {exportPgnMutation.isError && <ErrorBox error={exportPgnMutation.error} />}
       {openAsBoardMutation.isError && <ErrorBox error={openAsBoardMutation.error} />}
@@ -363,9 +433,7 @@ export function GameViewerPage() {
             lastMoveUci={lastMoveUci}
             engineArrows={engineArrows}
             whiteWinPercent={whiteWinPercent}
-            overlay={<OccupancyLayer controller={occupancyController} orientation={orientation} />}
-            onSelectSquare={occupancyController.selectSquare}
-            onHoverSquare={occupancyController.hoverSquare}
+            occupancyController={occupancyController}
           />
 
           <MoveNavigator
@@ -379,9 +447,9 @@ export function GameViewerPage() {
           />
 
           <p className={BOARD_HINT_CLASSES}>
-            ← → recorren la partida, Inicio y Fin van a sus extremos. Pulsa una jugada de la lista
-            o del gráfico para saltar a esa posición. Señala una jugada de las alternativas para
-            verla sobre el tablero. Con O se enciende y se apaga la capa de ocupación.
+            ← → recorren la partida, Inicio y Fin van a sus extremos. Pulsa una jugada de la lista o
+            del gráfico para saltar a esa posición. Señala una jugada de las alternativas para verla
+            sobre el tablero. {OCCUPANCY_TOGGLE_KEY_HINT}
           </p>
 
           <OccupancyPanel controller={occupancyController} />
@@ -576,7 +644,10 @@ function countClassifications(classifications: string[]): Map<string, number> {
 /** Reconstruye la secuencia de posiciones desde el PGN, para poder navegar la
  * partida aunque todavía no se haya analizado. */
 function parsePgn(pgn: string | undefined): ParsedGame {
-  const emptyParsedGame: ParsedGame = { startingFen: DEFAULT_POSITION, positions: [] };
+  const emptyParsedGame: ParsedGame = {
+    startingFen: DEFAULT_POSITION,
+    positions: [],
+  };
   if (!pgn) return emptyParsedGame;
   try {
     const chess = new Chess();

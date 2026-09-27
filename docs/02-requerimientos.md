@@ -22,6 +22,9 @@
 > antes el editor de posición pieza a pieza (RF-6.1, fase 2) y el sparring
 > contra motor con fuerza calibrada (RF-4.3, fase 3), que sí son alcance de
 > 1.0, y no cambia el esquema de la base ni obliga a re-analizar nada.
+> Sus dos dependencias están ya entregadas —RF-6.1 el **2026-09-18** y RF-4.3
+> el **2026-09-21**—, y **RF-11 sigue fuera del alcance de v1.0**: que ya se
+> pueda montar no lo mete dentro del corte.
 >
 > Ese mismo día se **reescribieron los textos de RF-5.2 y RF-6.2**, que estaban
 > resumidos en una línea ("análisis en vivo, flechas de mejores jugadas"), para
@@ -173,6 +176,58 @@ que cada motor se configure en sus propios términos está razonado en
   compilaron. Medidas y detalle en el ítem de RF-2.6 y en el apéndice de la
   fase 2 de [05-roadmap.md](05-roadmap.md).
 
+**Con qué reglas se cumplió RF-2.5, análisis en lote** (**2026-09-23**). El
+requerimiento es de **alcance congelado de v1.0** y estaba a medias desde hacía
+meses: `POST /analysis` ya aceptaba `game_ids` como lista y un `engine` para
+todas, así que "analiza mis últimas N partidas" se podía pedir con `curl` y no
+desde ninguna pantalla. Lo que se añadió es la mitad que faltaba, en el listado
+de Partidas (RF-5.3), más la columna que hace falta para elegir la tanda.
+Ninguna de estas decisiones estaba en el texto del requerimiento.
+
+- **Un motor para toda la tanda, no uno por partida.** El `EngineSelect` va
+  arriba, junto al botón, y vale para todas las marcadas
+  (`engineForNextBatch`). La pregunta de quien analiza en lote es "con cuál
+  quiero esta remesa", no "cuál para cada una": elegir motor fila a fila
+  convertiría un botón en un formulario, y para el caso raro ya están el visor
+  y el tablero de análisis, que analizan de una en una. Es además lo que la
+  API acepta: `POST /analysis` lleva un `engine` por petición.
+- **"N partidas" son las que están a la vista.** La casilla de la cabecera
+  marca la página visible y nada más. No hay "marcar las 324 que cumplen el
+  filtro": una tanda de trescientas partidas que no se han visto es trabajo de
+  horas de motor pedido a ciegas, y el tamaño de la página (25) es justo lo
+  que hace que el botón "Analizar N partidas" diga algo comprobable mirando la
+  pantalla.
+- **Lo marcado se vacía al cambiar de filtro y al pasar de página**
+  (`updateFilter` y `goToPageAtOffset`). Es la misma regla por la que "marcar
+  todas" no sale de la página: si la selección sobreviviera, el botón contaría
+  partidas que no están en pantalla y no habría forma de saber cuáles son. Se
+  vacía también al mandar la tanda, para que no se mande dos veces seguidas.
+- **La tanda no excluye lo ya analizado con ese mismo motor, a propósito.**
+  Reanalizar es legítimo —se cambió la profundidad, se instaló otra versión
+  del motor, se quiere contrastar—, y descartar en silencio lo repetido
+  dejaría un botón que dice "Analizar 5 partidas" y manda tres. Pero tampoco
+  avisa de que se van a repetir, que es lo que el visor y el tablero sí hacen
+  diciendo "Reanalizar con X": queda apuntado como **fila 111** del inventario
+  de [07-coherencia-ui.md](07-coherencia-ui.md), pendiente de decidir si se
+  avisa, se excluye o se deja marcar solo lo que falta.
+- **La columna «Análisis» es parte de este requerimiento, no otro.** Sin ver
+  qué está ya analizado y con qué, componer una tanda es adivinar. Dice
+  motores, no un sí o un no, porque una partida puede estar analizada con
+  Stockfish y con Lc0 (RF-2.6) y son análisis distintos; y el dato **no sale
+  de `games` sino de `analyses`** —`load_analysis_state_by_game_id`, una sola
+  consulta para toda la página—, porque "estar analizada" no es una propiedad
+  de la partida sino el resultado de las corridas que se le hayan lanzado. Una
+  partida sin ninguna dice "Sin analizar" y no "—": el guion es el hueco de un
+  dato que no llegó (el rating de un PGN manual, RF-1.5), y aquí no falta
+  nada, se sabe que no hay análisis.
+- **El análisis va en segundo plano** (RF-2.4): el botón encola y devuelve, y
+  la pantalla sigue usable. El precio es que la columna dice lo que era verdad
+  cuando se pidió la lista: se refresca al mandar una tanda o al tocar un
+  filtro, pero una partida que termina mientras se mira se queda en
+  "Analizando…" hasta recargar. El visor sí sigue el progreso en vivo, así que
+  el mismo análisis se cuenta de dos maneras según desde dónde se mire; es la
+  **fila 110** del inventario.
+
 ### RF-3 · Estadísticas e insight
 
 | ID | Requerimiento | Prioridad |
@@ -278,6 +333,14 @@ Cuánta teoría se sabe en cada momento es parte de la respuesta
 (`positions_missing`), y la pantalla lo dice siempre: ver la nota de RNF-1 más
 abajo.
 
+**Estas salidas son además el material del drill de aperturas** (RF-4.2, desde
+el **2026-09-21**): cada una lleva el camino que se recorrió hasta ella
+(`preceding_moves_uci`) y la jugada de maestros en UCI además de en SAN
+(`master_moves_uci`), que es lo que permite componer la línea que se repite
+jugando. De ahí sale la consecuencia de que un drill no continúe más allá de
+la salida: RF-3.6 no consulta esas posiciones. La comparación en sí no mira
+ninguno de los dos campos.
+
 **Con qué reglas se cumplió RF-3.7** (**2026-09-18**). El texto del
 requerimiento —"evolución de precisión y tipo de errores en el tiempo"— no
 dice en qué tramo ni en qué unidad; esta es la lectura que se le dio. Las
@@ -320,6 +383,342 @@ requerimiento.
 | RF-4.3 | Sparring contra motor con fuerza calibrada (Stockfish `UCI_LimitStrength` / `UCI_Elo`, o Lc0 con redes "Maia"-like para estilo humano). | P1 |
 | RF-4.4 | "Re-juega desde el error": retomar una partida propia desde la posición del blunder contra el motor. | P2 |
 | RF-4.5 | Plan de entrenamiento semanal generado a partir de las debilidades detectadas. | P2 |
+
+**Con qué reglas se cumplió RF-4.1** (**2026-09-19**), junto con RF-10.3. El
+texto dice "posición antes del blunder, encontrar la mejor jugada, con
+repetición espaciada", y no dice qué errores dan puzzle, qué respuestas se
+aceptan ni con qué algoritmo vuelven. Esta es la lectura que se le dio; los
+umbrales son constantes con nombre en `lucia_core.training` y en
+`lucia_api.services.training`, ajustables sin tocar el requerimiento ni
+[ADR-0017](adr/0017-puzzle-persistido-con-su-solucion-congelada.md).
+
+- **Dan puzzle los errores propios graves**: `mistake`, `blunder` y
+  `missed_win` (`PUZZLE_CLASSIFICATIONS`). Las imprecisiones quedan fuera: una
+  jugada que pierde menos de diez puntos de probabilidad de victoria no tiene
+  una respuesta que encontrar, tiene un matiz que discutir, y como puzzle solo
+  enseñaría a adivinar la preferencia del motor. Del rival no sale ninguno:
+  su error dice cómo juega el otro. Y se miran solo las jugadas del **análisis
+  terminado más reciente** de cada partida, el mismo criterio con el que se
+  cuentan las estadísticas (`latest_analysis_ids`).
+- **"La mejor jugada" se lee como "cualquiera igual de buena"** (RF-10.3). Se
+  acepta la línea favorita del motor y toda la que no pierda más de **2 puntos
+  de probabilidad de victoria** respecto a ella
+  (`EQUIVALENT_MOVE_MAX_WIN_PERCENT_LOSS`), que es el mismo margen con el que
+  RF-2.2 llama "excelente" a una jugada: lo que el análisis no considera un
+  error tampoco puede serlo en un puzzle sacado de ese mismo análisis. Las
+  candidatas salen de las alternativas de RF-10.1, o de lo que se rescate de
+  `position_cache`; si no hay ninguna, queda la única `best_move_uci`, que es
+  peor puzzle pero no uno falso, y un error del que no se pueda afirmar
+  ninguna respuesta no genera puzzle.
+- **La repetición espaciada es SM-2**, el algoritmo de SuperMemo que usa Anki,
+  con tres resultados: fallar (o rendirse), acertar tras más de un intento y
+  acertar a la primera. Fallar reinicia la cuenta de aciertos pero **no** la
+  facilidad, que se arrastra: un puzzle que se falla una y otra vez acaba
+  volviendo casi a diario. El próximo vencimiento se cuenta desde el repaso y
+  no desde el anterior, para que repasar con retraso no encadene retrasos.
+- **Los puzzles se generan a mano**, con un botón, y no al terminar un
+  análisis: quien entrena decide cuándo renovar su baraja, y analizar una
+  tanda de partidas no debe cambiar la cola de repaso por sorpresa. Generar es
+  idempotente —la clave es `(partida, jugada)`—, así que volver a pulsar solo
+  añade lo nuevo y no toca el estado de repaso de lo que ya había.
+- **La comprobación es del servidor y el puzzle abierto viaja sin nada que lo
+  resuelva**: ni la solución, ni la jugada que se hizo en la partida, ni la
+  clasificación, ni las probabilidades. Saber que aquello fue un blunder de
+  treinta puntos ya es media respuesta. Todo eso se manda al cerrarlo, que es
+  cuando la pantalla lo enseña; por lo mismo, esta fue la primera pantalla
+  con tablero **sin barra de evaluación** — hoy lo son las tres de
+  entrenamiento: el puzzle, el drill de apertura (RF-4.2) y la partida de
+  sparring (RF-4.3), donde la evaluación delata la línea o avisa del blunder
+  que un rival calibrado no debe avisar. La capa de ocupación de RF-7 sí entra
+  en las tres, que es la otra cara de lo mismo
+  ([ADR-0023](adr/0023-la-ocupacion-entra-en-el-entrenamiento-y-la-barra-no.md)).
+- **El puzzle se guarda entero y con su solución congelada**, desacoplado de
+  la jugada analizada de la que salió, porque lleva encima el historial de
+  repasos y ese dato no está en ninguna otra parte. Razonado en
+  [ADR-0017](adr/0017-puzzle-persistido-con-su-solucion-congelada.md), que es
+  la decisión contraria a la de los patrones
+  ([ADR-0008](adr/0008-patrones-deducidos-al-leer.md)) y explica por qué.
+
+**Con qué reglas se cumplió RF-4.3** (**2026-09-21**). El texto nombra las dos
+maneras de calibrar al rival —`UCI_LimitStrength`/`UCI_Elo` en Stockfish, redes
+tipo Maia en Lc0— y no dice qué pasa con la partida después. Esta es la lectura
+que se le dio; los topes y los tiempos son constantes con nombre en
+`lucia_api.services.sparring`, ajustables sin tocar el requerimiento ni
+[ADR-0018](adr/0018-sparring-en-su-propia-tabla-y-el-servidor-como-arbitro.md).
+
+- **Las dos perillas de fuerza no son la misma, y la pantalla lo dice.**
+  Stockfish busca igual de bien y se contiene: acepta un Elo entre **1320 y
+  3190** (`STOCKFISH_ELO_RANGE`, los topes de Stockfish 17 — fuera de ahí el
+  motor no acepta el valor o ya no limita nada) y piensa un segundo por jugada,
+  porque lo que lo frena es `UCI_LimitStrength` y no el reloj. Lc0 con una red
+  Maia **no se contiene**: la red está entrenada para predecir la jugada de una
+  persona de ~1500, así que sus errores son los que comete la gente y no los de
+  un motor mutilado; su fuerza es la de la red cargada y no un número que se le
+  pueda pedir, por eso `engine_elo` solo existe con Stockfish y el formulario
+  esconde el deslizador en vez de enseñar uno muerto. Maia se juega a **un solo
+  nodo**: con más, la búsqueda empieza a corregir a la red y se pierde justo lo
+  que la hace humana. Medido en el portátil de desarrollo (i7 + GTX 1060),
+  Stockfish calibrado tarda ~1,15 s por jugada y Maia ~0,08 s, y abre con el
+  Giuoco Piano, que es el comportamiento que se buscaba.
+- **La red del sparring es otra que la del análisis** (`MAIA_WEIGHTS`,
+  `maia-1500.pb.gz`, la que descarga `make engines`). Cambiarla por otra de la
+  familia (1100 a 1900) es cambiar la fuerza del rival de Lc0. No puede ser la
+  misma que la del análisis: Maia es buena imitando y mala como fuente de
+  verdad, que es exactamente lo contrario de lo que se le pide a un analizador.
+- **Una partida de sparring no es una partida del historial.** Vive en su
+  propia tabla (`sparring_games`) y **no cuenta** en estadísticas ni en
+  detección de patrones (RF-3), igual que un tablero de análisis sin publicar
+  (RF-6.5): una partida contra un motor al que se le ha bajado la fuerza no
+  dice nada del rendimiento real. Para estudiarla se abre como tablero de
+  análisis desde su PGN (RF-6.6) y se analiza desde ahí (RF-6.9), que es el
+  camino que ya existía y que la deja fuera de las estadísticas por
+  construcción; si quien juega decide que cuente, el paso es marcarla como
+  partida propia (RF-6.5), que es un acto explícito y no un efecto colateral de
+  haber entrenado. Razonado en
+  [ADR-0018](adr/0018-sparring-en-su-propia-tabla-y-el-servidor-como-arbitro.md),
+  que adelanta buena parte de lo que RF-11.3 pedirá.
+- **Aquí el servidor sí valida las jugadas**, al revés que en el tablero de
+  análisis, donde quien sabe de reglas es chess.js y la API solo custodia el
+  árbol. La razón es que en sparring el servidor **es el rival**: para contestar
+  tiene que saber qué posición hay, y una jugada inventada por el navegador
+  dejaría la partida donde el motor no la reconocería. Jugada de la persona y
+  respuesta del motor viajan en la misma petición, porque son un solo turno.
+- **La partida se guarda como posición de partida más jugadas en UCI**, y la
+  posición actual, el PGN, el final y `starting_ply` —desde qué media jugada de
+  la partida real arranca, para numerar bien una retomada a mitad (RF-4.4)— se
+  derivan al servir: así no hay dos versiones de la misma partida que puedan
+  discrepar. El **nombre del rival** dejó de derivarse para la pantalla el
+  **2026-09-22**: viajan `engine` y `engine_elo` y la frase "Stockfish (1500)"
+  la compone el front, porque componerla a la vez en los dos lados eran dos
+  nombres que coincidían sin que nada lo garantizara. En el servidor se queda
+  el que va al PGN, que es un documento que se abre en otros programas.
+  `result` es la **única** marca de que terminó (`null` mientras se juega) y `termination` dice por qué
+  —mate, ahogado, material insuficiente, cincuenta jugadas, repetición o
+  abandono—, porque "0-1" no distingue un mate de un abandono y en un
+  entrenamiento eso es justo lo que se quiere saber.
+- **Sin reloj y sin barra de evaluación.** El requerimiento no pide reloj, y
+  una partida de entrenamiento se interrumpe: se retoma por su URL tal como
+  estaba, porque el estado vive en la base. La barra queda fuera por lo mismo
+  que en los puzzles de RF-4.1: decir a cada jugada quién va ganando convierte
+  la partida en un análisis asistido.
+
+**Con qué reglas se cumplió RF-4.2** (**2026-09-21**). El texto dice "repetir
+las líneas donde mi rendimiento es peor" y no dice qué es una línea, qué es
+"peor" ni de dónde salen. Esta es la lectura que se le dio; los umbrales son
+constantes con nombre en `lucia_core.drills` y en `lucia_api.services.drills`,
+ajustables sin tocar el requerimiento ni
+[ADR-0019](adr/0019-el-drill-de-aperturas-se-construye-sobre-las-salidas-de-la-teoria.md).
+
+- **Un drill es una línea, no una posición.** Se repite desde la jugada 1
+  jugando el bando propio, y la aplicación responde por el rival hasta la
+  última jugada, que es siempre propia — una línea que acabara con la del
+  rival pediría recordar algo que no se llega a jugar. Es la diferencia con
+  los puzzles de RF-4.1, que son una posición suelta: una apertura no se
+  olvida en una posición, se olvida como camino, y así es como se recuerda.
+- **Las dos barajas comparten material y se diferencian en el criterio.**
+  "Salidas de la teoría" (RF-3.6) y "peores aperturas" (RF-3.2) se construyen
+  igual —el camino propio de una partida, corregido en el punto donde se
+  abandona el libro con la jugada más jugada por los maestros— y se eligen por
+  motivos distintos, que es lo único que las separa en pantalla (columna
+  `source`). Consecuencia buscada: **una apertura que va mal pero en la que
+  nunca se abandona el libro no da drill**, y es honesto que no lo dé — ahí el
+  problema no es la apertura sino lo que viene después, y eso son los puzzles
+  de RF-4.1.
+- **"Peor" se mide en puntos perdidos, no en porcentaje**: `games * (50 -
+  score_percent) / 100` (`points_lost`), y la baraja se ordena por ese daño.
+  Un corte absoluto ("por debajo del 45 %") deja fuera precisamente los
+  agujeros de repertorio grandes, que sangran despacio y muchas veces: quince
+  partidas al 40 % cuestan punto y medio y tres al 20 % cuestan nueve décimas,
+  así que la primera hay que arreglarla antes aunque su porcentaje asuste
+  menos. Medido sobre las 326 partidas del autor, el corte absoluto daba 3
+  líneas y ordenar por daño da 10, encabezadas por las que de verdad cuestan
+  puntos. El único umbral que queda es de hábito: **3 partidas**
+  (`MIN_GAMES_TO_DRILL`), porque con una o dos un mal marcador es mala suerte
+  — la misma pregunta que ya se hace RF-3.6.
+- **Una salida de la que no se pueda afirmar ninguna respuesta no genera
+  drill.** Sin jugada de maestros en esa posición no hay nada que enseñar, y
+  un drill sin solución solo enseñaría a adivinar: es la misma regla con la
+  que RF-10.3 decide que un error sin respuesta afirmable no genera puzzle.
+- **La línea no viaja al navegador mientras el drill está abierto**: es la
+  respuesta. El servidor comprueba jugada a jugada, contesta por el rival y
+  solo al cerrarlo manda la línea entera. Es la misma regla de RF-4.1, y aquí
+  además es lo que permite que el rival responda sin que el navegador sepa qué
+  viene. Fallar no cierra el drill ni enseña la jugada buena; rendirse sí lo
+  cierra, como fallado. Por lo mismo que en los puzzles, esta pantalla tampoco
+  tiene barra de evaluación.
+- **El servidor no guarda progreso.** Por dónde va la línea lo lleva la
+  pantalla (`ply`), como el número de intento de un puzzle. Un drill a medias
+  no es un estado que valga la pena conservar: se repite entero o no se
+  repite.
+- **El repaso es el mismo SM-2 de los puzzles** (`lucia_core.training`):
+  rendirse es fallar, recorrer la línea limpia es acertar, y tropezar por el
+  camino queda en medio. No hay dos algoritmos de repaso que mantener ni dos
+  comportamientos que explicar.
+- **Los drills se generan a mano**, con un botón, como los puzzles, y generar
+  es idempotente —la clave es `(bando, línea)`—, así que volver a pulsar solo
+  añade lo nuevo y no toca el estado de repaso de lo que ya había. Generar
+  **no sale a la red**: usa lo que la caché del explorador ya sepa, y si falta
+  teoría faltan drills, así que la pantalla dice cuántas posiciones quedan por
+  consultar y manda a refrescar el repertorio en vez de dejar creer que no hay
+  material. Sobre las 326 partidas del autor, con la caché refrescada a 150
+  posiciones, salían 49 salidas de teoría —la mayoría en los plies 2-3—, 10
+  drills y 42 posiciones todavía por consultar: la baraja crece según se
+  refresca el repertorio.
+- **La línea no continúa más allá de la salida**, y es una limitación
+  conocida: termina en la jugada de maestros que había que hacer, no sigue por
+  la línea principal. Seguir pediría posiciones que RF-3.6 nunca consulta, y
+  la caché del explorador se llena despacio y a propósito
+  ([ADR-0010](adr/0010-repertorio-con-red-y-cacheado.md)).
+
+El drill se guarda entero, con su línea y su motivo congelados y sin enlace a
+la partida de la que salió, por la misma razón que los puzzles
+([ADR-0017](adr/0017-puzzle-persistido-con-su-solucion-congelada.md)): lleva
+encima un historial de repasos que no está en ninguna otra parte. De dónde
+sale el material y cómo se mide "peor" está razonado en
+[ADR-0019](adr/0019-el-drill-de-aperturas-se-construye-sobre-las-salidas-de-la-teoria.md).
+
+**Con qué reglas se cumplió RF-4.4** (**2026-09-21**). El texto dice "retomar
+una partida propia desde la posición del blunder contra el motor" y no dice si
+eso es una forma distinta de jugar, desde cuántas posiciones se puede retomar
+ni de dónde sale la posición. Esta es la lectura que se le dio; los topes son
+constantes con nombre en `lucia_api.routers.replays`, ajustables sin tocar el
+requerimiento ni
+[ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md).
+
+- **Retomar es sparring desde otra posición, no otra cosa.** Misma tabla
+  (`sparring_games`, que gana `origin_game_id` y `origin_ply`), mismo ciclo de
+  endpoints, misma pantalla de juego y mismo listado, donde una partida
+  retomada se distingue con una insignia. Se abre con `POST /sparring/games`
+  pasando un `origin`, y a partir de ahí no hay nada distinto que hacer: las
+  reglas, el árbitro, el final y el camino para analizarla después (RF-6.6 +
+  RF-6.9) son los de RF-4.3. Una partida retomada **tampoco cuenta** en
+  estadísticas ni en patrones, por el mismo motivo.
+- **`origin_game_id`/`origin_ply` son procedencia, no dependencia.** Sirven
+  para decir en pantalla de dónde salió la partida y llevar de vuelta al
+  visor. La clave foránea es `ON DELETE SET NULL` y no hay cascada: borrar la
+  partida de origen no invalida lo jugado —la posición vive en `starting_fen`,
+  que es lo que hace la partida jugable—, solo deja de haber adónde volver.
+- **La lista de errores desde los que re-jugar no se guarda**: se deduce de
+  los análisis al leer (`GET /training/replays`), como los patrones de RF-3
+  ([ADR-0008](adr/0008-patrones-deducidos-al-leer.md)). Es la decisión
+  **contraria** a la de los puzzles (RF-4.1) y los drills (RF-4.2), y la
+  diferencia es el estado propio: un puzzle arrastra un historial de repasos
+  SM-2 que no está en ninguna otra parte y por eso se persiste con su solución
+  congelada ([ADR-0017](adr/0017-puzzle-persistido-con-su-solucion-congelada.md));
+  una posición desde la que re-jugar no se repasa, no vence y no acumula
+  intentos, así que guardarla solo daría una segunda copia que envejece en
+  cuanto se reanaliza la partida. No hay botón de generar: la pestaña está
+  llena en cuanto hay una partida analizada.
+- **La posición la deriva el servidor del PGN guardado** (`board_at_ply` sobre
+  `games.pgn`). Por HTTP se manda **de qué partida y de qué jugada**, nunca un
+  FEN, y esto es deliberado: es lo que mantiene la frontera con **RF-11.1**
+  (jugar desde una posición inicial personalizada), que sigue congelado fuera
+  de v1.0. `ply` cuenta jugadas ya hechas, así que retomar justo antes de un
+  error es pedir el ply de ese error, que es como lo numera `AnalyzedMove`.
+- **Se puede retomar cualquier posición de la partida y con cualquier bando**,
+  desde el botón "Jugar desde aquí" del visor. Es una lectura generosa de
+  "desde la posición del blunder", que se toma como el caso que importa y no
+  como una restricción: una apertura que va mal se rehace desde la jugada 6 y
+  no desde la 24. **No invade RF-11.1** porque las posiciones siguen saliendo
+  de partidas propias ya guardadas —no de un FEN pegado ni del editor de
+  posición de RF-6.1—, no hay ninguna perilla de ventaja material (RF-11.2) y
+  la partida no se guarda en `games` con `[SetUp "1"]` (RF-11.3). La pestaña
+  "Re-jugar" sí se ciñe a los errores graves, los mismos que dan puzzle
+  (`PUZZLE_CLASSIFICATIONS`), ordenados por lo que costaron: la libertad está
+  en el visor, la lista curada responde a "¿por dónde empiezo?".
+- **Quién abre no es "las blancas"** sino quien tenga el turno en la posición
+  de partida, que retomando a mitad puede ser cualquiera de los dos. El bando
+  que la pantalla ofrece por defecto es el que se jugaba en la partida
+  original —en el visor, el que tiene el turno en la posición que se está
+  viendo—, y se puede cambiar.
+- **Lo que costó el error viaja en la lista**, al revés que en un puzzle
+  abierto: no hay nada que adivinar —la jugada que se hizo está a la vista y
+  de lo que se trata es de jugar la posición mejor de lo que se jugó— y saber
+  cuánto costó es lo que dice por cuál empezar. No contradice a RF-4.1: allí
+  se esconde lo que resuelve el ejercicio, y aquí el ejercicio es la partida
+  entera.
+
+Razonado en
+[ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md),
+que también deja escrito por qué esto no mete RF-11 dentro de v1.0.
+
+**Con qué reglas se cumplió RF-4.5** (**2026-09-21**). El texto dice "plan de
+entrenamiento semanal generado a partir de las debilidades detectadas", y no
+dice qué cuenta como debilidad, cuánto hay que hacer de cada cosa, quién marca
+lo hecho ni cuándo empieza la semana. Esta es la lectura que se le dio; los
+cinco umbrales y los cuatro topes semanales son constantes con nombre en
+`lucia_core.plan`, ajustables sin tocar el requerimiento ni
+[ADR-0021](adr/0021-el-plan-semanal-se-deduce-y-el-orden-de-las-debilidades-es-editorial.md).
+
+- **Las debilidades son cinco clases, una por cada cosa que RF-3 ya sabe
+  mirar**, y cada una entra solo si pasa **su** umbral: la fase donde se pierde
+  ventaja (RF-3.3, `MIN_PHASE_WIN_PERCENT_LOST` = 5 puntos de probabilidad de
+  victoria por jugada), el tipo de error que más pesa (RF-3.4,
+  `MIN_MISTAKE_TYPE_SHARE` = 33 % de los errores, cuando el reparto ciego entre
+  cuatro tipos sería el 25 %), la apertura que más cuesta (RF-3.2,
+  `MIN_OPENING_POINTS_LOST` = 1 punto de marcador, **más estricto** que el
+  corte del drill de RF-4.2 —que entrena cualquier línea que cueste algo,
+  `points_lost > 0` sobre `MIN_GAMES_TO_DRILL` = 3 partidas—, porque el drill
+  reparte una baraja ordenada por daño y el plan nombra una sola apertura como
+  **la** debilidad), los apuros de reloj (RF-3.5, `MIN_TIME_TROUBLE_SHARE` =
+  30 % de las partidas analizadas **que traen relojes**, que es el denominador
+  con el que RF-3.5 los cuenta —`analyzed_games_with_clocks`— y no todas las
+  partidas) y la precisión que cae (RF-3.7, `MIN_ACCURACY_DROP` = 2 puntos
+  frente a los meses anteriores).
+  Un plan que enumera cinco debilidades siempre, las tenga o no, no ayuda a
+  decidir por dónde empezar.
+- **El orden en que se enseñan es fijo por clase y no sale de los números.**
+  Fase, tipo de error, apertura, apuros de reloj y tendencia: de lo más
+  estructural a lo más circunstancial. No puede salir de los números porque
+  cada debilidad se mide **en su propia unidad** —puntos de probabilidad,
+  porcentaje de errores, puntos de marcador, porcentaje de partidas, puntos de
+  precisión— y ordenarlas por ahí sería inventar una escala común en la que el
+  55 % de errores tácticos pesa más que perder 8 puntos de probabilidad por
+  jugada. La primera de la lista es la que lleva la insignia "lo primero", así
+  que ese orden es una recomendación y se responde de él.
+- **Cada deber nace de una debilidad concreta y la lleva encima.** La tabla
+  `_TASK_BY_WEAKNESS` es la lectura de "generado a partir de las debilidades
+  detectadas": lo táctico y el medio juego van a puzzles (RF-4.1), lo
+  posicional y la apertura a repetir líneas (RF-4.2), el final a re-jugar
+  posiciones (RF-4.4), y los apuros de reloj y la precisión que cae a partidas
+  enteras contra el motor (RF-4.3), que es lo único que reproduce la fatiga de
+  una partida de verdad. Una debilidad sin entrenamiento posible no genera
+  deber, y un deber sin motivo a la vista sería una cuota inventada.
+- **El objetivo nunca pide más de lo que hay**: `min(tope semanal, material
+  disponible)`, y un entrenamiento sin material no genera tarea. Un plan que
+  pide treinta puzzles cuando hay cuatro no es exigente, es falso. Puzzles y
+  líneas cuentan como material **solo lo que vence esta semana**: repasar antes
+  de tiempo no es entrenar, es adelantar trabajo que el SM-2 ya había colocado
+  en otra fecha.
+- **La semana empieza el lunes**, no "hace siete días". Con una ventana móvil,
+  lo entrenado el lunes dejaría de contar el martes siguiente y el avance
+  bajaría solo, sin que nadie hiciera nada.
+- **El plan no se guarda y nadie marca un deber a mano.** Se deduce en cada
+  visita de las estadísticas de RF-3 y de las colas de RF-4, y lo hecho sale de
+  fechas que la base ya tiene: `puzzles.last_reviewed_at`,
+  `opening_drills.last_reviewed_at` y `sparring_games.created_at`. Es la misma
+  decisión que los patrones ([ADR-0008](adr/0008-patrones-deducidos-al-leer.md))
+  y que la lista de re-jugar
+  ([ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md)):
+  **RF-4.5 es el único requerimiento de RF-4 que no toca el modelo de datos**.
+- **Un plan vacío no es un fallo, y hay dos vacíos distintos.** Sin partidas
+  analizadas la pantalla manda a analizar, porque no se sabe nada todavía; con
+  partidas analizadas y nada por encima de su umbral, dice que no ha encontrado
+  nada que destaque. Por eso la respuesta lleva sobre cuántas partidas se hizo
+  el diagnóstico.
+- **El plan es la portada de Entrenamiento**, que pasa a tener cinco pestañas
+  (Plan, Puzzles, Aperturas, Re-jugar, Sparring): es la pantalla que dice por
+  dónde empezar y las otras cuatro son adónde manda. `/training` es el plan y
+  los puzzles se mudan a `/training/puzzles`.
+
+Razonado en
+[ADR-0021](adr/0021-el-plan-semanal-se-deduce-y-el-orden-de-las-debilidades-es-editorial.md),
+que deja escrito por qué el plan no se persiste y por qué el orden de las
+debilidades es editorial y no numérico.
+
+**Con RF-4.5 queda cerrado RF-4 entero** (RF-4.1 a RF-4.5, todas entregadas
+entre el **2026-09-19** y el **2026-09-21**). El entrenamiento de v1.0 no tiene
+nada pendiente.
 
 ### RF-5 · Interfaz
 
@@ -606,8 +1005,16 @@ tiene que ver, no dónde ni con qué cálculo; esta es la lectura que se le dio.
 Vive entero en `apps/web/src/components/board/` —`occupancy.ts` (el cálculo,
 con pruebas propias), `useOccupancy` (el estado y la tecla `O`),
 `OccupancyLayer` (lo que se pinta sobre el tablero) y `OccupancyPanel` (el
-control, la inspección y la leyenda)—, así que se comporta igual en el visor y
-en el tablero de análisis; el entrenamiento (RF-4) lo enchufará cuando exista.
+control, la inspección y la leyenda)—, con la rejilla enfocable con la que se
+inspecciona una casilla sin ratón (RF-7.3) en `Chessboard` desde el
+**2026-09-22**: una casilla tiene dos trabajos —inspeccionarse y ser origen o
+destino de una jugada— y solo quien conoce los dos puede darle a Intro uno sin
+que salgan dos rejillas superpuestas. Así se comporta igual en las
+**cinco pantallas con tablero**: el visor (RF-5), el tablero de análisis (RF-6)
+y, desde el **2026-09-22**, las tres de entrenamiento (RF-4) que tienen tablero
+—el puzzle (RF-4.1), el drill de apertura (RF-4.2) y la partida de sparring
+(RF-4.3 y RF-4.4)—. El plan (RF-4.5), la lista de re-jugar y la antesala de
+sparring no tienen tablero y quedan fuera.
 
 - **Los alcances se generan aquí y no con `attackers()` de chess.js**, que solo
   devuelve casillas de origen: hacen falta además la pieza que ataca (para
@@ -624,11 +1031,39 @@ en el tablero de análisis; el entrenamiento (RF-4) lo enchufará cuando exista.
   la posición que ya está en pantalla, sin endpoint, sin esquema y sin motor,
   como dice la entrada de esta sección. Recordar el sub-modo entre sesiones es
   RF-7.8 y sigue pendiente.
+- **La capa entra en el entrenamiento y la barra de evaluación no**
+  (**2026-09-22**). Las tres pantallas de RF-4 con tablero renunciaron a la
+  barra a propósito —decir a cada jugada quién va ganando convierte el
+  ejercicio en un análisis asistido—, pero esto es otra cosa: es leer la
+  posición que ya está en pantalla, no la opinión del motor sobre ella, y la
+  cabecera de esta sección dice desde el primer día que la capa se activa sobre
+  **cualquier** tablero, entrenamiento incluido. La frontera —de dónde sale el
+  dato, no en qué pantalla se dibuja— y lo que se descartó están en
+  [ADR-0023](adr/0023-la-ocupacion-entra-en-el-entrenamiento-y-la-barra-no.md).
+- **Ahí las tres marcas arrancan apagadas**, y encendidas en el visor y en el
+  tablero de análisis (**2026-09-22**). Rodear las piezas colgadas (RF-7.4) es
+  media solución de un puzzle táctico y, en una partida de sparring, el aviso
+  de blunder que un rival calibrado no debe dar; las clavadas (RF-7.6) y los
+  rayos X (RF-7.5) se apagan con ellas, y no solo las que delatan, porque el
+  panel presenta las tres como controles iguales y arrancar con una sí y otra
+  no obligaría a explicar ahí por qué esa. Apagadas siguen estando en el panel,
+  con su ayuda: quien las quiera las enciende a sabiendas, que es el matiz
+  entre leer la posición y que te la lean.
+- **Las marcas gobiernan también lo que el panel dice**, no solo lo que se
+  dibuja (**2026-09-22**): con su marca apagada, la inspección de RF-7.3 calla
+  "· colgada", "· clavada" y la lista de rayos X, **y lo mismo vale para lo que
+  la casilla lee en voz alta** con un lector de pantalla
+  (`describeSquareOccupancy`, desde el 2026-09-22). Sin eso, apagar una marca
+  era un gesto sin efecto
+  —pulsar una casilla entregaba en palabras justo lo que se había pedido no
+  ver—, y quedaba sin efecto justo por la vía del teclado. El conteo de
+  atacantes y defensores va siempre: es el propio RF-7.3 y no una marca.
 
 ### RF-10 · Alternativas por jugada en el análisis guardado
 
 Añadido al alcance de v1.0 el 2026-09-06 (ver la nota de alcance al inicio del
-documento) y **entregado el 2026-09-08** en sus dos puntos P1. Nació de esto:
+documento) y **entregado el 2026-09-08** en sus dos puntos P1 —el P2, RF-10.3,
+el **2026-09-19** con los puzzles de RF-4.1—. Nació de esto:
 las flechas múltiples de RF-5.2 solo existían en el tablero de análisis, porque
 ahí el motor responde en vivo sobre la posición actual, mientras que en el
 visor de una partida analizada había una sola flecha —y no por decisión de
@@ -655,7 +1090,13 @@ razonada en [ADR-0007](adr/0007-alternativas-por-jugada-json-y-cache.md):
   posición, motor, red, límite y MultiPV—. Si no coincide, no se sirve nada:
   una línea calculada con otra configuración no es la que produjo esa
   clasificación.
-- **RF-10.3 sigue pendiente**, con RF-4.1: los puzzles no existen todavía.
+- **RF-10.3 quedó entregado el 2026-09-19**, con RF-4.1: los puzzles aceptan
+  como respuesta cualquier jugada que no pierda más de 2 puntos de
+  probabilidad de victoria respecto a la mejor, y esas jugadas salen de estas
+  alternativas —o de lo que se rescate de `position_cache`—. Las candidatas se
+  congelan en el puzzle al generarlo
+  ([ADR-0017](adr/0017-puzzle-persistido-con-su-solucion-congelada.md)); las
+  reglas concretas están en la nota de RF-4.
 - **RF-2.8 se apoyó en esto**, un día después: distinguir una jugada única de
   una con tres alternativas igual de buenas necesita exactamente este material.
   El extractor de momentos críticos lee `alternatives_json` —o lo que se
@@ -795,9 +1236,43 @@ Notas técnicas, para cuando se retome:
   siempre, así que las partidas con `[SetUp "1"]` daban posiciones imposibles;
   ahora arranca de `pgn_game.board()`, que además marca Chess960 cuando toca.
   Una partida con ventaja se analiza hoy sin tocar nada más.
-- **Lo que falta de verdad es jugar.** No hay ningún flujo en el que el motor
-  responda a una jugada del usuario: `EngineBridge` solo analiza. RF-4.3 y
-  RF-4.4 comparten esa carencia, y conviene resolverla una vez para los tres.
+- **Jugar contra el motor ya está resuelto** (**2026-09-21**, con RF-4.3).
+  Hasta entonces no había ningún flujo en el que el motor respondiera a una
+  jugada del usuario: `EngineBridge` solo analizaba. Ahora tiene `play(board)`,
+  que le pide al motor que **mueva** —y entonces respeta lo que se le haya
+  pedido de fuerza, que es lo que lo convierte en rival y no en oráculo—, y el
+  sparring de RF-4.3 lo usa entero: `sparring_games`, validación de jugadas en
+  el servidor y PGN derivado. RF-11.1 hereda eso resuelto y lo que le queda es
+  su parte propia: arrancar de una posición con ventaja (`starting_fen` ya es
+  columna, precisamente para esto) y la segunda perilla de dificultad.
+- **Y jugar desde una posición que no es la inicial también está resuelto**
+  (**2026-09-21**, con RF-4.4). "Re-juega desde el error" retoma una partida
+  propia desde cualquiera de sus posiciones: `starting_fen` ya lleva
+  posiciones que no son la estándar, `to_pgn` ya escribe `[SetUp "1"]` +
+  `[FEN ...]`, el turno de salida ya sale de la posición y no del color, y la
+  pantalla de juego ya no da por hecho que una partida empieza por el
+  principio. **RF-11.1 sigue entero fuera de v1.0**, y lo que le falta de
+  verdad después de esto son dos cosas, ninguna de ellas casual:
+  - **La posición inventada.** Hoy la posición la deriva siempre el servidor
+    del PGN de una partida propia ya guardada (`{game_id, ply}`); por HTTP
+    **no se acepta un FEN**, a propósito, que es justamente lo que mantiene la
+    frontera ([ADR-0020](adr/0020-re-jugar-desde-el-error-es-sparring-desde-otra-posicion.md)).
+    RF-11.1 pide lo contrario: la posición del editor de RF-6.1 o un FEN
+    pegado, es decir, una posición que nunca se jugó.
+  - **La ventaja material como perilla** (RF-11.2). No existe nada de esto:
+    ni quitar piezas antes de empezar, ni elegir qué bando va con ventaja, ni
+    la pantalla que distingue "motor débil" de "motor fuerte con una torre de
+    menos". Es el corazón de RF-11 y no lo adelanta ningún requerimiento de
+    v1.0.
+- **RF-11.3 está medio adelantado.** La frontera que pide —una partida contra
+  el motor que se guarda y se analiza pero **no cuenta** en RF-3— ya se trazó
+  para el sparring en
+  [ADR-0018](adr/0018-sparring-en-su-propia-tabla-y-el-servidor-como-arbitro.md):
+  tabla propia y análisis por el camino de RF-6.6 + RF-6.9. Lo que falta por
+  decidir es si una partida con ventaja se guarda en esa misma tabla o en
+  `games` con `[SetUp "1"]`, como dice hoy el texto del requerimiento. RF-4.4
+  empuja hacia lo primero: `sparring_games` ya guarda partidas que empiezan en
+  cualquier posición y ya sabe de dónde salió cada una.
 
 ### Requerimientos no funcionales (Post 1.0)
 

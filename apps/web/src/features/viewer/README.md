@@ -18,13 +18,13 @@ análisis enseñen lo mismo de la misma forma (RNF-11 y criterio C-5 de
 [`docs/07-coherencia-ui.md`](../../../../../docs/07-coherencia-ui.md)); si una
 de las dos se desviara, el problema es la desviación, no el compartir.
 
-| Archivo | Qué es | Quién lo usa |
-| --- | --- | --- |
-| `GameViewerPage.tsx` | La pantalla del visor: tablero, navegación, análisis y comparación de motores | ruta `/games/$gameId` |
-| `EvalChart.tsx` | Gráfico de evaluación de la partida (**Recharts**), eje Y en win%, con cada punto del color de su clasificación y los errores más grandes | visor |
-| `MoveList.tsx` | Jugadas emparejadas por turno con su clasificación | visor |
-| `CriticalMoments.tsx` | Las jugadas donde se decidió la partida y por qué (RF-2.8) | visor |
-| `EngineComparison.tsx` | Dónde discrepan dos motores sobre la misma partida (RF-2.6) | visor |
+| Archivo                | Qué es                                                                                                                                    | Quién lo usa          |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `GameViewerPage.tsx`   | La pantalla del visor: tablero, navegación, análisis y comparación de motores                                                             | ruta `/games/$gameId` |
+| `EvalChart.tsx`        | Gráfico de evaluación de la partida (**Recharts**), eje Y en win%, con cada punto del color de su clasificación y los errores más grandes | visor                 |
+| `MoveList.tsx`         | Jugadas emparejadas por turno con su clasificación. La rejilla de turnos es la compartida (`components/board/TurnList`, con `turnsOf` de `lib/moves.ts`, que numera desde la posición de partida real); lo propio de aquí es la celda, un botón que navega | visor                 |
+| `CriticalMoments.tsx`  | Las jugadas donde se decidió la partida y por qué (RF-2.8)                                                                                | visor                 |
+| `EngineComparison.tsx` | Dónde discrepan dos motores sobre la misma partida (RF-2.6)                                                                               | visor                 |
 
 ## De dónde salen los números
 
@@ -61,14 +61,34 @@ hacen igual la lista de jugadas, el gráfico y la comparación de motores. La
 cabecera avisa además de esas partidas, con el campo
 `starts_from_custom_position` que trae la API.
 
+## Qué explican las tres acciones de la cabecera
+
+"Exportar PGN anotado" (RF-5.5), "Abrir como tablero" (RF-6.6) y "Jugar desde
+aquí" (RF-4.4) son las tres formas de sacar la partida de esta pantalla, y las
+tres dicen qué hacen en **una línea bajo la fila de botones**, no en un `title`:
+con teclado un `title` no aparece nunca, y en un botón deshabilitado —que es
+como está "Exportar PGN anotado" mientras no hay análisis— tampoco. Es la misma
+forma con la que Puzzles y Aperturas explican su botón de generar (fila 103 del
+inventario de [`docs/07-coherencia-ui.md`](../../../../../docs/07-coherencia-ui.md),
+criterios C-6 y C-7). El texto cambia con el estado del análisis, que es lo que
+antes distinguía los dos `title` de cada botón.
+
 ## Exportar el PGN anotado
 
-"Exportar PGN anotado" (RF-5.5) es un `<a download>` a
-`GET /analysis/{id}/pgn` y no una llamada por `fetch`: así el navegador
-descarga el archivo con el nombre que manda el servidor en
-`Content-Disposition`, que es justo lo que se perdería al pasar el contenido
-por JavaScript. Por eso `lib/api.ts` expone `analysisPgnUrl()` —una URL— y no
-un método más del cliente.
+"Exportar PGN anotado" (RF-5.5) es un **botón**, no un `<a download>` a
+`GET /analysis/{id}/pgn`. Con el enlace la descarga la hacía el navegador, y un
+409 o un 404 se guardaban como si fueran el archivo sin que la pantalla dijera
+nada (fila 70 del inventario). Ahora `api.getAnalysisPgn()` pide la respuesta,
+la comprueba y solo entonces `lib/download.ts::saveTextAsFile` la guarda, así
+que el error sale en su `ErrorBox` como el de cualquier otra acción. El nombre
+del archivo, que con el enlace ponía el servidor en `Content-Disposition`, se
+lee de esa misma cabecera y se le pasa al `download` del enlace temporal;
+`analysisPgnUrl()` sigue en `lib/api.ts` porque es de ahí de donde sale esa URL.
+
+El botón está **siempre**, también sin análisis: deshabilitado y diciendo qué
+falta para que sirva. Antes no existía hasta haber un análisis terminado, así
+que quien abría una partida sin analizar no podía saber que la exportación
+existe (fila 68, criterio C-3).
 
 El archivo lo compone el servidor entero (`services/pgn_export.py`): el visor
 no arma nada. Eso obliga a que las etiquetas de clasificación estén escritas
@@ -76,9 +96,9 @@ también allí, duplicadas a propósito de las de `lib/classification.ts`; si
 cambian aquí, hay que cambiarlas allá (criterio C-5 de
 [`docs/07-coherencia-ui.md`](../../../../../docs/07-coherencia-ui.md)).
 
-El enlace solo aparece con el análisis en `done`, que es lo único que la API
-exporta: un análisis a medias daría una partida comentada hasta la jugada 20 y
-muda a partir de ahí. Qué lleva exactamente el archivo está en la nota de
+Solo se habilita con el análisis en `done`, que es lo único que la API exporta:
+un análisis a medias daría una partida comentada hasta la jugada 20 y muda a
+partir de ahí. Qué lleva exactamente el archivo está en la nota de
 RF-5.5 de
 [`docs/02-requerimientos.md`](../../../../../docs/02-requerimientos.md).
 
@@ -100,10 +120,21 @@ marcarla la contaría dos veces en el dashboard.
 La capa de RF-7 (quién controla cada casilla, piezas colgadas, clavadas y rayos
 X) se enciende con la tecla `O` o desde su panel, bajo el tablero. Esta pantalla
 no calcula nada: le pasa a `useOccupancy` el FEN de la jugada en la que está
-parada y pone `OccupancyLayer` en el hueco `overlay` de `Chessboard`. Todo lo
-demás vive en `components/board/`, compartido con el tablero de análisis, y no
-pasa por la API ni por el motor. Cambiar de jugada suelta la casilla
-inspeccionada: era de la posición anterior.
+parada y le da ese controlador a `Chessboard` por su propiedad
+`occupancyController`, que es quien dibuja `OccupancyLayer` encima y quien monta
+la rejilla enfocable con la que se inspecciona una casilla sin ratón (RF-7.3);
+esa rejilla vivía dentro de la capa hasta que hubo que compartirla con mover una
+pieza por teclado, y dos rejillas superpuestas eran dos juegos de paradas de
+foco. Todo lo
+demás vive en `components/board/`, compartido con las otras cuatro pantallas
+con tablero, y no pasa por la API ni por el motor. Cambiar de jugada suelta la
+casilla inspeccionada: era de la posición anterior.
+
+Aquí las tres marcas —colgadas, clavadas y rayos X— **arrancan encendidas**,
+que es el ajuste por omisión de `useOccupancy`: son lo que la capa aporta sobre
+mirar el tablero a secas y apagadas de entrada nadie las descubriría. En las
+tres pantallas de entrenamiento arrancan apagadas, y por qué está en
+`features/training/README.md`.
 
 ## Momentos críticos
 

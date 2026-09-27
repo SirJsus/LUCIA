@@ -3,7 +3,8 @@
  *
  * Existe porque el bloque estaba copiado literal en las dos pantallas, con el
  * ancho máximo escrito a mano en cada una: el primer cambio de medida se
- * habría hecho en una sola.
+ * habría hecho en una sola. Esa medida ya no vive aquí sino en `BoardFrame`,
+ * que es el que la comparte con los tres tableros de entrenamiento.
  *
  * La barra se dibuja **siempre**, incluso sin evaluación —ahí se pinta
  * inactiva y con un guion—, por dos motivos: el tablero no se desplaza
@@ -11,6 +12,7 @@
  * nada" es un estado que merece verse (criterio C-3 de
  * docs/07-coherencia-ui.md).
  */
+import { BoardFrame } from "./BoardFrame";
 import { Chessboard, type ChessboardProps } from "./Chessboard";
 import { EvalBar } from "./EvalBar";
 
@@ -22,11 +24,13 @@ export interface BoardWithEvalBarProps extends ChessboardProps {
 
 export function BoardWithEvalBar({ whiteWinPercent, ...boardProps }: BoardWithEvalBarProps) {
   return (
-    <div className="mx-auto flex w-full max-w-[36rem] gap-3">
-      <EvalBar whiteWinPercent={whiteWinPercent} orientation={boardProps.orientation} />
-      <div className="min-w-0 flex-1">
-        <Chessboard {...boardProps} />
+    <BoardFrame>
+      <div className="flex gap-3">
+        <EvalBar whiteWinPercent={whiteWinPercent} orientation={boardProps.orientation} />
+        <div className="min-w-0 flex-1">
+          <Chessboard {...boardProps} />
+        </div>
       </div>
-    </div>
+    </BoardFrame>
   );
 }

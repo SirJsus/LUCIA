@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import datetime as dt
 import io
-from collections.abc import Awaitable, Callable, Mapping, Sequence
+from collections.abc import Awaitable, Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -176,6 +176,26 @@ async def alternatives_from_cache(
     )
     lines_by_fen = dict(cached_positions.all())
     return {ply: lines_by_fen[fen] for ply, fen in fens_by_ply.items() if fen in lines_by_fen}
+
+
+async def cached_alternatives_by_analysis(
+    session: AsyncSession, moves_with_analysis: Iterable[tuple[AnalyzedMove, Analysis]]
+) -> dict[int, dict[int, list[dict]]]:
+    """Lo que `alternatives_from_cache` rescata para un montón de jugadas de
+    varios análisis a la vez, indexado por id de análisis.
+
+    La caché se consulta por análisis —su motor y su límite forman parte de la
+    clave—, así que quien lee jugadas de muchas partidas de golpe (los
+    patrones, los puzzles) tiene que agruparlas antes. Se hace aquí para no
+    tenerlo escrito en cada servicio que lo necesita.
+    """
+    moves_by_analysis: dict[Analysis, list[AnalyzedMove]] = {}
+    for move, analysis in moves_with_analysis:
+        moves_by_analysis.setdefault(analysis, []).append(move)
+    return {
+        analysis.id: await alternatives_from_cache(session, analysis, analysis_moves)
+        for analysis, analysis_moves in moves_by_analysis.items()
+    }
 
 
 def alternatives_of(move: AnalyzedMove, cached_alternatives: dict[int, list[dict]]) -> list[dict]:

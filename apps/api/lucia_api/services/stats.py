@@ -197,6 +197,13 @@ class PlayerStats:
     average_accuracy: float | None = None
 
 
+#: Cuántas aperturas se miran cuando lo que se busca es la que cuesta puntos:
+#: las más jugadas, que es como las devuelve RF-3.2, y de ellas las que pierden
+#: puntos. Lo preguntan igual el plan semanal (RF-4.5) y el drill de aperturas
+#: (RF-4.2), así que el número es uno solo y vive junto a quien lo responde.
+MAX_OPENINGS_CONSIDERED = 40
+
+
 async def get_player_stats(
     session: AsyncSession, username: str, limit_openings: int = 10
 ) -> PlayerStats:

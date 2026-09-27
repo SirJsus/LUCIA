@@ -2,9 +2,11 @@
  * jugadas e Inicio/Fin saltan a los extremos.
  *
  * Va aparte del componente porque escucha en `window` —el foco no está en los
- * botones— y así las dos pantallas con tablero responden a las mismas teclas
- * con la misma regla, en vez de tener cada una su copia del listener
- * (criterios C-1 y C-2 de docs/07-coherencia-ui.md).
+ * botones— y así las dos pantallas que recorren jugadas —el visor (RF-5) y el
+ * tablero de análisis (RF-6); las tres de entrenamiento tienen tablero pero
+ * nada que recorrer— responden a las mismas teclas con la misma regla, en vez
+ * de tener cada una su copia del listener (criterios C-1 y C-2 de
+ * docs/07-coherencia-ui.md).
  *
  * Escribiendo en un campo —o eligiendo en un desplegable— las flechas son del
  * campo, no del tablero: el selector de motor de las dos pantallas cambiaba de

@@ -465,6 +465,236 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/training/puzzles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Player Puzzle Queue
+         * @description Los puzzles que toca repasar ahora, del más atrasado al más reciente.
+         */
+        get: operations["player_puzzle_queue_training_puzzles_get"];
+        put?: never;
+        /**
+         * Generate Player Puzzles
+         * @description Crea puzzles a partir de los errores de las partidas ya analizadas.
+         *
+         *     Se pide a mano y no al analizar: quien entrena decide cuándo renovar su
+         *     baraja, y así analizar una tanda de partidas no cambia la cola de repaso
+         *     por sorpresa. Volver a pulsar solo añade lo nuevo.
+         */
+        post: operations["generate_player_puzzles_training_puzzles_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/training/puzzles/{puzzle_id}/answer": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Answer Player Puzzle
+         * @description Comprueba una respuesta y, si cierra el puzzle, anota el repaso.
+         */
+        post: operations["answer_player_puzzle_training_puzzles__puzzle_id__answer_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/training/drills": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Player Drill Queue
+         * @description Los drills que toca repetir ahora, del más atrasado al más reciente, y
+         *     cuánta teoría le falta al repertorio del que salen.
+         */
+        get: operations["player_drill_queue_training_drills_get"];
+        put?: never;
+        /**
+         * Generate Opening Drills
+         * @description Crea los drills que falten a partir del repertorio y de las aperturas.
+         *
+         *     Se pide a mano, como los puzzles: quien entrena decide cuándo renovar su
+         *     baraja. Volver a pulsar solo añade lo nuevo y no toca el estado de repaso
+         *     de lo que ya había.
+         */
+        post: operations["generate_opening_drills_training_drills_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/training/drills/{drill_id}/moves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Play Drill Move
+         * @description Comprueba una jugada de la línea y contesta por el rival.
+         *
+         *     Fallar **no** cierra el drill ni enseña la jugada buena: se puede volver a
+         *     intentar, igual que en un puzzle. Rendirse (`uci` a `null`) sí lo cierra,
+         *     como fallado, y entonces se ve la línea entera.
+         */
+        post: operations["play_drill_move_training_drills__drill_id__moves_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/training/replays": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Player Replay Positions
+         * @description Los errores propios desde los que se puede retomar, del más caro al más
+         *     barato, y cuántos hay en total.
+         */
+        get: operations["player_replay_positions_training_replays_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/training/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Player Weekly Plan
+         * @description El plan de esta semana: qué falla y qué hacer al respecto.
+         */
+        get: operations["player_weekly_plan_training_plan_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sparring/games": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Sparring Games
+         * @description Las partidas jugadas, la de la última jugada primero. La pantalla
+         *     distingue las vivas de las terminadas por `result`.
+         */
+        get: operations["list_sparring_games_sparring_games_get"];
+        put?: never;
+        /**
+         * Start Sparring Game
+         * @description Abre una partida contra el motor, desde el principio o retomando una
+         *     partida propia (RF-4.4). Si al motor le toca mover, ya ha movido cuando la
+         *     respuesta llega.
+         */
+        post: operations["start_sparring_game_sparring_games_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sparring/games/{game_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Sparring Game
+         * @description Retomar una partida: es lo que permite cerrar la pestaña a mitad y
+         *     seguir después, porque el estado vive en la base y no en la pantalla.
+         */
+        get: operations["get_sparring_game_sparring_games__game_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sparring/games/{game_id}/moves": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Play Sparring Move
+         * @description Juega una jugada y devuelve la partida con la respuesta del motor.
+         */
+        post: operations["play_sparring_move_sparring_games__game_id__moves_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sparring/games/{game_id}/resign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Resign Sparring Game
+         * @description Abandona la partida: gana el motor y la partida queda cerrada.
+         */
+        post: operations["resign_sparring_game_sparring_games__game_id__resign_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -755,6 +985,96 @@ export interface components {
             /** Score Percent */
             score_percent: number;
         };
+        /** DrillGenerationOut */
+        DrillGenerationOut: {
+            /** Created */
+            created: number;
+            /** Total */
+            total: number;
+            /** Positions Missing */
+            positions_missing: number;
+        };
+        /** DrillMoveIn */
+        DrillMoveIn: {
+            /** Ply */
+            ply: number;
+            /** Uci */
+            uci?: string | null;
+            /**
+             * Wrong Moves
+             * @default 0
+             */
+            wrong_moves: number;
+        };
+        /** DrillMoveOut */
+        DrillMoveOut: {
+            /** Correct */
+            correct: boolean;
+            /** Reply Uci */
+            reply_uci: string | null;
+            /** Reply San */
+            reply_san: string | null;
+            /** Fen */
+            fen: string;
+            /** Next Ply */
+            next_ply: number | null;
+            /** Reviewed */
+            reviewed: boolean;
+            /** Line Moves San */
+            line_moves_san: string[];
+            /** Due At */
+            due_at: string | null;
+            /** Interval Days */
+            interval_days: number | null;
+        };
+        /**
+         * DrillOut
+         * @description Un drill por hacer, sin la línea que lo resuelve.
+         */
+        DrillOut: {
+            /** Id */
+            id: number;
+            /** Source */
+            source: string;
+            /** Player Color */
+            player_color: string;
+            /** Opening Eco */
+            opening_eco: string | null;
+            /** Opening Name */
+            opening_name: string | null;
+            /** Games Played */
+            games_played: number;
+            /** Score Percent */
+            score_percent: number;
+            /** Fen */
+            fen: string;
+            /** First Player Ply */
+            first_player_ply: number;
+            /** Preceding Moves San */
+            preceding_moves_san: string[];
+            /** Line Length Plies */
+            line_length_plies: number;
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /** Repetitions */
+            repetitions: number;
+        };
+        /** DrillQueueOut */
+        DrillQueueOut: {
+            /** Drills */
+            drills: components["schemas"]["DrillOut"][];
+            /** Due */
+            due: number;
+            /** Total */
+            total: number;
+            /** Next Due At */
+            next_due_at: string | null;
+            /** Positions Missing */
+            positions_missing: number;
+        };
         /** EngineConfigOut */
         EngineConfigOut: {
             /** Name */
@@ -853,6 +1173,16 @@ export interface components {
             starts_from_custom_position: boolean;
             /** Platform */
             platform: string;
+            /**
+             * Analyzed By Engines
+             * @default []
+             */
+            analyzed_by_engines: string[];
+            /**
+             * Has Analysis In Progress
+             * @default false
+             */
+            has_analysis_in_progress: boolean;
             /** Pgn */
             pgn: string;
             /** Clocks Json */
@@ -891,6 +1221,16 @@ export interface components {
             starts_from_custom_position: boolean;
             /** Platform */
             platform: string;
+            /**
+             * Analyzed By Engines
+             * @default []
+             */
+            analyzed_by_engines: string[];
+            /**
+             * Has Analysis In Progress
+             * @default false
+             */
+            has_analysis_in_progress: boolean;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1074,6 +1414,20 @@ export interface components {
             /** Blunders */
             blunders: number;
         };
+        /**
+         * PlanTaskOut
+         * @description Un deber de la semana: qué entrenar, cuánto y por qué.
+         */
+        PlanTaskOut: {
+            /** Kind */
+            kind: string;
+            /** Weekly Target */
+            weekly_target: number;
+            /** Done This Week */
+            done_this_week: number;
+            /** Weaknesses */
+            weaknesses: components["schemas"]["WeaknessOut"][];
+        };
         /** PlayerStatsOut */
         PlayerStatsOut: {
             /** Username */
@@ -1115,6 +1469,85 @@ export interface components {
             /** Multipv */
             multipv?: number | null;
         };
+        /** PuzzleAnswerIn */
+        PuzzleAnswerIn: {
+            /** Uci */
+            uci?: string | null;
+            /**
+             * Attempt Number
+             * @default 1
+             */
+            attempt_number: number;
+        };
+        /** PuzzleAnswerOut */
+        PuzzleAnswerOut: {
+            /** Correct */
+            correct: boolean;
+            /** Reviewed */
+            reviewed: boolean;
+            /** Solutions San */
+            solutions_san: string[];
+            /** Played San */
+            played_san: string | null;
+            /** Classification */
+            classification: string | null;
+            /** Win Percent Before */
+            win_percent_before: number | null;
+            /** Win Percent After */
+            win_percent_after: number | null;
+            /** Due At */
+            due_at: string | null;
+            /** Interval Days */
+            interval_days: number | null;
+        };
+        /** PuzzleGenerationOut */
+        PuzzleGenerationOut: {
+            /** Created */
+            created: number;
+            /** Total */
+            total: number;
+        };
+        /**
+         * PuzzleOut
+         * @description Un puzzle por resolver, sin nada que lo resuelva.
+         */
+        PuzzleOut: {
+            /** Id */
+            id: number;
+            /** Fen */
+            fen: string;
+            /** Player Color */
+            player_color: string;
+            /** Game Id */
+            game_id: number;
+            /** Ply */
+            ply: number;
+            /** Opponent */
+            opponent: string;
+            /**
+             * Played At
+             * Format: date-time
+             */
+            played_at: string;
+            /**
+             * Due At
+             * Format: date-time
+             */
+            due_at: string;
+            /** Repetitions */
+            repetitions: number;
+        };
+        /** PuzzleQueueOut */
+        PuzzleQueueOut: {
+            /** Puzzles */
+            puzzles: components["schemas"]["PuzzleOut"][];
+            /** Due */
+            due: number;
+            /** Total */
+            total: number;
+            /** Next Due At */
+            next_due_at: string | null;
+        };
         /** RecordOut */
         RecordOut: {
             /** Wins */
@@ -1151,6 +1584,127 @@ export interface components {
             positions_per_refresh: number;
             /** Seconds Between Positions */
             seconds_between_positions: number;
+        };
+        /**
+         * ReplayPositionOut
+         * @description Un error propio desde el que se puede retomar la partida.
+         */
+        ReplayPositionOut: {
+            /** Game Id */
+            game_id: number;
+            /** Ply */
+            ply: number;
+            /** Fen */
+            fen: string;
+            /** Player Color */
+            player_color: string;
+            /** San */
+            san: string;
+            /** Classification */
+            classification: string;
+            /** Win Percent Before */
+            win_percent_before: number;
+            /** Win Percent After */
+            win_percent_after: number;
+            /** Opponent */
+            opponent: string;
+            /**
+             * Played At
+             * Format: date-time
+             */
+            played_at: string;
+        };
+        /**
+         * ReplayQueueOut
+         * @description La lista y cuántos errores hay, como la cola de puzzles y la de drills.
+         *
+         *     El total no es `len(positions)`: la lista viene recortada a `limit`, así que
+         *     sin él la pantalla enseñaba veinte de trescientos sin decir que había más
+         *     (fila 102 del inventario de docs/07-coherencia-ui.md). Va en el cuerpo y no
+         *     en una cabecera `X-Total-Count` como el listado de Partidas porque así lo
+         *     traen las **dos** pestañas hermanas que también reparten una cola —puzzles
+         *     y aperturas, `PuzzleQueueOut` y `DrillQueueOut`—, y es con ellas con las que
+         *     se compara al cambiar de pestaña. El sparring no cuenta aquí: su listado es
+         *     de partidas abiertas, no una cola, y `GET /sparring/games` devuelve la lista
+         *     a secas.
+         */
+        ReplayQueueOut: {
+            /** Positions */
+            positions: components["schemas"]["ReplayPositionOut"][];
+            /** Total */
+            total: number;
+        };
+        /** SparringGameCreate */
+        SparringGameCreate: {
+            /** Player Color */
+            player_color: string;
+            /**
+             * Engine
+             * @default stockfish
+             */
+            engine: string;
+            /** Engine Elo */
+            engine_elo?: number | null;
+            origin?: components["schemas"]["SparringOriginIn"] | null;
+        };
+        /**
+         * SparringGameOut
+         * @description Una partida de sparring entera: lo que hay en el tablero y cómo se llegó.
+         */
+        SparringGameOut: {
+            /** Id */
+            id: number;
+            /** Player Color */
+            player_color: string;
+            /** Engine */
+            engine: string;
+            /** Engine Elo */
+            engine_elo: number | null;
+            /** Origin Game Id */
+            origin_game_id: number | null;
+            /** Origin Ply */
+            origin_ply: number | null;
+            /** Starting Ply */
+            starting_ply: number;
+            /** Fen */
+            fen: string;
+            /** Moves San */
+            moves_san: string[];
+            /** Last Move Uci */
+            last_move_uci: string | null;
+            /** Is Player Turn */
+            is_player_turn: boolean;
+            /** Result */
+            result: string | null;
+            /** Termination */
+            termination: string | null;
+            /** Pgn */
+            pgn: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** SparringMoveIn */
+        SparringMoveIn: {
+            /** Uci */
+            uci: string;
+        };
+        /**
+         * SparringOriginIn
+         * @description Desde qué posición de qué partida propia se retoma (RF-4.4).
+         */
+        SparringOriginIn: {
+            /** Game Id */
+            game_id: number;
+            /** Ply */
+            ply: number;
         };
         /** SyncRequest */
         SyncRequest: {
@@ -1256,6 +1810,34 @@ export interface components {
             draw: number;
             /** Loss */
             loss: number;
+        };
+        /**
+         * WeaknessOut
+         * @description Algo que se está haciendo mal, con su número y de dónde sale.
+         */
+        WeaknessOut: {
+            /** Kind */
+            kind: string;
+            /** Subject */
+            subject: string;
+            /** Magnitude */
+            magnitude: number;
+            /** Color */
+            color: string;
+        };
+        /** WeeklyPlanOut */
+        WeeklyPlanOut: {
+            /**
+             * Week Start
+             * Format: date-time
+             */
+            week_start: string;
+            /** Weaknesses */
+            weaknesses: components["schemas"]["WeaknessOut"][];
+            /** Tasks */
+            tasks: components["schemas"]["PlanTaskOut"][];
+            /** Analyzed Games */
+            analyzed_games: number;
         };
     };
     responses: never;
@@ -2079,6 +2661,434 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RefreshResultOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    player_puzzle_queue_training_puzzles_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PuzzleQueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_player_puzzles_training_puzzles_post: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PuzzleGenerationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    answer_player_puzzle_training_puzzles__puzzle_id__answer_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                puzzle_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PuzzleAnswerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PuzzleAnswerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    player_drill_queue_training_drills_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrillQueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    generate_opening_drills_training_drills_post: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrillGenerationOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    play_drill_move_training_drills__drill_id__moves_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                drill_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DrillMoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DrillMoveOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    player_replay_positions_training_replays_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReplayQueueOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    player_weekly_plan_training_plan_get: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WeeklyPlanOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_sparring_games_sparring_games_get: {
+        parameters: {
+            query?: {
+                limit?: number;
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SparringGameOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_sparring_game_sparring_games_post: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SparringGameCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SparringGameOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_sparring_game_sparring_games__game_id__get: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SparringGameOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    play_sparring_move_sparring_games__game_id__moves_post: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SparringMoveIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SparringGameOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    resign_sparring_game_sparring_games__game_id__resign_post: {
+        parameters: {
+            query?: {
+                username?: string | null;
+            };
+            header?: never;
+            path: {
+                game_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SparringGameOut"];
                 };
             };
             /** @description Validation Error */

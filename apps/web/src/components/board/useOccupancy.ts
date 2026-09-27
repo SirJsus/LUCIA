@@ -1,6 +1,7 @@
-/** El estado de la capa de ocupación (RF-7), compartido por las dos pantallas
- * que tienen tablero: el visor de partidas (RF-5) y el tablero de análisis
- * (RF-6). El entrenamiento (RF-4) lo usará igual cuando exista.
+/** El estado de la capa de ocupación (RF-7), compartido por las cinco
+ * pantallas que tienen tablero: el visor de partidas (RF-5), el tablero de
+ * análisis (RF-6) y las tres de entrenamiento (RF-4) —el puzzle, el drill de
+ * apertura y la partida de sparring—.
  *
  * Vive en un hook y no en cada pantalla porque la capa se comporta igual en
  * todas: los mismos sub-modos, los mismos filtros y el mismo atajo. Tener una
@@ -27,12 +28,17 @@ export type OccupancyMode = "heatmap" | "coverage";
  * (RF-7.4), piezas clavadas (RF-7.6) y rayos X (RF-7.5). */
 export type OccupancyMark = "hanging" | "pinned" | "xray";
 
-/** Encendidas de salida: son lo que la capa aporta sobre mirar el tablero a
- * secas, y apagadas de entrada nadie las descubriría. */
-const ALL_MARKS_ON: Record<OccupancyMark, boolean> = { hanging: true, pinned: true, xray: true };
+/** Las tres marcas de salida, encendidas o apagadas todas a la vez: el panel
+ * las presenta como tres controles iguales, y arrancar con una sí y otra no
+ * obligaría a explicar ahí por qué esa. */
+function allMarksSetTo(on: boolean): Record<OccupancyMark, boolean> {
+  return { hanging: on, pinned: on, xray: on };
+}
 
 /** La tecla que enciende y apaga la capa. Es un acelerador: el control visible
- * está en el panel, y la frase bajo el tablero la anuncia (criterio C-1). */
+ * está en el panel, y la frase que lo anuncia bajo el tablero es
+ * `OCCUPANCY_TOGGLE_KEY_HINT`, en `hints.ts`, junto a la del teclado del
+ * tablero: las dos componen el mismo párrafo de pie. */
 const OCCUPANCY_TOGGLE_KEY = "o";
 
 export interface OccupancyController {
@@ -54,6 +60,12 @@ export interface OccupancyController {
    * quitar (fila 88 del inventario de docs/07-coherencia-ui.md). */
   marks: Record<OccupancyMark, boolean>;
   toggleMark: (mark: OccupancyMark) => void;
+  /** Con qué arrancaron las tres marcas en esta pantalla, tal como se pidió en
+   * `OccupancyOptions`. Lo sabe el panel para decir ahí mismo por qué salen
+   * apagadas: arrancan encendidas en el visor y en el tablero de análisis, así
+   * que quien viene de ahí se encuentra las tres casillas desmarcadas sin nada
+   * que explique por qué (criterio C-2 de docs/07-coherencia-ui.md). */
+  marksOnByDefault: boolean;
   /** La casilla que se está inspeccionando (RF-7.3), fijada al pulsarla. */
   selectedSquare: string | null;
   selectSquare: (square: string) => void;
@@ -64,11 +76,26 @@ export interface OccupancyController {
   focusedPieceSquare: string | null;
 }
 
-export function useOccupancy(fen: string): OccupancyController {
+export interface OccupancyOptions {
+  /** Si las tres marcas arrancan encendidas. El visor y el tablero de análisis
+   * las quieren así: son lo que la capa aporta sobre mirar el tablero a secas,
+   * y apagadas de entrada nadie las descubriría. Las tres pantallas de
+   * entrenamiento pasan `false`, porque colgadas (RF-7.4), clavadas (RF-7.6) y
+   * rayos X (RF-7.5) son media solución del puzzle que se está resolviendo y
+   * el aviso de blunder que la partida de sparring no da. Apagadas siguen
+   * estando en el panel, con su ayuda, y quien las quiera las enciende a
+   * sabiendas: es el matiz que separa leer la posición de que te la lean. */
+  marksOnByDefault?: boolean;
+}
+
+export function useOccupancy(
+  fen: string,
+  { marksOnByDefault = true }: OccupancyOptions = {},
+): OccupancyController {
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState<OccupancyMode>("heatmap");
   const [isShowingOtherColor, setIsShowingOtherColor] = useState(false);
-  const [marks, setMarks] = useState(ALL_MARKS_ON);
+  const [marks, setMarks] = useState(() => allMarksSetTo(marksOnByDefault));
   const [selectedSquare, setSelectedSquare] = useState<string | null>(null);
   const [hoveredSquare, setHoveredSquare] = useState<string | null>(null);
 
@@ -113,6 +140,7 @@ export function useOccupancy(fen: string): OccupancyController {
     toggleCoverageColor: () => setIsShowingOtherColor((other) => !other),
     marks,
     toggleMark: (mark) => setMarks((current) => ({ ...current, [mark]: !current[mark] })),
+    marksOnByDefault,
     selectedSquare,
     // Con la capa apagada las dos se ignoran: el tablero avisa igual de cada
     // pulsación y de cada casilla que cruza el ratón, y guardarlas redibujaría

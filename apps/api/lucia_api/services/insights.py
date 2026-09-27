@@ -35,7 +35,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from lucia_api.db.models import Analysis, AnalyzedMove, Game
-from lucia_api.services.analysis import alternatives_from_cache, alternatives_of
+from lucia_api.services.analysis import alternatives_of, cached_alternatives_by_analysis
 
 
 def latest_analysis_ids():
@@ -92,13 +92,9 @@ async def player_move_contexts(
     # rescatan de la caché de posiciones, igual que hace el visor (ADR-0007).
     # Sin ellas no habría forma de saber si un error fue táctico ni si la
     # posición tenía una sola jugada.
-    moves_by_analysis: dict[Analysis, list[AnalyzedMove]] = {}
-    for move, analysis, _game_id, _clocks_json in player_rows:
-        moves_by_analysis.setdefault(analysis, []).append(move)
-    cached_by_analysis = {
-        analysis.id: await alternatives_from_cache(session, analysis, analysis_moves)
-        for analysis, analysis_moves in moves_by_analysis.items()
-    }
+    cached_by_analysis = await cached_alternatives_by_analysis(
+        session, ((move, analysis) for move, analysis, _game_id, _clocks_json in player_rows)
+    )
 
     return [
         (
@@ -129,20 +125,22 @@ def _move_context(
         win_percent_before=move.win_percent_before,
         win_percent_after=move.win_percent_after,
         alternative_win_percents=tuple(
-            _mover_win_percent(line, move.color, move.ply) for line in alternatives
+            mover_win_percent(line, move.color, move.ply) for line in alternatives
         ),
         best_alternative_san=_best_alternative_san(alternatives, move.fen_before),
         seconds_left=_seconds_left(clocks_json, move.ply),
     )
 
 
-def _mover_win_percent(serialized_line: dict, color: str, ply: int) -> float:
+def mover_win_percent(serialized_line: dict, color: str, ply: int) -> float:
     """Probabilidad de victoria de una línea guardada, desde el punto de vista
     de quien mueve.
 
     Las líneas se guardan desde el de las blancas, como todo lo persistido; un
     patrón, en cambio, es de quien lo comete, así que aquí se le da la vuelta
-    cuando las juega el negro.
+    cuando las juega el negro. Por eso es pública: los puzzles (RF-4.1)
+    comparan las alternativas entre sí en esta misma unidad y desde este mismo
+    punto de vista, y tenerlo escrito dos veces daría dos formas de girarlo.
     """
     score_mate, score_cp = serialized_line["score_mate"], serialized_line["score_cp"]
     score = (

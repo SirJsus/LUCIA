@@ -2,9 +2,12 @@
 
 Plataforma personal de entrenamiento de ajedrez. Usa **Stockfish** y **Lc0 (Leela Chess Zero)** como "cerebro", importa tu perfil e historial de **chess.com**, y construye encima análisis, estadísticas y entrenamiento que en las plataformas comerciales están detrás de un muro de pago.
 
-> Estado: fases 0 a 2 del roadmap cerradas (importación, análisis con motor,
-> estadísticas, tablero de análisis y ocupación del tablero); quedan
-> entrenamiento (fase 3) y empaquetado (fase 4) para la v1.0.0. Ver
+> Estado: fases 0 a 3 del roadmap cerradas — importación, análisis con motor,
+> estadísticas, tablero de análisis, ocupación del tablero y **RF-4 entero**:
+> puzzles desde los errores propios con repetición espaciada (RF-4.1), drill de
+> aperturas (RF-4.2), sparring contra el motor con fuerza calibrada (RF-4.3),
+> re-jugar desde el error (RF-4.4) y el plan de entrenamiento semanal (RF-4.5).
+> Queda el empaquetado (fase 4) para la v1.0.0. Ver
 > [docs/05-roadmap.md](docs/05-roadmap.md) y [CHANGELOG.md](CHANGELOG.md).
 
 ## Estructura del monorepo
@@ -16,7 +19,10 @@ LUCIA/
 │   └── web/            # Frontend React + Vite + TypeScript: tablero, gráficas, entrenamiento
 ├── packages/
 │   ├── core/           # Python: puente UCI con Stockfish/Lc0, clasificación de jugadas, métricas,
-│   │                   #   patrones de juego y tabla ECO de aperturas (datos incluidos)
+│   │                   #   patrones de juego, repetición espaciada de los puzzles,
+│   │                   #   reglas de una partida de sparring, del drill de aperturas
+│   │                   #   y del plan de entrenamiento semanal
+│   │                   #   y tabla ECO de aperturas (datos incluidos)
 │   ├── chesscom/       # Python: cliente de la API pública de chess.com (perfil, archivos PGN)
 │   ├── lichess/        # Python: cliente del Opening Explorer de Lichess (teoría de aperturas)
 │   └── shared-types/   # TypeScript: tipos compartidos API <-> web (generados desde OpenAPI)
@@ -52,7 +58,7 @@ make up S=api  # solo un servicio (api | web)
 make types     # regenera los tipos TS del front desde el OpenAPI de la API
 ```
 
-La web tiene cinco pantallas: **Partidas** (lista con filtros, sincronización
+La web tiene seis pantallas: **Partidas** (lista con filtros, sincronización
 desde chess.com e importación de un archivo PGN de otra fuente —OTB, lichess—),
 **Visor** (tablero, jugadas clasificadas, gráfico de
 evaluación, análisis con progreso en vivo, exportación de la partida a PGN
@@ -67,13 +73,36 @@ OTB, una de club— se marca como "partida propia" y pasa a contar en Partidas y
 en Estadísticas como cualquier otra), **Estadísticas** (marcador,
 ratings, aperturas con su código ECO, en qué fase se pierde más ventaja, de qué
 tipo son los errores, qué pasa cuando baja el reloj, si mejoras mes a mes y
-dónde te sales de la teoría de maestros) y **Motores** (profundidad, MultiPV, hilos y hash,
-editables).
+dónde te sales de la teoría de maestros), **Entrenamiento** (te recibe el **plan de
+la semana**: qué te está costando puntos —en qué fase pierdes ventaja, de qué
+tipo son tus errores, qué apertura te sale cara, si juegas con el reloj encima,
+si tu precisión está cayendo— y los deberes que salen de ahí, cada uno diciendo
+qué debilidad lo pide y cuánto llevas hecho. No hay nada que marcar: el avance
+sale de lo que ya entrenaste, y cada deber te lleva a su pestaña. Las cuatro
+pestañas a las que manda son: puzzles sacados de tus propios errores —la posición justo antes del blunder—,
+con repetición espaciada, donde los que aciertas vuelven cada vez más tarde y
+vale cualquier jugada tan buena como la del motor, no solo la suya; el **drill
+de aperturas**, que toma las líneas donde más puntos pierdes —los puntos donde
+abandonas la teoría y las aperturas que peor se te dan— y te las hace repetir
+jugando desde la primera jugada, con la aplicación respondiendo por el rival,
+hasta la jugada que los maestros hacen ahí en lugar de la tuya;
+**sparring**, partidas contra Stockfish con el Elo que le pongas o contra Lc0
+con una red Maia, que en vez de contenerse juega como una persona de ~1500; y
+**re-jugar desde el error**, que te lista tus errores más caros y te deja
+volver a jugar la partida desde justo antes de cada uno, contra el motor y con
+el bando que quieras —o, desde el visor, desde cualquier posición de cualquier
+partida tuya, con "Jugar desde aquí"—. Una partida contra el motor, la empieces
+donde la empieces, no cuenta en tus estadísticas —sería medirte contra un
+motor al que le has bajado la fuerza—, pero se abre como tablero para
+analizarla) y **Motores** (profundidad, MultiPV, hilos y hash, editables).
 
-Sobre cualquier tablero —el del visor y el de análisis— se enciende con la
-tecla `O` la **capa de ocupación** (RF-7): quién controla cada casilla, qué
+Sobre cualquier tablero —el del visor, el de análisis y los tres de
+entrenamiento: puzzle, drill de apertura y partida de sparring— se enciende con
+la tecla `O` la **capa de ocupación** (RF-7): quién controla cada casilla, qué
 piezas están colgadas o clavadas y qué rayos X hay detrás. Se calcula en el
-navegador, sin motor y sin red.
+navegador, sin motor y sin red. Entrenando, las tres marcas —colgadas, clavadas
+y rayos X— arrancan apagadas: rodear una pieza colgada es media solución del
+puzzle. Se encienden desde el panel cuando quieras la ayuda.
 
 Todo funciona sin conexión salvo dos cosas, y las dos las pides tú: importar
 partidas de chess.com y traer teoría de aperturas nueva del Opening Explorer de

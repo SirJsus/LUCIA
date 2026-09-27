@@ -1,12 +1,13 @@
 /** El panel que gobierna y explica la capa de ocupación (RF-7).
  *
- * Va **bajo** el tablero en las dos pantallas que lo tienen —el visor (RF-5) y
- * el tablero de análisis (RF-6)—, en el mismo sitio y con los mismos nombres,
- * porque la capa es la misma (criterio C-2 de docs/07-coherencia-ui.md). Bajo
- * el tablero y no en el lateral con los demás paneles porque este es la leyenda
- * de lo que se está pintando encima de él, y leer "borde a rayas ámbar" a dos
- * columnas de la casilla que lo lleva obliga a cruzar la vista (fila 90 del
- * inventario). Tiene tres trabajos:
+ * Va **bajo** el tablero en las cinco pantallas que lo tienen —el visor
+ * (RF-5), el tablero de análisis (RF-6) y las tres de entrenamiento (RF-4): el
+ * puzzle, el drill de apertura y la partida de sparring—, en el mismo sitio y
+ * con los mismos nombres, porque la capa es la misma (criterio C-2 de
+ * docs/07-coherencia-ui.md). Bajo el tablero y no en el lateral con los demás
+ * paneles porque este es la leyenda de lo que se está pintando encima de él, y
+ * leer "borde a rayas ámbar" a dos columnas de la casilla que lo lleva obliga
+ * a cruzar la vista (fila 90 del inventario). Tiene tres trabajos:
  *
  * - **Encenderla y configurarla**: el sub-modo (RF-7.1 y RF-7.2), qué bando se
  *   mira y qué marcas se enseñan. El botón de encendido está siempre, también
@@ -59,6 +60,7 @@ export function OccupancyPanel({ controller }: { controller: OccupancyController
     toggleCoverageColor,
     marks,
     toggleMark,
+    marksOnByDefault,
     selectedSquare,
   } = controller;
 
@@ -74,9 +76,8 @@ export function OccupancyPanel({ controller }: { controller: OccupancyController
     >
       {!isActive ? (
         <p className="opacity-70">
-          Colorea cada casilla según quién la controla, marca las piezas colgadas y las
-          clavadas, y dice quién ataca y quién defiende la casilla que pulses. Se enciende aquí
-          o con la tecla{" "}
+          Colorea cada casilla según quién la controla, marca las piezas colgadas y las clavadas, y
+          dice quién ataca y quién defiende la casilla que pulses. Se enciende aquí o con la tecla{" "}
           <kbd className="rounded border border-slate-300 px-1 font-mono text-xs dark:border-slate-700">
             O
           </kbd>
@@ -132,6 +133,16 @@ export function OccupancyPanel({ controller }: { controller: OccupancyController
 
           <fieldset>
             <legend className="opacity-70">Qué se marca</legend>
+            {/* Por qué aquí arrancan apagadas, dicho donde se ven apagadas: en
+                el visor y en el tablero de análisis las tres salen marcadas, y
+                sin esta línea la misma capa se comporta de dos maneras sin
+                explicación (criterio C-2). */}
+            {!marksOnByDefault && (
+              <p className="mt-1 text-xs opacity-60">
+                Aquí arrancan apagadas: señalan sobre el tablero justo lo que esta pantalla te está
+                entrenando a ver. Enciende las que quieras cuando prefieras la ayuda.
+              </p>
+            )}
             <div className="mt-1 space-y-2">
               {MARK_CONTROLS.map(({ mark, label, hint }) => (
                 <div key={mark}>
@@ -155,7 +166,7 @@ export function OccupancyPanel({ controller }: { controller: OccupancyController
           </fieldset>
 
           {selectedSquare ? (
-            <SquareInspection occupancy={occupancy} square={selectedSquare} />
+            <SquareInspection occupancy={occupancy} square={selectedSquare} marks={marks} />
           ) : (
             <EmptyState title="Ninguna casilla elegida">
               Pulsa una casilla del tablero para ver quién la ataca y quién la defiende. Señala una
@@ -163,11 +174,7 @@ export function OccupancyPanel({ controller }: { controller: OccupancyController
             </EmptyState>
           )}
 
-          <OccupancyLegend
-            mode={mode}
-            coverageColor={coverageColor}
-            marks={marks}
-          />
+          <OccupancyLegend mode={mode} coverageColor={coverageColor} marks={marks} />
         </>
       )}
     </Panel>
@@ -180,8 +187,23 @@ export function OccupancyPanel({ controller }: { controller: OccupancyController
  * la menos. Si la casilla tiene pieza, se nombra a los bandos por lo que hacen
  * —atacar o defender—, que es como se habla de una posición; si está vacía, los
  * dos bandos la cubren y no hay nada que defender.
+ *
+ * **Las marcas mandan también aquí**, no solo sobre lo que se dibuja: colgada,
+ * clavada y rayo X se callan si su casilla está desmarcada. Escribirlas igual
+ * dejaría sin efecto apagarlas —pulsar una casilla entregaría en palabras justo
+ * lo que se pidió no ver, que es lo que arrancan apagadas las tres pantallas de
+ * entrenamiento— y haría de las tres casillas un control a medias
+ * (fila 108 del inventario de docs/07-coherencia-ui.md, criterio C-3).
  */
-function SquareInspection({ occupancy, square }: { occupancy: OccupancyMap; square: string }) {
+function SquareInspection({
+  occupancy,
+  square,
+  marks,
+}: {
+  occupancy: OccupancyMap;
+  square: string;
+  marks: OccupancyController["marks"];
+}) {
   const piece = occupancy.pieces[square];
   const { directAttacks, xrayAttacks } = occupancy.squares[square];
   const sides: PieceColor[] = piece ? [otherColor(piece.color), piece.color] : ["w", "b"];
@@ -191,10 +213,10 @@ function SquareInspection({ occupancy, square }: { occupancy: OccupancyMap; squa
       <p className="font-medium">
         <span className="font-mono">{square}</span>
         {piece ? `: ${pieceName(piece.role, piece.color)}` : ": casilla vacía"}
-        {piece && occupancy.pinnedSquares.includes(square) && (
+        {marks.pinned && piece && occupancy.pinnedSquares.includes(square) && (
           <span className="ml-1 text-amber-700 dark:text-amber-400">· clavada contra su rey</span>
         )}
-        {piece && occupancy.hangingSquares.includes(square) && (
+        {marks.hanging && piece && occupancy.hangingSquares.includes(square) && (
           <span className="ml-1 text-red-700 dark:text-red-400">· colgada</span>
         )}
       </p>
@@ -211,6 +233,7 @@ function SquareInspection({ occupancy, square }: { occupancy: OccupancyMap; squa
           }
           directAttacks={directAttacks[color]}
           xrayAttacks={xrayAttacks[color]}
+          marks={marks}
         />
       ))}
     </div>
@@ -221,10 +244,16 @@ function AttackList({
   heading,
   directAttacks,
   xrayAttacks,
+  marks,
 }: {
   heading: string;
   directAttacks: Attack[];
   xrayAttacks: Attack[];
+  /** Las mismas marcas que gobiernan el tablero, por la razón que explica
+   * `SquareInspection`: aquí callan la clavada y la lista de rayos X. El
+   * conteo de atacantes directos no depende de ninguna —es RF-7.3 y no una
+   * marca—, así que ese va siempre. */
+  marks: OccupancyController["marks"];
 }) {
   return (
     <div>
@@ -242,14 +271,14 @@ function AttackList({
               {/* La clavada se dice, además de marcarse en el tablero: sigue
                   contando como atacante y conviene saber por qué está ahí
                   (RF-7.6). */}
-              {attack.isPinned && (
+              {marks.pinned && attack.isPinned && (
                 <span className="opacity-70"> · clavada, no puede moverse</span>
               )}
             </li>
           ))}
         </ul>
       )}
-      {xrayAttacks.length > 0 && (
+      {marks.xray && xrayAttacks.length > 0 && (
         <ul className="mt-0.5 space-y-0.5 opacity-70">
           {sortAttacksByValue(xrayAttacks).map((attack) => (
             <li key={attack.from} className="text-xs">
@@ -330,8 +359,7 @@ function OccupancyLegend({
             className="mt-1.5 h-0 w-3 shrink-0 border-t-2 border-dashed border-slate-500"
             aria-hidden="true"
           />
-          Línea discontinua: rayo X, el alcance a través de otra pieza. Nunca cuenta en el
-          balance.
+          Línea discontinua: rayo X, el alcance a través de otra pieza. Nunca cuenta en el balance.
         </li>
       )}
     </ul>

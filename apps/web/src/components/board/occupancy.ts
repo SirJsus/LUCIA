@@ -7,9 +7,11 @@
  * enseña es `OccupancyLayer` y quien la explica en palabras, `OccupancyPanel`.
  *
  * **De dónde sale la posición y a dónde va el resultado**: entra un FEN —el de
- * la jugada que se está viendo en el visor (RF-5) o el del nodo actual del
- * tablero de análisis (RF-6)— y sale un `OccupancyMap` que las dos pantallas
- * pintan igual. No se guarda nada: se recalcula al cambiar de posición.
+ * la jugada que se está viendo en el visor (RF-5), el del nodo actual del
+ * tablero de análisis (RF-6) o el de la posición que hay en juego en las tres
+ * pantallas de entrenamiento con tablero (RF-4)— y sale un `OccupancyMap` que
+ * las cinco pintan igual. No se guarda nada: se recalcula al cambiar de
+ * posición.
  *
  * **Los alcances se generan a mano y no con `attackers()` de chess.js**, que
  * devuelve solo las casillas de origen. Aquí hacen falta tres cosas más que
@@ -24,7 +26,14 @@
  * tratarla como un caso especial.
  */
 import { Chess } from "chess.js";
-import { otherColor, pieceValue, type PieceColor, type PieceRole } from "./pieces";
+import {
+  colorName,
+  otherColor,
+  pieceName,
+  pieceValue,
+  type PieceColor,
+  type PieceRole,
+} from "./pieces";
 import { ALL_SQUARES, FILES } from "./squares";
 
 /** Un alcance sobre una casilla: una pieza que la ataca o la defiende. */
@@ -267,7 +276,7 @@ function isPinnedToOwnKing(
 
   // Del rey hasta la pieza no puede haber nada: si hay algo, el clavado sería
   // eso y no esta pieza.
-  for (let betweenSquare = stepFrom(kingSquare, ...step); betweenSquare !== square; ) {
+  for (let betweenSquare = stepFrom(kingSquare, ...step); betweenSquare !== square;) {
     if (betweenSquare === null || pieces[betweenSquare]) return false;
     betweenSquare = stepFrom(betweenSquare, ...step);
   }
@@ -311,8 +320,12 @@ function stepFrom(square: string, fileStep: number, rankStep: number): string | 
 }
 
 /** Lee las piezas del FEN con chess.js, que es quien sabe si el FEN es válido.
- * Solo se le pide eso: el resto del cálculo es de aquí. */
-function readPiecesFromFen(fen: string): Record<string, OccupancyPiece> | null {
+ * Solo se le pide eso: el resto del cálculo es de aquí.
+ *
+ * Se exporta porque la rejilla enfocable de `Chessboard` necesita decir qué hay
+ * en cada casilla también con la capa de ocupación apagada (fila 91 del
+ * inventario de docs/07-coherencia-ui.md). */
+export function readPiecesFromFen(fen: string): Record<string, OccupancyPiece> | null {
   let board;
   try {
     board = new Chess(fen).board();
@@ -350,4 +363,34 @@ export function coverageFrom(
  * que es como se leen en la inspección (RF-7.3). */
 export function sortAttacksByValue(attacks: Attack[]): Attack[] {
   return [...attacks].sort((a, b) => b.value - a.value);
+}
+
+/** Lo que se lee de una casilla con un lector de pantalla: qué hay en ella y
+ * quién la alcanza. Es la versión en palabras de todo lo que la capa dice con
+ * color (criterio C-7).
+ *
+ * **Las marcas mandan también aquí**, igual que en la inspección del panel: con
+ * «Piezas colgadas» o «Piezas clavadas» desmarcada, la casilla no lo dice
+ * tampoco en voz alta. Decirlo igual dejaría sin efecto apagarlas justo por la
+ * vía del teclado —que es la única de la que se ocupa este texto— en las tres
+ * pantallas de entrenamiento, donde arrancan apagadas para no adelantar la
+ * solución (fila 108 del inventario de docs/07-coherencia-ui.md, criterio
+ * C-3). El conteo de atacantes no depende de ninguna marca: es RF-7.3. */
+export function describeSquareOccupancy(
+  occupancy: OccupancyMap,
+  square: string,
+  marks: { hanging: boolean; pinned: boolean },
+): string {
+  const piece = occupancy.pieces[square];
+  const { directAttacks } = occupancy.squares[square];
+  const parts = [
+    `${square}: ${piece ? pieceName(piece.role, piece.color) : "vacía"}`,
+    ...(["w", "b"] as PieceColor[])
+      .filter((color) => directAttacks[color].length > 0)
+      .map((color) => `${directAttacks[color].length} de las ${colorName(color)}`),
+  ];
+  if (marks.pinned && piece && occupancy.pinnedSquares.includes(square)) parts.push("clavada");
+  if (marks.hanging && piece && occupancy.hangingSquares.includes(square)) parts.push("colgada");
+  if (directAttacks.w.length === 0 && directAttacks.b.length === 0) parts.push("sin control");
+  return parts.join(", ");
 }

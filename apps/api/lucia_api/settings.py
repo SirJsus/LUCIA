@@ -42,6 +42,17 @@ class Settings(BaseSettings):
 
     Se sigue pudiendo forzar desde `.env` (`LC0_BACKEND`) cuando se sepa más
     que Lc0 sobre la máquina concreta."""
+
+    maia_weights: Path = Path("./engines/networks/maia-1500.pb.gz")
+    """Red de Lc0 para el sparring (RF-4.3), aparte de la de análisis.
+
+    Maia está entrenada para **predecir la jugada de un humano** de cierto
+    nivel, no para buscar la mejor: eso la hace un rival de estilo humano y
+    una mala fuente de verdad, así que no puede ser la misma red con la que se
+    analiza. `scripts/setup-engines.sh` descarga la de ~1500, que es la que
+    trae este valor por defecto; cambiarla por otra de la familia (1100 a
+    1900) es cambiar la fuerza del rival de Lc0."""
+
     analysis_depth: int = 18
     analysis_multipv: int = 3
     lichess_token: str = ""
@@ -71,6 +82,7 @@ class Settings(BaseSettings):
         self.stockfish_path = _absolute_path(self.stockfish_path)
         self.lc0_path = _absolute_path(self.lc0_path)
         self.lc0_weights = _absolute_path(self.lc0_weights)
+        self.maia_weights = _absolute_path(self.maia_weights)
         return self
 
 

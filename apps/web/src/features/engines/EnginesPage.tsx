@@ -28,7 +28,7 @@ export function EnginesPage() {
         </p>
       </div>
 
-      {configQuery.isPending && <Spinner />}
+      {configQuery.isPending && <Spinner label="Cargando la configuración…" />}
       {configQuery.isError && <ErrorBox error={configQuery.error} onRetry={configQuery.refetch} />}
 
       {configQuery.data && (

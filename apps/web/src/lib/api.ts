@@ -13,6 +13,9 @@ import type {
   AnalysisSummary,
   BoardDetail,
   BoardSummary,
+  DrillGeneration,
+  DrillMove,
+  DrillQueue,
   EngineLine,
   EngineConfigUpdate,
   EnginesConfigOut,
@@ -21,9 +24,16 @@ import type {
   OwnGamePublishRequest,
   PgnImportSummary,
   PlayerStats,
+  PuzzleAnswer,
+  PuzzleGeneration,
+  PuzzleQueue,
   RepertoireComparison,
   RepertoireRefresh,
+  ReplayQueue,
+  SparringGame,
+  SparringGameCreate,
   SyncSummary,
+  WeeklyPlan,
 } from "@lucia/shared-types";
 
 const BASE_URL = "/api";
@@ -261,6 +271,89 @@ export const api = {
   updateEngineConfig: (engineName: string, body: EngineConfigUpdate) =>
     request<EnginesConfigOut["stockfish"]>(`/engines/config/${engineName}`, {
       method: "PUT",
+      body: JSON.stringify(body),
+    }),
+
+  /** Crea puzzles a partir de los errores de las partidas ya analizadas
+   * (RF-4.1). Se pide a mano: analizar una tanda de partidas no debe cambiar
+   * la cola de repaso por sorpresa. Volver a pulsar solo añade lo nuevo. */
+  generatePuzzles: (username?: string) =>
+    request<PuzzleGeneration>(`/training/puzzles${toQueryString({ username })}`, {
+      method: "POST",
+    }),
+
+  /** Los puzzles que toca repasar ahora, del más atrasado al más reciente.
+   * No traen ni la solución ni la jugada que se hizo en la partida: las dos
+   * resolverían el puzzle, así que se quedan en el servidor hasta cerrarlo. */
+  getPuzzleQueue: () => request<PuzzleQueue>("/training/puzzles"),
+
+  /** Contesta un puzzle. `uci` a `null` es rendirse y ver la solución;
+   * `attempt_number` es el número de intento, y con él el servidor distingue
+   * acertar a la primera de acertar tropezando (RF-4.1, repetición espaciada). */
+  answerPuzzle: (puzzleId: number, body: { uci: string | null; attempt_number: number }) =>
+    request<PuzzleAnswer>(`/training/puzzles/${puzzleId}/answer`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  /** Abre una partida de sparring contra el motor (RF-4.3). Si el motor lleva
+   * blancas, la partida vuelve con su primera jugada ya hecha. */
+  startSparringGame: (body: SparringGameCreate) =>
+    request<SparringGame>("/sparring/games", {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
+
+  /** El plan de entrenamiento de esta semana (RF-4.5): qué falla y qué hacer
+   * al respecto. No se guarda ni se marca: se deduce de las estadísticas y de
+   * las colas de entrenamiento, y el avance sale de lo que ya se hizo. */
+  getWeeklyPlan: () => request<WeeklyPlan>("/training/plan"),
+
+  /** Los errores propios desde los que se puede retomar una partida contra el
+   * motor (RF-4.4), del que más caro salió al que menos. Es la lista curada;
+   * desde el visor se puede retomar cualquier posición. */
+  getReplayPositions: () => request<ReplayQueue>("/training/replays"),
+
+  /** Las partidas de sparring, la de la última jugada primero. Las que siguen
+   * vivas son las que tienen `result` a `null`. */
+  getSparringGames: () => request<SparringGame[]>("/sparring/games"),
+
+  getSparringGame: (gameId: number) => request<SparringGame>(`/sparring/games/${gameId}`),
+
+  /** Juega una jugada. La respuesta trae ya la del motor: para quien juega es
+   * un solo turno, así que es una sola petición. */
+  playSparringMove: (gameId: number, uci: string) =>
+    request<SparringGame>(`/sparring/games/${gameId}/moves`, {
+      method: "POST",
+      body: JSON.stringify({ uci }),
+    }),
+
+  /** Abandona la partida: gana el motor y queda cerrada. */
+  resignSparringGame: (gameId: number) =>
+    request<SparringGame>(`/sparring/games/${gameId}/resign`, { method: "POST" }),
+
+  /** Crea los drills de apertura que falten, a partir del repertorio ya
+   * comparado (RF-3.6) y de las estadísticas por apertura (RF-3.2). Se pide a
+   * mano, como los puzzles, y volver a pulsar solo añade lo nuevo. */
+  generateDrills: (username?: string) =>
+    request<DrillGeneration>(`/training/drills${toQueryString({ username })}`, {
+      method: "POST",
+    }),
+
+  /** Los drills que toca repetir ahora. **No traen la línea**: es la
+   * respuesta, y la comprueba el servidor jugada a jugada. */
+  getDrillQueue: () => request<DrillQueue>("/training/drills"),
+
+  /** Juega una jugada de la línea. El servidor comprueba, contesta por el
+   * rival y, cuando la línea se acaba, anota el repaso y la enseña entera.
+   * `uci` a `null` es rendirse. `wrong_moves` son los fallos de esta pasada, que
+   * es lo que distingue recorrerla limpia de recorrerla tropezando. */
+  playDrillMove: (
+    drillId: number,
+    body: { ply: number; uci: string | null; wrong_moves: number },
+  ) =>
+    request<DrillMove>(`/training/drills/${drillId}/moves`, {
+      method: "POST",
       body: JSON.stringify(body),
     }),
 

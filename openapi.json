@@ -3,7 +3,7 @@
   "info": {
     "title": "L.U.C.I.A. API",
     "description": "Logic & Ultimate Chess Insight Algorithm",
-    "version": "0.4.0"
+    "version": "0.6.0"
   },
   "paths": {
     "/health": {
@@ -1389,6 +1389,739 @@
           }
         }
       }
+    },
+    "/training/puzzles": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Generate Player Puzzles",
+        "description": "Crea puzzles a partir de los errores de las partidas ya analizadas.\n\nSe pide a mano y no al analizar: quien entrena decide cuándo renovar su\nbaraja, y así analizar una tanda de partidas no cambia la cola de repaso\npor sorpresa. Volver a pulsar solo añade lo nuevo.",
+        "operationId": "generate_player_puzzles_training_puzzles_post",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuzzleGenerationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Player Puzzle Queue",
+        "description": "Los puzzles que toca repasar ahora, del más atrasado al más reciente.",
+        "operationId": "player_puzzle_queue_training_puzzles_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuzzleQueueOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/puzzles/{puzzle_id}/answer": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Answer Player Puzzle",
+        "description": "Comprueba una respuesta y, si cierra el puzzle, anota el repaso.",
+        "operationId": "answer_player_puzzle_training_puzzles__puzzle_id__answer_post",
+        "parameters": [
+          {
+            "name": "puzzle_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Puzzle Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PuzzleAnswerIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PuzzleAnswerOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/drills": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Generate Opening Drills",
+        "description": "Crea los drills que falten a partir del repertorio y de las aperturas.\n\nSe pide a mano, como los puzzles: quien entrena decide cuándo renovar su\nbaraja. Volver a pulsar solo añade lo nuevo y no toca el estado de repaso\nde lo que ya había.",
+        "operationId": "generate_opening_drills_training_drills_post",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrillGenerationOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Player Drill Queue",
+        "description": "Los drills que toca repetir ahora, del más atrasado al más reciente, y\ncuánta teoría le falta al repertorio del que salen.",
+        "operationId": "player_drill_queue_training_drills_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrillQueueOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/drills/{drill_id}/moves": {
+      "post": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Play Drill Move",
+        "description": "Comprueba una jugada de la línea y contesta por el rival.\n\nFallar **no** cierra el drill ni enseña la jugada buena: se puede volver a\nintentar, igual que en un puzzle. Rendirse (`uci` a `null`) sí lo cierra,\ncomo fallado, y entonces se ve la línea entera.",
+        "operationId": "play_drill_move_training_drills__drill_id__moves_post",
+        "parameters": [
+          {
+            "name": "drill_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Drill Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DrillMoveIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DrillMoveOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/replays": {
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Player Replay Positions",
+        "description": "Los errores propios desde los que se puede retomar, del más caro al más\nbarato, y cuántos hay en total.",
+        "operationId": "player_replay_positions_training_replays_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplayQueueOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/training/plan": {
+      "get": {
+        "tags": [
+          "training"
+        ],
+        "summary": "Player Weekly Plan",
+        "description": "El plan de esta semana: qué falla y qué hacer al respecto.",
+        "operationId": "player_weekly_plan_training_plan_get",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WeeklyPlanOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sparring/games": {
+      "post": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "Start Sparring Game",
+        "description": "Abre una partida contra el motor, desde el principio o retomando una\npartida propia (RF-4.4). Si al motor le toca mover, ya ha movido cuando la\nrespuesta llega.",
+        "operationId": "start_sparring_game_sparring_games_post",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SparringGameCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringGameOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "List Sparring Games",
+        "description": "Las partidas jugadas, la de la última jugada primero. La pantalla\ndistingue las vivas de las terminadas por `result`.",
+        "operationId": "list_sparring_games_sparring_games_get",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 20,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SparringGameOut"
+                  },
+                  "title": "Response List Sparring Games Sparring Games Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sparring/games/{game_id}": {
+      "get": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "Get Sparring Game",
+        "description": "Retomar una partida: es lo que permite cerrar la pestaña a mitad y\nseguir después, porque el estado vive en la base y no en la pantalla.",
+        "operationId": "get_sparring_game_sparring_games__game_id__get",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringGameOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sparring/games/{game_id}/moves": {
+      "post": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "Play Sparring Move",
+        "description": "Juega una jugada y devuelve la partida con la respuesta del motor.",
+        "operationId": "play_sparring_move_sparring_games__game_id__moves_post",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SparringMoveIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringGameOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/sparring/games/{game_id}/resign": {
+      "post": {
+        "tags": [
+          "sparring"
+        ],
+        "summary": "Resign Sparring Game",
+        "description": "Abandona la partida: gana el motor y la partida queda cerrada.",
+        "operationId": "resign_sparring_game_sparring_games__game_id__resign_post",
+        "parameters": [
+          {
+            "name": "game_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Game Id"
+            }
+          },
+          {
+            "name": "username",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Username"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SparringGameOut"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -2210,6 +2943,288 @@
         "title": "DepartureOut",
         "description": "Un punto donde el repertorio propio se separa del de los maestros."
       },
+      "DrillGenerationOut": {
+        "properties": {
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "positions_missing": {
+            "type": "integer",
+            "title": "Positions Missing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "total",
+          "positions_missing"
+        ],
+        "title": "DrillGenerationOut"
+      },
+      "DrillMoveIn": {
+        "properties": {
+          "ply": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ply"
+          },
+          "uci": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uci"
+          },
+          "wrong_moves": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Wrong Moves",
+            "default": 0
+          }
+        },
+        "type": "object",
+        "required": [
+          "ply"
+        ],
+        "title": "DrillMoveIn"
+      },
+      "DrillMoveOut": {
+        "properties": {
+          "correct": {
+            "type": "boolean",
+            "title": "Correct"
+          },
+          "reply_uci": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply Uci"
+          },
+          "reply_san": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reply San"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "next_ply": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Ply"
+          },
+          "reviewed": {
+            "type": "boolean",
+            "title": "Reviewed"
+          },
+          "line_moves_san": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Line Moves San"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "interval_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "correct",
+          "reply_uci",
+          "reply_san",
+          "fen",
+          "next_ply",
+          "reviewed",
+          "line_moves_san",
+          "due_at",
+          "interval_days"
+        ],
+        "title": "DrillMoveOut"
+      },
+      "DrillOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source"
+          },
+          "player_color": {
+            "type": "string",
+            "title": "Player Color"
+          },
+          "opening_eco": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opening Eco"
+          },
+          "opening_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Opening Name"
+          },
+          "games_played": {
+            "type": "integer",
+            "title": "Games Played"
+          },
+          "score_percent": {
+            "type": "number",
+            "title": "Score Percent"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "first_player_ply": {
+            "type": "integer",
+            "title": "First Player Ply"
+          },
+          "preceding_moves_san": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Preceding Moves San"
+          },
+          "line_length_plies": {
+            "type": "integer",
+            "title": "Line Length Plies"
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Due At"
+          },
+          "repetitions": {
+            "type": "integer",
+            "title": "Repetitions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "source",
+          "player_color",
+          "opening_eco",
+          "opening_name",
+          "games_played",
+          "score_percent",
+          "fen",
+          "first_player_ply",
+          "preceding_moves_san",
+          "line_length_plies",
+          "due_at",
+          "repetitions"
+        ],
+        "title": "DrillOut",
+        "description": "Un drill por hacer, sin la línea que lo resuelve."
+      },
+      "DrillQueueOut": {
+        "properties": {
+          "drills": {
+            "items": {
+              "$ref": "#/components/schemas/DrillOut"
+            },
+            "type": "array",
+            "title": "Drills"
+          },
+          "due": {
+            "type": "integer",
+            "title": "Due"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "next_due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Due At"
+          },
+          "positions_missing": {
+            "type": "integer",
+            "title": "Positions Missing"
+          }
+        },
+        "type": "object",
+        "required": [
+          "drills",
+          "due",
+          "total",
+          "next_due_at",
+          "positions_missing"
+        ],
+        "title": "DrillQueueOut"
+      },
       "EngineConfigOut": {
         "properties": {
           "name": {
@@ -2473,6 +3488,19 @@
             "type": "string",
             "title": "Platform"
           },
+          "analyzed_by_engines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Analyzed By Engines",
+            "default": []
+          },
+          "has_analysis_in_progress": {
+            "type": "boolean",
+            "title": "Has Analysis In Progress",
+            "default": false
+          },
           "pgn": {
             "type": "string",
             "title": "Pgn"
@@ -2576,6 +3604,19 @@
           "platform": {
             "type": "string",
             "title": "Platform"
+          },
+          "analyzed_by_engines": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Analyzed By Engines",
+            "default": []
+          },
+          "has_analysis_in_progress": {
+            "type": "boolean",
+            "title": "Has Analysis In Progress",
+            "default": false
           }
         },
         "type": "object",
@@ -3069,6 +4110,38 @@
         ],
         "title": "PhaseStatsOut"
       },
+      "PlanTaskOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "weekly_target": {
+            "type": "integer",
+            "title": "Weekly Target"
+          },
+          "done_this_week": {
+            "type": "integer",
+            "title": "Done This Week"
+          },
+          "weaknesses": {
+            "items": {
+              "$ref": "#/components/schemas/WeaknessOut"
+            },
+            "type": "array",
+            "title": "Weaknesses"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "weekly_target",
+          "done_this_week",
+          "weaknesses"
+        ],
+        "title": "PlanTaskOut",
+        "description": "Un deber de la semana: qué entrenar, cuánto y por qué."
+      },
       "PlayerStatsOut": {
         "properties": {
           "username": {
@@ -3219,6 +4292,241 @@
         ],
         "title": "PositionAnalysisRequest"
       },
+      "PuzzleAnswerIn": {
+        "properties": {
+          "uci": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Uci"
+          },
+          "attempt_number": {
+            "type": "integer",
+            "minimum": 1.0,
+            "title": "Attempt Number",
+            "default": 1
+          }
+        },
+        "type": "object",
+        "title": "PuzzleAnswerIn"
+      },
+      "PuzzleAnswerOut": {
+        "properties": {
+          "correct": {
+            "type": "boolean",
+            "title": "Correct"
+          },
+          "reviewed": {
+            "type": "boolean",
+            "title": "Reviewed"
+          },
+          "solutions_san": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Solutions San"
+          },
+          "played_san": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Played San"
+          },
+          "classification": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Classification"
+          },
+          "win_percent_before": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Percent Before"
+          },
+          "win_percent_after": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Win Percent After"
+          },
+          "due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due At"
+          },
+          "interval_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interval Days"
+          }
+        },
+        "type": "object",
+        "required": [
+          "correct",
+          "reviewed",
+          "solutions_san",
+          "played_san",
+          "classification",
+          "win_percent_before",
+          "win_percent_after",
+          "due_at",
+          "interval_days"
+        ],
+        "title": "PuzzleAnswerOut"
+      },
+      "PuzzleGenerationOut": {
+        "properties": {
+          "created": {
+            "type": "integer",
+            "title": "Created"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "created",
+          "total"
+        ],
+        "title": "PuzzleGenerationOut"
+      },
+      "PuzzleOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "player_color": {
+            "type": "string",
+            "title": "Player Color"
+          },
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "opponent": {
+            "type": "string",
+            "title": "Opponent"
+          },
+          "played_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Played At"
+          },
+          "due_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Due At"
+          },
+          "repetitions": {
+            "type": "integer",
+            "title": "Repetitions"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "fen",
+          "player_color",
+          "game_id",
+          "ply",
+          "opponent",
+          "played_at",
+          "due_at",
+          "repetitions"
+        ],
+        "title": "PuzzleOut",
+        "description": "Un puzzle por resolver, sin nada que lo resuelva."
+      },
+      "PuzzleQueueOut": {
+        "properties": {
+          "puzzles": {
+            "items": {
+              "$ref": "#/components/schemas/PuzzleOut"
+            },
+            "type": "array",
+            "title": "Puzzles"
+          },
+          "due": {
+            "type": "integer",
+            "title": "Due"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          },
+          "next_due_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Due At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "puzzles",
+          "due",
+          "total",
+          "next_due_at"
+        ],
+        "title": "PuzzleQueueOut"
+      },
       "RecordOut": {
         "properties": {
           "wins": {
@@ -3315,6 +4623,297 @@
           "seconds_between_positions"
         ],
         "title": "RepertoireOut"
+      },
+      "ReplayPositionOut": {
+        "properties": {
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "ply": {
+            "type": "integer",
+            "title": "Ply"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "player_color": {
+            "type": "string",
+            "title": "Player Color"
+          },
+          "san": {
+            "type": "string",
+            "title": "San"
+          },
+          "classification": {
+            "type": "string",
+            "title": "Classification"
+          },
+          "win_percent_before": {
+            "type": "number",
+            "title": "Win Percent Before"
+          },
+          "win_percent_after": {
+            "type": "number",
+            "title": "Win Percent After"
+          },
+          "opponent": {
+            "type": "string",
+            "title": "Opponent"
+          },
+          "played_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Played At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game_id",
+          "ply",
+          "fen",
+          "player_color",
+          "san",
+          "classification",
+          "win_percent_before",
+          "win_percent_after",
+          "opponent",
+          "played_at"
+        ],
+        "title": "ReplayPositionOut",
+        "description": "Un error propio desde el que se puede retomar la partida."
+      },
+      "ReplayQueueOut": {
+        "properties": {
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/ReplayPositionOut"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total"
+          }
+        },
+        "type": "object",
+        "required": [
+          "positions",
+          "total"
+        ],
+        "title": "ReplayQueueOut",
+        "description": "La lista y cuántos errores hay, como la cola de puzzles y la de drills.\n\nEl total no es `len(positions)`: la lista viene recortada a `limit`, así que\nsin él la pantalla enseñaba veinte de trescientos sin decir que había más\n(fila 102 del inventario de docs/07-coherencia-ui.md). Va en el cuerpo y no\nen una cabecera `X-Total-Count` como el listado de Partidas porque así lo\ntraen las **dos** pestañas hermanas que también reparten una cola —puzzles\ny aperturas, `PuzzleQueueOut` y `DrillQueueOut`—, y es con ellas con las que\nse compara al cambiar de pestaña. El sparring no cuenta aquí: su listado es\nde partidas abiertas, no una cola, y `GET /sparring/games` devuelve la lista\na secas."
+      },
+      "SparringGameCreate": {
+        "properties": {
+          "player_color": {
+            "type": "string",
+            "pattern": "^(white|black)$",
+            "title": "Player Color"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine",
+            "default": "stockfish"
+          },
+          "engine_elo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Elo"
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SparringOriginIn"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "type": "object",
+        "required": [
+          "player_color"
+        ],
+        "title": "SparringGameCreate"
+      },
+      "SparringGameOut": {
+        "properties": {
+          "id": {
+            "type": "integer",
+            "title": "Id"
+          },
+          "player_color": {
+            "type": "string",
+            "title": "Player Color"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine"
+          },
+          "engine_elo": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Engine Elo"
+          },
+          "origin_game_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Game Id"
+          },
+          "origin_ply": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Origin Ply"
+          },
+          "starting_ply": {
+            "type": "integer",
+            "title": "Starting Ply"
+          },
+          "fen": {
+            "type": "string",
+            "title": "Fen"
+          },
+          "moves_san": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Moves San"
+          },
+          "last_move_uci": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Move Uci"
+          },
+          "is_player_turn": {
+            "type": "boolean",
+            "title": "Is Player Turn"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "termination": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Termination"
+          },
+          "pgn": {
+            "type": "string",
+            "title": "Pgn"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Created At"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Updated At"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "player_color",
+          "engine",
+          "engine_elo",
+          "origin_game_id",
+          "origin_ply",
+          "starting_ply",
+          "fen",
+          "moves_san",
+          "last_move_uci",
+          "is_player_turn",
+          "result",
+          "termination",
+          "pgn",
+          "created_at",
+          "updated_at"
+        ],
+        "title": "SparringGameOut",
+        "description": "Una partida de sparring entera: lo que hay en el tablero y cómo se llegó."
+      },
+      "SparringMoveIn": {
+        "properties": {
+          "uci": {
+            "type": "string",
+            "title": "Uci"
+          }
+        },
+        "type": "object",
+        "required": [
+          "uci"
+        ],
+        "title": "SparringMoveIn"
+      },
+      "SparringOriginIn": {
+        "properties": {
+          "game_id": {
+            "type": "integer",
+            "title": "Game Id"
+          },
+          "ply": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Ply"
+          }
+        },
+        "type": "object",
+        "required": [
+          "game_id",
+          "ply"
+        ],
+        "title": "SparringOriginIn",
+        "description": "Desde qué posición de qué partida propia se retoma (RF-4.4)."
       },
       "SyncRequest": {
         "properties": {
@@ -3589,6 +5188,70 @@
         ],
         "title": "WdlOut",
         "description": "Probabilidad de victoria, tablas y derrota **de las blancas** según el\nmotor, en partes por mil (RF-2.6).\n\nEs la opinión del motor, no la fórmula: `win_percent_*` sale de convertir\nel centipeón con el modelo de Lichess y es igual para cualquier motor,\nmientras que esto lo contesta cada uno por su cuenta y es donde Lc0 aporta\nuna segunda opinión de verdad. Los tres suman 1000."
+      },
+      "WeaknessOut": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "title": "Kind"
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject"
+          },
+          "magnitude": {
+            "type": "number",
+            "title": "Magnitude"
+          },
+          "color": {
+            "type": "string",
+            "title": "Color"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "subject",
+          "magnitude",
+          "color"
+        ],
+        "title": "WeaknessOut",
+        "description": "Algo que se está haciendo mal, con su número y de dónde sale."
+      },
+      "WeeklyPlanOut": {
+        "properties": {
+          "week_start": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Week Start"
+          },
+          "weaknesses": {
+            "items": {
+              "$ref": "#/components/schemas/WeaknessOut"
+            },
+            "type": "array",
+            "title": "Weaknesses"
+          },
+          "tasks": {
+            "items": {
+              "$ref": "#/components/schemas/PlanTaskOut"
+            },
+            "type": "array",
+            "title": "Tasks"
+          },
+          "analyzed_games": {
+            "type": "integer",
+            "title": "Analyzed Games"
+          }
+        },
+        "type": "object",
+        "required": [
+          "week_start",
+          "weaknesses",
+          "tasks",
+          "analyzed_games"
+        ],
+        "title": "WeeklyPlanOut"
       }
     }
   }

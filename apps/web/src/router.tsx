@@ -10,6 +10,12 @@ import { BoardsPage } from "./features/board/BoardsPage";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { EnginesPage } from "./features/engines/EnginesPage";
 import { GamesPage } from "./features/games/GamesPage";
+import { DrillsPage } from "./features/training/DrillsPage";
+import { PlanPage } from "./features/training/PlanPage";
+import { PuzzlesPage } from "./features/training/PuzzlesPage";
+import { ReplaysPage } from "./features/training/ReplaysPage";
+import { SparringGamePage } from "./features/training/SparringGamePage";
+import { SparringPage } from "./features/training/SparringPage";
 import { GameViewerPage } from "./features/viewer/GameViewerPage";
 
 const rootRoute = createRootRoute({ component: Layout });
@@ -38,6 +44,44 @@ const statsRoute = createRoute({
   component: DashboardPage,
 });
 
+// El plan es la portada de Entrenamiento (RF-4.5): es la pantalla que dice por
+// dónde empezar, así que es donde cae quien pulsa la sección en la navegación.
+const planRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/training",
+  component: PlanPage,
+});
+
+const puzzlesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/training/puzzles",
+  component: PuzzlesPage,
+});
+
+const drillsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/training/drills",
+  component: DrillsPage,
+});
+
+const replaysRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/training/replays",
+  component: ReplaysPage,
+});
+
+const sparringRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/training/sparring",
+  component: SparringPage,
+});
+
+const sparringGameRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/training/sparring/$sparringGameId",
+  component: SparringGamePage,
+});
+
 const boardsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/boards",
@@ -55,6 +99,12 @@ const routeTree = rootRoute.addChildren([
   gameViewerRoute,
   boardsRoute,
   boardRoute,
+  planRoute,
+  puzzlesRoute,
+  drillsRoute,
+  replaysRoute,
+  sparringRoute,
+  sparringGameRoute,
   statsRoute,
   enginesRoute,
 ]);

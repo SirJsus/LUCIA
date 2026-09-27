@@ -23,6 +23,7 @@ import type { Color, Role } from "chessground/types";
 import { createElement, useCallback, useRef, useState } from "react";
 import { Button } from "../../components/Button";
 import { Chessboard, type ChessboardApi } from "../../components/board/Chessboard";
+import { KEYBOARD_PLACE_PIECE_HINT } from "../../components/board/hints";
 import {
   chessgroundColor,
   chessgroundRole,
@@ -167,10 +168,13 @@ export function PositionEditor({
               />
             }
           />
+          {/* La parte del teclado es la frase compartida de
+              `components/board/hints.ts`, no una copia: las cinco pantallas
+              con tablero anuncian las mismas teclas con las mismas palabras
+              (criterios C-1 y C-2). */}
           <p className={BOARD_HINT_CLASSES}>
             Elige una pieza y pulsa las casillas, o arrástrala desde la paleta. Arrastra fuera del
-            tablero para quitar una pieza. Con teclado: tabula hasta el tablero, muévete con las
-            flechas y pon la pieza elegida con Intro.
+            tablero para quitar una pieza. {KEYBOARD_PLACE_PIECE_HINT}
           </p>
         </div>
 
@@ -213,9 +217,7 @@ export function PositionEditor({
               {/* Qué hace la goma, a la vista y no en un `title`: con teclado
                   un `title` no aparece nunca (criterio C-6, la misma razón por
                   la que las ayudas de los filtros bajaron bajo su campo). */}
-              <p className="text-xs opacity-60">
-                La goma deja vacía la casilla que pulses.
-              </p>
+              <p className="text-xs opacity-60">La goma deja vacía la casilla que pulses.</p>
             </div>
           </fieldset>
 

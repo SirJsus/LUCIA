@@ -6,6 +6,7 @@
  * que se reconozcan como la misma familia a simple vista.
  */
 import type { ReactNode } from "react";
+import { ProgressBar } from "./ProgressBar";
 
 export function Spinner({ label = "Cargando…" }: { label?: string }) {
   return (
@@ -87,9 +88,9 @@ export function WarningBox({ children }: { children: ReactNode }) {
 /** "Estoy trabajando, y esto es lo que llevo".
  *
  * `progress` va de 0 a 100, o `null` cuando el trabajo está encolado o no se
- * sabe cuánto queda: entonces la barra se muestra indeterminada en vez de
- * fingir un 0 %. `detail` es el texto de la derecha (posición actual, tiempo
- * transcurrido). */
+ * sabe cuánto queda. `detail` es el texto de la derecha (posición actual,
+ * tiempo transcurrido). La barra es la compartida (`ProgressBar`), la misma
+ * que enseña el avance de los deberes del plan semanal. */
 export function ProgressBox({
   label,
   detail,
@@ -105,21 +106,7 @@ export function ProgressBox({
         <span role="status">{label}</span>
         {detail && <span className="tabular-nums opacity-70">{detail}</span>}
       </div>
-      <div
-        className="mt-1.5 h-1.5 overflow-hidden rounded bg-indigo-200 dark:bg-indigo-900"
-        role="progressbar"
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={progress ?? undefined}
-        aria-label={label}
-      >
-        <div
-          className={`h-full bg-indigo-600 dark:bg-indigo-400 ${
-            progress === null ? "w-1/3 animate-pulse" : "transition-all"
-          }`}
-          style={progress === null ? undefined : { width: `${progress}%` }}
-        />
-      </div>
+      <ProgressBar percent={progress} label={label} className="mt-1.5" />
     </Notice>
   );
 }

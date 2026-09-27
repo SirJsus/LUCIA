@@ -17,13 +17,18 @@ from . import __version__
 from .routers import (
     analysis,
     boards,
+    drills,
     engines,
     games,
     health,
     pgn_import,
+    plan,
     repertoire,
+    replays,
+    sparring,
     stats,
     sync,
+    training,
 )
 from .worker import AnalysisWorker
 
@@ -56,3 +61,8 @@ app.include_router(engines.router)
 app.include_router(stats.router)
 app.include_router(boards.router)
 app.include_router(repertoire.router)
+app.include_router(training.router)
+app.include_router(drills.router)
+app.include_router(replays.router)
+app.include_router(plan.router)
+app.include_router(sparring.router)

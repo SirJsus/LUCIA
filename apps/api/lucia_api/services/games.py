@@ -14,10 +14,20 @@ encontraría ninguna de sus propias partidas.
 
 from __future__ import annotations
 
-from lucia_core.openings import opening_of_pgn
-from sqlalchemy import case, func
+from collections import defaultdict
+from collections.abc import Sequence
+from dataclasses import dataclass
 
-from lucia_api.db.models import Game
+from lucia_core.openings import opening_of_pgn
+from sqlalchemy import case, func, select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from lucia_api.db.models import Analysis, Game
+
+#: Estados de `Analysis.status` que significan "todavía no hay resultado": la
+#: cola del worker (RF-2.4) los recorre en este orden. Los demás son "done" y
+#: "error", que sí son finales.
+ANALYSIS_UNFINISHED_STATUSES = ("queued", "running")
 
 #: Valores de `white_result`/`black_result` que significan tablas: los de
 #: chess.com, que dicen además cómo se llegó a ellas, más el "draw" a secas que
@@ -92,3 +102,66 @@ def outcome_of(username: str):
         (player_result.in_(DRAW_RESULTS), "draw"),
         else_="loss",
     )
+
+
+@dataclass(frozen=True)
+class GameAnalysisState:
+    """Qué análisis tiene ya una partida.
+
+    Lo necesitan la lista de partidas (RF-5.3), para decir de un vistazo qué
+    está analizado y con qué, y el análisis en lote (RF-2.5), para que quien
+    elige la tanda no vuelva a mandar lo que ya está hecho.
+    """
+
+    analyzed_by_engines: tuple[str, ...]
+    """Motores cuyo análisis terminó, en orden alfabético. Puede haber más de
+    uno: una misma partida se analiza con Stockfish y con Lc0 como segunda
+    opinión (RF-2.6), y son análisis distintos."""
+    has_analysis_in_progress: bool
+    """Hay un análisis suyo en la cola o corriendo (RF-2.4). Se enseña aparte
+    de los terminados porque es lo que explica que una partida recién mandada
+    todavía no tenga motor que mostrar."""
+
+
+async def load_analysis_state_by_game_id(
+    session: AsyncSession, game_ids: Sequence[int]
+) -> dict[int, GameAnalysisState]:
+    """El estado de análisis de cada partida pedida, sacado de `analyses`.
+
+    **De dónde sale**: de la tabla de análisis, no de una columna de `games`.
+    Una partida no "está analizada" como propiedad suya; tiene tantas corridas
+    de motor como se le hayan lanzado, con motor y profundidad propios (ver
+    `Analysis`). Por eso lo que vuelve no es un booleano sino con qué motores
+    terminó.
+
+    **Por qué en una sola consulta**: la lista sirve hasta 200 partidas de una
+    vez, y preguntar por cada fila serían 200 idas y vueltas a la base para
+    pintar una columna.
+
+    Los análisis de tablero cuentan si están atribuidos a la partida
+    (`game_id` lleno, RF-6.5 y ADR-0014): son la misma corrida de motor sobre
+    las mismas jugadas.
+    """
+    if not game_ids:
+        return {}
+
+    rows = await session.execute(
+        select(Analysis.game_id, Analysis.engine, Analysis.status).where(
+            Analysis.game_id.in_(game_ids)
+        )
+    )
+    engines_done_by_game: dict[int, set[str]] = defaultdict(set)
+    games_in_progress: set[int] = set()
+    for game_id, engine, status in rows:
+        if status == "done":
+            engines_done_by_game[game_id].add(engine)
+        elif status in ANALYSIS_UNFINISHED_STATUSES:
+            games_in_progress.add(game_id)
+
+    return {
+        game_id: GameAnalysisState(
+            analyzed_by_engines=tuple(sorted(engines_done_by_game.get(game_id, ()))),
+            has_analysis_in_progress=game_id in games_in_progress,
+        )
+        for game_id in game_ids
+    }

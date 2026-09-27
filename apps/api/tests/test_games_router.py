@@ -5,7 +5,7 @@ from collections.abc import AsyncIterator
 
 from fastapi.testclient import TestClient
 from lucia_api.db import get_session
-from lucia_api.db.models import Game, Player
+from lucia_api.db.models import Analysis, Game, Player
 from lucia_api.main import app
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -348,3 +348,82 @@ async def test_the_listing_says_where_each_game_came_from(db_session: AsyncSessi
     assert response.status_code == 200
     platforms = {game["black_username"]: game["platform"] for game in response.json()}
     assert platforms == {"beto": "chesscom", "caro": "manual", "dani": "board"}
+
+
+async def test_list_games_says_with_which_engines_each_game_is_analyzed(
+    db_session: AsyncSession,
+) -> None:
+    """La columna «Análisis» de la lista (RF-5.3) sale de `analyses`, no de una
+    columna de `games`: una partida analizada con los dos motores los nombra a
+    los dos, y una sin analizar no nombra ninguno (RF-2.5)."""
+    analyzed = await _create_game(db_session, platform_id="g1", white="ana", black="beto")
+    untouched = await _create_game(db_session, platform_id="g2", white="ana", black="beto")
+    db_session.add_all(
+        [
+            Analysis(game_id=analyzed.id, engine="stockfish", depth=18, multipv=3, status="done"),
+            Analysis(game_id=analyzed.id, engine="lc0", depth=18, multipv=3, status="done"),
+        ]
+    )
+    await db_session.commit()
+
+    _override(db_session)
+    try:
+        with TestClient(app) as http:
+            response = http.get("/games")
+        assert response.status_code == 200
+        by_id = {game["id"]: game for game in response.json()}
+        assert by_id[analyzed.id]["analyzed_by_engines"] == ["lc0", "stockfish"]
+        assert by_id[analyzed.id]["has_analysis_in_progress"] is False
+        assert by_id[untouched.id]["analyzed_by_engines"] == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+async def test_list_games_separates_a_running_analysis_from_a_finished_one(
+    db_session: AsyncSession,
+) -> None:
+    """Una partida recién mandada a analizar todavía no tiene motor que enseñar,
+    y sin decirlo se leería como que no se mandó (RF-2.4)."""
+    queued = await _create_game(db_session, platform_id="g1", white="ana", black="beto")
+    failed = await _create_game(db_session, platform_id="g2", white="ana", black="beto")
+    db_session.add_all(
+        [
+            Analysis(game_id=queued.id, engine="stockfish", depth=18, multipv=3, status="running"),
+            Analysis(game_id=failed.id, engine="stockfish", depth=18, multipv=3, status="error"),
+        ]
+    )
+    await db_session.commit()
+
+    _override(db_session)
+    try:
+        with TestClient(app) as http:
+            response = http.get("/games")
+        assert response.status_code == 200
+        by_id = {game["id"]: game for game in response.json()}
+        assert by_id[queued.id]["has_analysis_in_progress"] is True
+        assert by_id[queued.id]["analyzed_by_engines"] == []
+        # Un análisis que falló no está en marcha ni cuenta como hecho: la
+        # partida se ofrece para volver a analizarla.
+        assert by_id[failed.id]["has_analysis_in_progress"] is False
+        assert by_id[failed.id]["analyzed_by_engines"] == []
+    finally:
+        app.dependency_overrides.clear()
+
+
+async def test_get_game_reports_its_analyses_too(db_session: AsyncSession) -> None:
+    """El detalle hereda los campos del resumen; si no se llenaran dirían que
+    la partida no tiene ningún análisis."""
+    game = await _create_game(db_session, platform_id="g1", white="ana", black="beto")
+    db_session.add(
+        Analysis(game_id=game.id, engine="stockfish", depth=18, multipv=3, status="done")
+    )
+    await db_session.commit()
+
+    _override(db_session)
+    try:
+        with TestClient(app) as http:
+            response = http.get(f"/games/{game.id}")
+        assert response.status_code == 200
+        assert response.json()["analyzed_by_engines"] == ["stockfish"]
+    finally:
+        app.dependency_overrides.clear()
